@@ -1,0 +1,27 @@
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
+const TOKEN_COOKIE = "wiki_token";
+
+export async function POST() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(TOKEN_COOKIE)?.value;
+
+  if (token) {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => undefined);
+  }
+
+  const response = NextResponse.json({ data: { loggedOut: true } });
+  response.cookies.set(TOKEN_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
+  return response;
+}

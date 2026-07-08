@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.env
+*.env.local
+*.env.*.local
+.DS_Store
+*.log
+pnpm-debug.log
+.pnpm-store/
+
+# AWS CDK
+cdk.out/
+infra/cdk.out/
+
+# Local dev
+.localstack/
+docker-volumes/
+
+# Generated from node_modules at install time
+apps/web/src/styles/heroui.css
