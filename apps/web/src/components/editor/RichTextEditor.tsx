@@ -13,6 +13,7 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import { useEffect, useRef } from "react";
 import { EditorToolbar } from "./EditorToolbar";
+import Underline from "@tiptap/extension-underline";
 
 const lowlight = createLowlight(common);
 
@@ -37,6 +38,7 @@ export function RichTextEditor({
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       Placeholder.configure({ placeholder }),
+      Underline,
       Image,
       Link.configure({ openOnClick: false }),
       Table.configure({ resizable: true }),

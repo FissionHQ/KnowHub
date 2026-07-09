@@ -3,10 +3,10 @@
 import type { Editor } from "@tiptap/react";
 import {
   Bold, Italic, Strikethrough, Code, Heading2, Heading3,
-  List, ListOrdered, Quote, Minus, Table, Undo, Redo,
-} from "lucide-react";
+  List, ListOrdered, Quote, Minus, Table, Image, Undo, Redo, UnderlineIcon, Pilcrow, SquareCode, LinkIcon} from "lucide-react";
 import { Tooltip } from "@heroui/react";
 import clsx from "clsx";
+import Link from "@tiptap/extension-link";
 
 interface Props { editor: Editor }
 
@@ -139,6 +139,40 @@ export function EditorToolbar({ editor }: Props) {
         label="Insert Table"
       >
         <Table size={14} />
+      </ToolBtn>
+      <ToolBtn
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        active={editor.isActive("underline")}
+        label="Underline"
+      >
+        <UnderlineIcon size={14} />
+      </ToolBtn>
+      <ToolBtn
+        onClick={() => editor.chain().focus().setParagraph().run()}
+        active={editor.isActive("paragraph")}
+        label="Paragraph"
+      >
+        <Pilcrow size={14} />
+      </ToolBtn>
+      <ToolBtn
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        active={editor.isActive("codeBlock")}
+        label="Code Block"
+      >
+        <SquareCode size={14} />
+      </ToolBtn>
+      <ToolBtn
+        onClick={() => {
+          const url = window.prompt("Enter URL");
+
+          if (!url) return;
+
+          editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+        }}
+        active={editor.isActive("link")}
+        label="Link"
+      >
+        <LinkIcon size={14} />
       </ToolBtn>
     </div>
   );
