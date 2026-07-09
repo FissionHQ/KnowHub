@@ -73,6 +73,8 @@ export interface Document {
   title: string;
   contentRef?: string;
   ownerId: string;
+  ownerName?: string;
+  lastEditedByName?: string;
   status: DocumentStatus;
   version: number;
   createdAt: Date;
@@ -94,6 +96,7 @@ export interface DocumentVersion {
   versionNumber: number;
   contentSnapshot: string;
   editedBy: string;
+  editedByName?: string;
   editedAt: Date;
 }
 

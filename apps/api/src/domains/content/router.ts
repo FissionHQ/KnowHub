@@ -126,8 +126,24 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
     const { documentId } = req.params;
 
     const rows = await db
-      .select()
+      .select({
+        id: documents.id,
+        orgId: documents.orgId,
+        spaceId: documents.spaceId,
+        parentId: documents.parentId,
+        type: documents.type,
+        title: documents.title,
+        contentRef: documents.contentRef,
+        ownerId: documents.ownerId,
+        ownerName: users.name,
+        status: documents.status,
+        version: documents.version,
+        tags: documents.tags,
+        createdAt: documents.createdAt,
+        updatedAt: documents.updatedAt,
+      })
       .from(documents)
+      .leftJoin(users, eq(documents.ownerId, users.id))
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
 
     if (!rows.length) throw new NotFoundError("Document");
@@ -140,7 +156,21 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
       required: "view",
     });
 
-    res.json({ data: doc });
+    const lastVersion = await db
+      .select({ editedByName: users.name })
+      .from(documentVersions)
+      .leftJoin(users, eq(documentVersions.editedBy, users.id))
+      .where(eq(documentVersions.documentId, documentId ?? ""))
+      .orderBy(desc(documentVersions.versionNumber))
+      .limit(1);
+
+    res.json({
+      data: {
+        ...doc,
+        ownerName: doc.ownerName ?? undefined,
+        lastEditedByName: lastVersion[0]?.editedByName ?? undefined,
+      },
+    });
   });
 
   // PATCH /documents/:documentId
@@ -248,12 +278,83 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
     });
 
     const versions = await db
-      .select()
+      .select({
+        id: documentVersions.id,
+        documentId: documentVersions.documentId,
+        versionNumber: documentVersions.versionNumber,
+        contentSnapshot: documentVersions.contentSnapshot,
+        editedBy: documentVersions.editedBy,
+        editedByName: users.name,
+        editedAt: documentVersions.editedAt,
+      })
       .from(documentVersions)
+      .leftJoin(users, eq(documentVersions.editedBy, users.id))
       .where(eq(documentVersions.documentId, documentId ?? ""))
       .orderBy(desc(documentVersions.versionNumber));
 
     res.json({ data: versions });
+  });
+
+  // POST /documents/:documentId/versions/:versionNumber/restore
+  router.post("/documents/:documentId/versions/:versionNumber/restore", async (req, res) => {
+    const { orgId, userRole, userId, groupIds } = req.tenant;
+    const { documentId, versionNumber } = req.params;
+
+    const rows = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+    if (!rows.length) throw new NotFoundError("Document");
+    const doc = rows[0]!;
+
+    await assertDocumentAccess({
+      db, userRole, userId, groupIds,
+      documentId: doc.id,
+      spaceId: doc.spaceId,
+      required: "edit",
+    });
+
+    const versionRows = await db
+      .select()
+      .from(documentVersions)
+      .where(
+        and(
+          eq(documentVersions.documentId, documentId ?? ""),
+          eq(documentVersions.versionNumber, parseInt(versionNumber ?? "0", 10)),
+        ),
+      );
+
+    if (!versionRows.length) throw new NotFoundError("Version");
+    const version = versionRows[0]!;
+
+    // Use max versionNumber from documentVersions to avoid unique constraint violations
+    const maxRows = await db
+      .select({ max: documentVersions.versionNumber })
+      .from(documentVersions)
+      .where(eq(documentVersions.documentId, documentId ?? ""))
+      .orderBy(desc(documentVersions.versionNumber))
+      .limit(1);
+
+    const newVersion = (maxRows[0]?.max ?? doc.version) + 1;
+
+    const updated = await db
+      .update(documents)
+      .set({ contentRef: version.contentSnapshot, version: newVersion, updatedAt: new Date() })
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
+      .returning();
+
+    await db.insert(documentVersions).values({
+      id: uuidv4(),
+      documentId: documentId ?? "",
+      versionNumber: newVersion,
+      contentSnapshot: version.contentSnapshot,
+      editedBy: userId,
+    });
+
+    await enqueueIndex(documentId ?? "", orgId, "upsert").catch(() => null);
+
+    res.json({ data: updated[0] });
   });
 
   async function loadDocument(orgId: string, documentId: string) {

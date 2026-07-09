@@ -8,6 +8,8 @@ import type { Document, Space } from "@wiki/types";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { PdfViewer } from "@/components/pdf/PdfViewer";
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
+import { VersionHistoryPanel } from "@/components/editor/VersionHistoryPanel";
+import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { Chip, Skeleton, Card, CardContent } from "@heroui/react";
 import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
@@ -61,6 +63,11 @@ export function DocumentView({ spaceId, docId }: Props) {
     [doc, docId, mutate],
   );
 
+  const handleRestore = useCallback((restoredContent: string) => {
+    setContent(restoredContent);
+    mutate();
+  }, [mutate]);
+
   if (!doc) {
     return (
       <div className="p-8 max-w-4xl mx-auto space-y-4">
@@ -102,7 +109,7 @@ export function DocumentView({ spaceId, docId }: Props) {
         <SaveIndicator status={saveStatus} />
       </div>
 
-      {/* Tags */}
+      {/* Tags (read-only summary — editable in PageMetadataPanel) */}
       {doc.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-5">
           {doc.tags.map((tag) => (
@@ -111,6 +118,14 @@ export function DocumentView({ spaceId, docId }: Props) {
             </Chip>
           ))}
         </div>
+      )}
+
+      {/* ED-5: Page metadata */}
+      <PageMetadataPanel doc={doc} onUpdate={(updated) => mutate(updated, false)} />
+
+      {/* ED-3: Version history */}
+      {doc.type === "page" && (
+        <VersionHistoryPanel documentId={docId} onRestore={handleRestore} />
       )}
 
       <DocumentPermissionsPanel documentId={docId} />

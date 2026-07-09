@@ -1,5 +1,6 @@
 import type {
   Document,
+  DocumentVersion,
   Space,
   Group,
   User,
@@ -118,9 +119,9 @@ export const documentsApi = {
   delete: (id: string) =>
     apiFetch<{ trashed: boolean }>(`${BASE}/documents/${id}`, { method: "DELETE" }),
   getVersions: (id: string) =>
-    apiFetch<{ id: string; versionNumber: number; editedAt: string }[]>(
-      `${BASE}/documents/${id}/versions`,
-    ),
+    apiFetch<DocumentVersion[]>(`${BASE}/documents/${id}/versions`),
+  restoreVersion: (id: string, versionNumber: number) =>
+    apiFetch<Document>(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, { method: "POST", body: "{}" }),
   listPermissions: (id: string) =>
     apiFetch<DocumentPermissionsResponse>(`${BASE}/documents/${id}/permissions`),
   setPermission: (id: string, body: SetDocumentPermissionBody) =>
