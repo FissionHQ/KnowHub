@@ -65,10 +65,8 @@ export function createApp(
 
   // ─── Authenticated routes ───────────────────────────────────────────────
   const auth = createAuthMiddleware({
-    userPoolId: env.COGNITO_USER_POOL_ID,
-    clientId: env.COGNITO_CLIENT_ID,
-    region: env.COGNITO_REGION,
-    devMode: env.NODE_ENV === "development",
+    jwtSecret: env.JWT_SECRET,
+    baseDomain: env.BASE_DOMAIN,
   });
 
   const tenantCtx = createTenantContextMiddleware(db, redis);

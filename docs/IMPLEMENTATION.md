@@ -46,7 +46,7 @@ Zod-validated environment variable schemas. Each app calls its parser at startup
 - `parseSearchEnv()` — Search service config (adds `SEARCH_PORT`)
 - `parseWorkerEnv()` — Worker config (same as base)
 
-All schemas share a base that covers: `DATABASE_URL`, `REDIS_URL`, AWS credentials, S3 bucket names, SQS queue URLs, Cognito pool IDs, `BASE_DOMAIN`, `JWT_SECRET`, `SES_FROM_ADDRESS`.
+All schemas share a base that covers: `DATABASE_URL`, `REDIS_URL`, AWS credentials, S3 bucket names, SQS queue URLs, `BASE_DOMAIN`, `JWT_SECRET`, `SES_FROM_ADDRESS`.
 
 ---
 
@@ -95,7 +95,7 @@ Express.js modular monolith. Entry point: `src/server.ts` → `src/app.ts`.
 | `express.json` | JSON body parsing, 2 MB limit |
 | `requestId` | Attaches `x-request-id` to every request |
 | `morgan` | HTTP access log via Winston |
-| `auth` | Verifies Cognito JWT (RS256); in dev accepts HS256 with `JWT_SECRET` |
+| `auth` | Verifies HS256 JWT signed with `JWT_SECRET` (Bearer header or `wiki_token` cookie) |
 | `tenantContext` | Sets Postgres RLS context; loads user's group IDs (Redis-cached, 30 s TTL) |
 
 ### Domain routers
@@ -272,6 +272,6 @@ The following areas were planned in the requirements but have no code yet:
 - **Trash / restore UI** — `status = trashed` is set by `DELETE /documents/:id`; no restore endpoint or UI
 - **Admin UI** — audit log and settings API endpoints exist; no frontend pages
 - **Phase 2 AI search** — `content_embedding` field is in the index mapping (1536-dim knn_vector); no embedding generation or vector query
-- **Cognito integration** — auth middleware supports Cognito RS256 JWTs; no user pool provisioning scripts or signup flow
+- **Email/password auth** — login, invite accept, and JWT issuance are implemented; production uses the same HS256 model as local (secure `JWT_SECRET`, HTTPS, httpOnly cookies)
 - **Document tree navigation** — `parentId` is in the schema; no API or UI for hierarchy browsing
 - **Audit log writes** — `audit_log` table exists; no middleware or service writes to it yet

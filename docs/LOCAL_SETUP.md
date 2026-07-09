@@ -28,7 +28,7 @@ The `postinstall` script in `apps/web` automatically copies the HeroUI styleshee
 cp .env.example .env
 ```
 
-Open `.env` and fill in the required values. For local development the defaults work for everything except Cognito — you can leave those blank and use the dev JWT mode instead (set `JWT_SECRET` to any string of 32+ characters).
+Open `.env` and fill in the required values. For local development the defaults work as-is — set `JWT_SECRET` to any string of 32+ characters.
 
 Key variables to check:
 
@@ -37,7 +37,7 @@ Key variables to check:
 | `DATABASE_URL` | `postgresql://wiki:wiki@localhost:5434/wiki` |
 | `REDIS_URL` | `redis://localhost:6380` |
 | `OPENSEARCH_URL` | `http://localhost:9200` |
-| `JWT_SECRET` | Set to any 32+ char string for dev mode |
+| `JWT_SECRET` | Set to any 32+ char string (same auth model in dev and production) |
 | `BASE_DOMAIN` | `localhost` |
 | `S3_ENDPOINT` | `http://localhost:4566` (LocalStack) |
 | `SQS_ENDPOINT` | `http://localhost:4566` (LocalStack) |
@@ -47,8 +47,6 @@ Key variables to check:
 | `SQS_PDF_QUEUE_URL` | `http://localhost:4566/000000000000/wiki-pdf-processing` |
 | `SQS_INDEX_QUEUE_URL` | `http://localhost:4566/000000000000/wiki-search-indexing` |
 | `SES_FROM_ADDRESS` | `noreply@localhost` |
-| `COGNITO_USER_POOL_ID` | Leave blank for dev mode |
-| `COGNITO_CLIENT_ID` | Leave blank for dev mode |
 
 ### 3. Start infrastructure
 

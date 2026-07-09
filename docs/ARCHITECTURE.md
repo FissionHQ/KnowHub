@@ -229,16 +229,18 @@ The `knn_vector` field is declared in the mapping from day one so Phase 2 AI sea
 
 ## Authentication
 
-JWTs are issued by AWS Cognito. Each organization has its own App Client. Claims in the token:
+Users sign in with email and password. The API verifies credentials against `users.password_hash`, then issues an HS256 JWT signed with `JWT_SECRET`. The same model is used in local development and production.
+
+Claims in the token:
 
 | Claim | Value |
 |-------|-------|
-| `sub` | Cognito user UUID (becomes `userId`) |
+| `sub` | User UUID |
 | `custom:org_id` | Organization UUID |
 | `custom:org_slug` | Organization subdomain slug |
 | `custom:role` | `admin` \| `member` \| `viewer` |
 
-The auth middleware uses `jose` to verify the signature against Cognito's JWKS endpoint. In development it also accepts HS256 tokens signed with `JWT_SECRET`, enabling local testing without a real Cognito pool.
+The auth middleware uses `jose` to verify the HS256 signature with `JWT_SECRET`. Tokens are accepted from the `Authorization: Bearer` header or the `wiki_token` httpOnly cookie set by the web BFF.
 
 ---
 
@@ -276,8 +278,7 @@ Key variables:
 |----------|---------|---------|
 | `DATABASE_URL` | api, search, worker | Primary PG connection |
 | `REDIS_URL` | api | ACL cache + pub/sub |
-| `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID` | api | JWT verification |
-| `JWT_SECRET` | api (dev), search | HS256 dev tokens |
+| `JWT_SECRET` | api, search | HS256 JWT signing and verification |
 | `BASE_DOMAIN` | api | Subdomain cross-check (e.g. `wiki.example.com`) |
 | `S3_QUARANTINE_BUCKET`, `S3_SERVED_BUCKET` | api, worker | Upload pipeline |
 | `SQS_PDF_QUEUE_URL`, `SQS_INDEX_QUEUE_URL` | api, worker | Async queues |
@@ -290,7 +291,7 @@ Key variables:
 ## Local development
 
 ```bash
-cp .env.example .env        # fill in Cognito pool IDs (or leave empty for dev-mode JWT)
+cp .env.example .env        # set JWT_SECRET (32+ chars) and other defaults
 pnpm install                # install all workspace dependencies
 docker compose up -d        # start Postgres, Redis, OpenSearch, LocalStack
 pnpm db:generate            # generate migration SQL from schema
