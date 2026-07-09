@@ -258,7 +258,7 @@ Re-run the postinstall copy step:
 ```bash
 pnpm install
 # or directly:
-cp apps/web/node_modules/@heroui/styles/dist/heroui.min.css apps/web/src/styles/heroui.css
+node apps/web/scripts/copy-heroui-styles.mjs
 ```
 
 **Worker not processing messages**
