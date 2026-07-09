@@ -1,14 +1,19 @@
 "use client";
 
+import { useRef } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Bold, Italic, Strikethrough, Code, Heading2, Heading3,
-  List, ListOrdered, Quote, Minus, Table, Image, Undo, Redo, UnderlineIcon, Pilcrow, SquareCode, LinkIcon} from "lucide-react";
+  List, ListOrdered, Quote, Minus, Table, Image, Undo, Redo,
+  UnderlineIcon, Pilcrow, SquareCode, LinkIcon,
+} from "lucide-react";
 import { Tooltip } from "@heroui/react";
 import clsx from "clsx";
-import Link from "@tiptap/extension-link";
 
-interface Props { editor: Editor }
+interface Props {
+  editor: Editor;
+  onInsertImage: (src: string) => void;
+}
 
 function ToolBtn({
   onClick,
@@ -45,9 +50,26 @@ function ToolBtn({
   );
 }
 
-export function EditorToolbar({ editor }: Props) {
+export function EditorToolbar({ editor, onInsertImage }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="flex items-center gap-0.5 flex-wrap px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => onInsertImage(reader.result as string);
+          reader.readAsDataURL(file);
+          e.target.value = "";
+        }}
+      />
+
       <ToolBtn onClick={() => editor.chain().focus().undo().run()} label="Undo">
         <Undo size={14} />
       </ToolBtn>
@@ -89,6 +111,13 @@ export function EditorToolbar({ editor }: Props) {
         <Italic size={14} />
       </ToolBtn>
       <ToolBtn
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        active={editor.isActive("underline")}
+        label="Underline"
+      >
+        <UnderlineIcon size={14} />
+      </ToolBtn>
+      <ToolBtn
         onClick={() => editor.chain().focus().toggleStrike().run()}
         active={editor.isActive("strike")}
         label="Strikethrough"
@@ -105,6 +134,13 @@ export function EditorToolbar({ editor }: Props) {
 
       <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
 
+      <ToolBtn
+        onClick={() => editor.chain().focus().setParagraph().run()}
+        active={editor.isActive("paragraph")}
+        label="Paragraph"
+      >
+        <Pilcrow size={14} />
+      </ToolBtn>
       <ToolBtn
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         active={editor.isActive("bulletList")}
@@ -127,6 +163,16 @@ export function EditorToolbar({ editor }: Props) {
         <Quote size={14} />
       </ToolBtn>
       <ToolBtn
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        active={editor.isActive("codeBlock")}
+        label="Code Block"
+      >
+        <SquareCode size={14} />
+      </ToolBtn>
+
+      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+
+      <ToolBtn
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
         label="Divider"
       >
@@ -141,38 +187,21 @@ export function EditorToolbar({ editor }: Props) {
         <Table size={14} />
       </ToolBtn>
       <ToolBtn
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
-        active={editor.isActive("underline")}
-        label="Underline"
-      >
-        <UnderlineIcon size={14} />
-      </ToolBtn>
-      <ToolBtn
-        onClick={() => editor.chain().focus().setParagraph().run()}
-        active={editor.isActive("paragraph")}
-        label="Paragraph"
-      >
-        <Pilcrow size={14} />
-      </ToolBtn>
-      <ToolBtn
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-        active={editor.isActive("codeBlock")}
-        label="Code Block"
-      >
-        <SquareCode size={14} />
-      </ToolBtn>
-      <ToolBtn
         onClick={() => {
           const url = window.prompt("Enter URL");
-
           if (!url) return;
-
           editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
         }}
         active={editor.isActive("link")}
         label="Link"
       >
         <LinkIcon size={14} />
+      </ToolBtn>
+      <ToolBtn
+        onClick={() => fileInputRef.current?.click()}
+        label="Image"
+      >
+        <Image size={14} />
       </ToolBtn>
     </div>
   );
