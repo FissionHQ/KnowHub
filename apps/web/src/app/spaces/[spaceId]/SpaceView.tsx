@@ -24,7 +24,7 @@ function DocRow({ doc, spaceId, depth = 0, allDocs }: { doc: Document; spaceId: 
                   : "p-1.5 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 shrink-0"
               }
             >
-              {doc.type === "pdf" ? <File size={16} /> : <FileText size={16} />}
+              {doc.type === "pdf" ? <File size={16} color="#f25011"/> : <FileText size={16} color="#f25011"/>}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate group-hover:text-violet-700 dark:group-hover:text-violet-300 transition-colors">

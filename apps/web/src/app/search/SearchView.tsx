@@ -58,7 +58,7 @@ export function SearchView() {
           variant="primary"
           size="md"
           isDisabled={loading || !query.trim()}
-          className="px-5 h-11"
+          className="px-5 h-11 !bg-[#f25011] hover:!bg-[#e0470f] active:!bg-[#cf400d] !text-white transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed"
         >
           {loading ? "Searching…" : "Search"}
         </Button>
