@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { documentsApi, attachmentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
@@ -10,12 +11,81 @@ import { PdfViewer } from "@/components/pdf/PdfViewer";
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
 import { VersionHistoryPanel } from "@/components/editor/VersionHistoryPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
-import { Chip, Skeleton, Card, CardContent } from "@heroui/react";
-import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
+import { CheckCircle2, Clock, AlertCircle, Plus, FileText, Globe, PenLine } from "lucide-react";
 
 type SaveStatus = "saved" | "saving" | "unsaved";
 
 interface Props { spaceId: string; docId: string }
+
+function SubPagesSection({ spaceId, docId }: Props) {
+  const router = useRouter();
+  const { data: children = [], mutate } = useSWR<Document[]>(
+    `doc:${docId}:children`,
+    () => documentsApi.listChildren(docId),
+  );
+  const [creating, setCreating] = useState(false);
+
+  async function handleNewSubPage() {
+    setCreating(true);
+    try {
+      const doc = await documentsApi.create({
+        spaceId,
+        parentId: docId,
+        type: "page",
+        title: "Untitled",
+        content: "",
+      });
+      mutate();
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="mt-8 border-t border-zinc-200 dark:border-zinc-700 pt-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wide">
+          Sub-pages
+        </h2>
+        <Button
+          variant="secondary"
+          size="sm"
+          isLoading={creating}
+          onPress={handleNewSubPage}
+          className="flex items-center gap-1.5"
+        >
+          <Plus size={13} />
+          New Sub-page
+        </Button>
+      </div>
+      {children.length === 0 ? (
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">No sub-pages yet.</p>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {children.map((child) => (
+            <Link
+              key={child.id}
+              href={`/spaces/${spaceId}/docs/${child.id}`}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group"
+            >
+              <FileText size={14} className="text-violet-500 shrink-0" />
+              <span className="text-sm text-zinc-700 dark:text-zinc-300 group-hover:text-violet-700 dark:group-hover:text-violet-300 truncate">
+                {child.title}
+              </span>
+              {child.status === "draft" && (
+                <Chip size="sm" color="warning" variant="soft" className="text-xs ml-auto shrink-0">
+                  Draft
+                </Chip>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function DocumentView({ spaceId, docId }: Props) {
   const { data: doc, mutate } = useSWR<Document>(
@@ -26,10 +96,17 @@ export function DocumentView({ spaceId, docId }: Props) {
     `space:${spaceId}`,
     () => spacesApi.get(spaceId),
   );
+  const { data: parentDoc } = useSWR<Document>(
+    doc?.parentId ? `doc:${doc.parentId}` : null,
+    () => documentsApi.get(doc!.parentId!),
+  );
 
   const [content, setContent] = useState<string>("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [title, setTitle] = useState<string>("");
+
+  useEffect(() => { if (doc?.title) setTitle(doc.title); }, [doc?.id]);
 
   if (doc && content === "" && doc.contentRef) {
     setContent(doc.contentRef);
@@ -98,6 +175,17 @@ export function DocumentView({ spaceId, docId }: Props) {
           {space?.name ?? "Space"}
         </Link>
         <span aria-hidden="true">/</span>
+        {parentDoc && (
+          <>
+            <Link
+              href={`/spaces/${spaceId}/docs/${parentDoc.id}`}
+              className="text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate max-w-[160px]"
+            >
+              {parentDoc.title}
+            </Link>
+            <span aria-hidden="true">/</span>
+          </>
+        )}
         <span className="text-zinc-700 dark:text-zinc-200 font-medium truncate max-w-[240px]">
           {doc.title}
         </span>
@@ -105,8 +193,29 @@ export function DocumentView({ spaceId, docId }: Props) {
 
       {/* Title + save status */}
       <div className="flex items-start gap-3 mb-4">
-        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex-1 leading-tight">{doc.title}</h1>
-        <SaveIndicator status={saveStatus} />
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={async () => {
+            const trimmed = title.trim();
+            if (!trimmed || trimmed === doc.title) return;
+            setSaveStatus("saving");
+            try {
+              const updated = await documentsApi.update(docId, { title: trimmed });
+              mutate(updated, false);
+              setSaveStatus("saved");
+            } catch {
+              setSaveStatus("unsaved");
+            }
+          }}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex-1 leading-tight bg-transparent border-none outline-none focus:ring-0 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 w-full"
+          placeholder="Untitled"
+        />
+        <div className="flex items-center gap-2 shrink-0 mt-1">
+          <SaveIndicator status={saveStatus} />
+          <PublishButton doc={doc} onUpdate={(updated) => mutate(updated, false)} />
+        </div>
       </div>
 
       {/* Tags (read-only summary — editable in PageMetadataPanel) */}
@@ -130,6 +239,9 @@ export function DocumentView({ spaceId, docId }: Props) {
 
       <DocumentPermissionsPanel documentId={docId} />
 
+      {/* Sub-pages */}
+      {doc.type === "page" && <SubPagesSection spaceId={spaceId} docId={docId} />}
+
       {/* Content */}
       {doc.type === "pdf" ? (
         pdfUrl ? (
@@ -152,6 +264,36 @@ export function DocumentView({ spaceId, docId }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function PublishButton({ doc, onUpdate }: { doc: Document; onUpdate: (updated: Document) => void }) {
+  const [loading, setLoading] = useState(false);
+  const isPublished = doc.status === "published";
+
+  async function toggle() {
+    setLoading(true);
+    try {
+      const updated = await documentsApi.update(doc.id, {
+        status: isPublished ? "draft" : "published",
+      });
+      onUpdate(updated);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant={isPublished ? "secondary" : "primary"}
+      isLoading={loading}
+      onPress={toggle}
+      className="flex items-center gap-1.5"
+    >
+      {isPublished ? <PenLine size={12} /> : <Globe size={12} />}
+      {isPublished ? "Unpublish" : "Publish"}
+    </Button>
   );
 }
 

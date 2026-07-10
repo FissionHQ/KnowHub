@@ -257,6 +257,34 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
     res.json({ data: { trashed: true } });
   });
 
+  // GET /documents/:documentId/children
+  router.get("/documents/:documentId/children", async (req, res) => {
+    const { orgId, userRole, userId, groupIds } = req.tenant;
+    const { documentId } = req.params;
+
+    const rows = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+    if (!rows.length) throw new NotFoundError("Document");
+    const doc = rows[0]!;
+
+    await assertDocumentAccess({
+      db, userRole, userId, groupIds,
+      documentId: doc.id,
+      spaceId: doc.spaceId,
+      required: "view",
+    });
+
+    const children = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.parentId, documentId ?? ""), eq(documents.orgId, orgId)));
+
+    res.json({ data: children });
+  });
+
   // GET /documents/:documentId/versions
   router.get("/documents/:documentId/versions", async (req, res) => {
     const { orgId, userRole, userId, groupIds } = req.tenant;

@@ -122,6 +122,8 @@ export const documentsApi = {
     apiFetch<DocumentVersion[]>(`${BASE}/documents/${id}/versions`),
   restoreVersion: (id: string, versionNumber: number) =>
     apiFetch<Document>(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, { method: "POST", body: "{}" }),
+  listChildren: (id: string) =>
+    apiFetch<Document[]>(`${BASE}/documents/${id}/children`),
   listPermissions: (id: string) =>
     apiFetch<DocumentPermissionsResponse>(`${BASE}/documents/${id}/permissions`),
   setPermission: (id: string, body: SetDocumentPermissionBody) =>
