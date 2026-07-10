@@ -77,7 +77,7 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
         className="w-full flex items-center justify-between px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
       >
         <span className="flex items-center gap-2">
-          <Shield size={14} className="text-violet-600 dark:text-violet-400" />
+          <Shield size={14} className="text-[#f25011]" />
           Document permissions
         </span>
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -232,7 +232,7 @@ function AccessBadge({ level }: { level: AccessLevel }) {
     <span
       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
         isEdit
-          ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+          ? "bg-orange-50 text-[#f25011] dark:bg-orange-950/30"
           : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
       }`}
     >

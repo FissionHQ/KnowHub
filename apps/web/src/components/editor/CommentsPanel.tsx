@@ -165,7 +165,7 @@ function MentionComposer({
                       : "text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700",
                   )}
                 >
-                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-white text-[9px] font-bold shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-[#f25011] flex items-center justify-center text-white text-[9px] font-bold shrink-0">
                     {u.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 text-left">
@@ -238,7 +238,7 @@ function CommentItem({
     <div className="px-4 py-3 group">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+          <div className="w-6 h-6 rounded-full bg-[#f25011] flex items-center justify-center text-white text-[10px] font-bold shrink-0">
             {comment.authorName.charAt(0).toUpperCase()}
           </div>
           <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200 truncate">{comment.authorName}</span>
@@ -252,7 +252,7 @@ function CommentItem({
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           {onReply && (
-            <button type="button" onClick={onReply} title="Reply" className="p-1 rounded text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400">
+            <button type="button" onClick={onReply} title="Reply" className="p-1 rounded text-zinc-400 hover:text-[#f25011]">
               <Reply size={12} />
             </button>
           )}

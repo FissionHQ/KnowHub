@@ -117,7 +117,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
               onChange={(e) => setRenameValue(e.target.value)}
               onBlur={handleRenameSubmit}
               onKeyDown={(e) => e.key === "Escape" && setRenaming(false)}
-              className="w-full text-[13px] px-1 py-0.5 rounded border border-violet-400 outline-none bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100"
+              className="w-full text-[13px] px-1 py-0.5 rounded border border-[#f25011] outline-none bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100"
             />
           </form>
         ) : (

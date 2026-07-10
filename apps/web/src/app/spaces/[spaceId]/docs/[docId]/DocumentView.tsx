@@ -109,13 +109,13 @@ export function DocumentView({ spaceId, docId }: Props) {
           aria-label="Breadcrumb"
           className="text-xs text-zinc-400 mb-5 flex items-center gap-1.5 flex-wrap"
         >
-          <Link href="/spaces" className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
+          <Link href="/spaces" className="hover:text-[#f25011] transition-colors">
             Spaces
           </Link>
           <span aria-hidden="true">/</span>
           <Link
             href={`/spaces/${spaceId}`}
-            className="text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate max-w-[160px]"
+            className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] transition-colors truncate max-w-[160px]"
           >
             {space?.name ?? "Space"}
           </Link>
@@ -124,7 +124,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             <>
               <Link
                 href={`/spaces/${spaceId}/docs/${parentDoc.id}`}
-                className="text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate max-w-[160px]"
+                className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] transition-colors truncate max-w-[160px]"
               >
                 {parentDoc.title}
               </Link>

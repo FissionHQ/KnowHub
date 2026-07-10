@@ -50,7 +50,7 @@ export function SearchView() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search pages and PDFs…"
-            className="w-full h-11 pl-9 pr-4 text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-colors"
+            className="w-full h-11 pl-9 pr-4 text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f25011]/30 focus:border-[#f25011] transition-colors"
           />
         </div>
         <Button
@@ -96,20 +96,20 @@ export function SearchView() {
                   className="group text-left w-full"
                   onClick={() => router.push(`/spaces/${hit.spaceId}/docs/${hit.documentId}`)}
                 >
-                  <Card className="transition-all hover:shadow-sm hover:border-violet-200 dark:hover:border-violet-800 cursor-pointer">
+                  <Card className="transition-all hover:shadow-sm hover:border-[#f25011]/30 cursor-pointer">
                     <CardContent className="flex flex-row items-start gap-3 p-4">
                       <div
                         className={
                           hit.type === "pdf"
                             ? "p-2 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0 mt-0.5"
-                            : "p-2 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5"
+                            : "p-2 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-[#f25011] shrink-0 mt-0.5"
                         }
                       >
                         {hit.type === "pdf" ? <File size={15} /> : <FileText size={15} />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
-                          className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm group-hover:text-violet-700 dark:group-hover:text-violet-300 transition-colors"
+                          className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm group-hover:text-[#f25011] transition-colors"
                           dangerouslySetInnerHTML={{
                             __html: hit.highlight.title?.[0] ?? hit.title,
                           }}

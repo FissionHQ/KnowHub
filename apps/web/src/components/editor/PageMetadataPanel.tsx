@@ -102,13 +102,13 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTag()}
                   placeholder="Add tag…"
-                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-0.5 bg-transparent outline-none focus:border-violet-400 w-24"
+                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-0.5 bg-transparent outline-none focus:border-[#f25011] w-24"
                 />
                 <button
                   type="button"
                   onClick={addTag}
                   disabled={saving || !tagInput.trim()}
-                  className="text-violet-600 hover:text-violet-800 disabled:opacity-40"
+                  className="text-[#f25011] hover:text-[#e0470f] disabled:opacity-40"
                 >
                   <Plus size={13} />
                 </button>
