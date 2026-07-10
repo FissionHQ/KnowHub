@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ne } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
 import {
@@ -70,7 +70,13 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
     const rows = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.spaceId, spaceId ?? ""), eq(documents.orgId, req.tenant.orgId)));
+      .where(
+        and(
+          eq(documents.spaceId, spaceId ?? ""),
+          eq(documents.orgId, req.tenant.orgId),
+          ne(documents.status, "trashed"),
+        ),
+      );
 
     res.json({ data: rows });
   });

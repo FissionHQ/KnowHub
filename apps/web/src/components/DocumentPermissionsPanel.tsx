@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { documentsApi, groupsApi, usersApi } from "@/lib/api";
 import type { AccessLevel } from "@wiki/types";
-import { Button, Card, CardContent } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { ChevronDown, ChevronUp, Shield, Users, User } from "lucide-react";
 
 interface Props {
@@ -70,26 +70,21 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
   }
 
   return (
-    <Card className="mb-5 border-violet-100 dark:border-violet-900/40">
-      <CardContent className="p-0">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-        >
-          <span className="inline-flex items-center gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">
-            <Shield size={16} className="text-violet-600 dark:text-violet-400" />
-            Document permissions
-          </span>
-          {expanded ? (
-            <ChevronUp size={16} className="text-zinc-400 shrink-0" />
-          ) : (
-            <ChevronDown size={16} className="text-zinc-400 shrink-0" />
-          )}
-        </button>
+    <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden mb-4">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Shield size={14} className="text-violet-600 dark:text-violet-400" />
+          Document permissions
+        </span>
+        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
 
-        {expanded && (
-          <div className="px-4 pb-4 space-y-5 border-t border-zinc-100 dark:border-zinc-800">
+      {expanded && (
+        <div className="px-4 pb-4 space-y-5 border-t border-zinc-100 dark:border-zinc-800">
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
                 Inherited from space
@@ -214,20 +209,20 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                   <option value="view">View access</option>
                   <option value="edit">Edit access</option>
                 </select>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  isDisabled={submitting || !selectedGranteeId}
-                >
-                  Add override
-                </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isDisabled={submitting || !selectedGranteeId}
+                className="!bg-[#f25011] hover:!bg-[#e0470f] active:!bg-[#cf400d] !text-white transition-colors duration-200 cursor-pointer disabled:cursor-not-allowed"
+              >
+                Add override
+              </Button>
               </form>
             </section>
           </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
 

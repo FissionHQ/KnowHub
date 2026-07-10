@@ -72,7 +72,7 @@ export function VersionHistoryPanel({ documentId, onRestore }: Props) {
                 type="button"
                 onClick={() => handleRestore(v)}
                 disabled={restoring === v.id}
-                className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800 disabled:opacity-50"
+                className="flex items-center gap-1 text-xs text-[#f25011] hover:text-[#e0470f] cursor-pointer disabled:opacity-50"
               >
                 {restoring === v.id ? (
                   <Spinner size="sm" />

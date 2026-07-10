@@ -105,7 +105,11 @@ export function SpaceView({ spaceId }: Props) {
           </>
         )}
         <Link href={`/spaces/${spaceId}/new` as never}>
-          <Button variant="primary" size="sm" className="shrink-0 flex items-center gap-1.5">
+          <Button
+            variant="primary"
+            size="sm"
+            className="shrink-0 flex items-center gap-1.5 bg-[#f25011] text-white hover:bg-[#e0470f] active:bg-[#cf400d] transition-colors duration-200"
+          >
             <Plus size={14} />
             New Page
           </Button>
