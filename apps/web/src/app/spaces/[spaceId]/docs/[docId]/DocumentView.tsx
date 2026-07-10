@@ -202,6 +202,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               content={content}
               onChange={setContent}
               onAutoSave={handleAutoSave}
+              title={doc.title}
             />
           </div>
         )}

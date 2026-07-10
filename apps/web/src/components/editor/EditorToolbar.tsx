@@ -5,14 +5,16 @@ import type { Editor } from "@tiptap/react";
 import {
   Bold, Italic, Strikethrough, Code, Heading2, Heading3,
   List, ListOrdered, Quote, Minus, Table, Image, Undo, Redo,
-  UnderlineIcon, Pilcrow, SquareCode, LinkIcon,
+  UnderlineIcon, Pilcrow, SquareCode, LinkIcon, Download, Upload,
 } from "lucide-react";
 import { Tooltip } from "@heroui/react";
 import clsx from "clsx";
+import { htmlToMarkdown, markdownToHtml, downloadFile, readTextFile } from "@/lib/markdownUtils";
 
 interface Props {
   editor: Editor;
   onInsertImage: (src: string) => void;
+  title?: string;
 }
 
 function ToolBtn({
@@ -50,11 +52,28 @@ function ToolBtn({
   );
 }
 
-export function EditorToolbar({ editor, onInsertImage }: Props) {
+export function EditorToolbar({ editor, onInsertImage, title = "document" }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mdImportRef = useRef<HTMLInputElement>(null);
+
+  async function handleExportMarkdown() {
+    const md = htmlToMarkdown(editor.getHTML());
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    downloadFile(`${slug}.md`, md, "text/markdown");
+  }
+
+  async function handleImportMarkdown(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const md = await readTextFile(file);
+    const html = await markdownToHtml(md);
+    editor.commands.setContent(html);
+    e.target.value = "";
+  }
 
   return (
     <div className="flex items-center gap-0.5 flex-wrap px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900">
+      {/* hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
@@ -68,6 +87,13 @@ export function EditorToolbar({ editor, onInsertImage }: Props) {
           reader.readAsDataURL(file);
           e.target.value = "";
         }}
+      />
+      <input
+        ref={mdImportRef}
+        type="file"
+        accept=".md,.markdown,text/markdown,text/plain"
+        className="hidden"
+        onChange={handleImportMarkdown}
       />
 
       <ToolBtn onClick={() => editor.chain().focus().undo().run()} label="Undo">
@@ -202,6 +228,15 @@ export function EditorToolbar({ editor, onInsertImage }: Props) {
         label="Image"
       >
         <Image size={14} />
+      </ToolBtn>
+
+      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+
+      <ToolBtn onClick={() => mdImportRef.current?.click()} label="Import Markdown">
+        <Upload size={14} />
+      </ToolBtn>
+      <ToolBtn onClick={handleExportMarkdown} label="Export Markdown">
+        <Download size={14} />
       </ToolBtn>
     </div>
   );

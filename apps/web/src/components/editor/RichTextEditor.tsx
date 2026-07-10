@@ -23,6 +23,7 @@ interface Props {
   placeholder?: string;
   autoSaveMs?: number;
   onAutoSave?: (content: string) => void;
+  title?: string;
 }
 
 export function RichTextEditor({
@@ -31,6 +32,7 @@ export function RichTextEditor({
   placeholder = "Start writing...",
   autoSaveMs = 3000,
   onAutoSave,
+  title = "document",
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -81,7 +83,7 @@ export function RichTextEditor({
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <EditorToolbar editor={editor} onInsertImage={handleInsertImage} />
+      <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} />
       <EditorContent
         editor={editor}
         className="prose prose-sm max-w-none"
