@@ -1,6 +1,7 @@
 import type {
   Document,
   DocumentVersion,
+  Comment,
   Space,
   Group,
   User,
@@ -9,6 +10,8 @@ import type {
   SearchResponse,
   CreateDocumentBody,
   UpdateDocumentBody,
+  CreateCommentBody,
+  UpdateCommentBody,
   CreateSpaceBody,
   InviteUserBody,
   UpdateOrgSettingsBody,
@@ -232,6 +235,27 @@ export const adminApi = {
       `${BASE}/admin/audit-log${query ? `?${query}` : ""}`,
     );
   },
+};
+
+// ─── Comments ─────────────────────────────────────────────────────────────
+
+export const commentsApi = {
+  list: (documentId: string) =>
+    apiFetch<Comment[]>(`${BASE}/documents/${documentId}/comments`),
+  create: (documentId: string, body: CreateCommentBody) =>
+    apiFetch<Comment>(`${BASE}/documents/${documentId}/comments`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  update: (documentId: string, commentId: string, body: UpdateCommentBody) =>
+    apiFetch<Comment>(`${BASE}/documents/${documentId}/comments/${commentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  delete: (documentId: string, commentId: string) =>
+    apiFetch<{ deleted: boolean }>(`${BASE}/documents/${documentId}/comments/${commentId}`, {
+      method: "DELETE",
+    }),
 };
 
 // ─── Search ───────────────────────────────────────────────────────────────

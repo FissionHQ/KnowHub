@@ -4,15 +4,16 @@ import { useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { documentsApi, attachmentsApi, spacesApi } from "@/lib/api";
-import type { Document, Space } from "@wiki/types";
+import { documentsApi, attachmentsApi, spacesApi, commentsApi } from "@/lib/api";
+import type { Document, Space, Comment } from "@wiki/types";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { PdfViewer } from "@/components/pdf/PdfViewer";
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
 import { VersionHistoryPanel } from "@/components/editor/VersionHistoryPanel";
+import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
-import { CheckCircle2, Clock, AlertCircle, Globe, PenLine } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, Globe, PenLine, MessageSquare, ChevronRight } from "lucide-react";
 
 type SaveStatus = "saved" | "saving" | "unsaved";
 
@@ -37,6 +38,14 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
+  const [commentsOpen, setCommentsOpen] = useState(false);
+
+  // Fetch comment count for the badge
+  const { data: comments = [] } = useSWR<Comment[]>(
+    `comments:${docId}`,
+    () => commentsApi.list(docId),
+  );
+  const commentCount = comments.filter((c) => !c.parentId).length;
 
   useEffect(() => { if (doc?.title) setTitle(doc.title); }, [doc?.id]);
 
@@ -154,16 +163,25 @@ export function DocumentView({ spaceId, docId }: Props) {
           </div>
         </div>
 
-        {/* Tags */}
-        {doc.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-5">
-            {doc.tags.map((tag) => (
-              <Chip key={tag} size="sm" variant="secondary" className="text-xs">
-                {tag}
-              </Chip>
-            ))}
-          </div>
-        )}
+        {/* Tags + comment badge row */}
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
+          {doc.tags.length > 0 && doc.tags.map((tag) => (
+            <Chip key={tag} size="sm" variant="secondary" className="text-xs">{tag}</Chip>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCommentsOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1 rounded-full transition-colors"
+          >
+            <MessageSquare size={12} />
+            <span>Comments</span>
+            {commentCount > 0 && (
+              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {commentCount}
+              </span>
+            )}
+          </button>
+        </div>
 
         {/* Content */}
         <DocumentPermissionsPanel documentId={docId} />
@@ -195,7 +213,46 @@ export function DocumentView({ spaceId, docId }: Props) {
         {doc.type === "page" && (
           <VersionHistoryPanel documentId={docId} onRestore={handleRestore} />
         )}
-        {/* <DocumentPermissionsPanel documentId={docId} /> */}
+      </div>
+
+      {/* ── Comments drawer ── */}
+      {commentsOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setCommentsOpen(false)}
+        />
+      )}
+      <div
+        className={`fixed top-0 right-0 h-full w-[48%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+          commentsOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {/* Drawer header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
+          <button
+            type="button"
+            onClick={() => setCommentsOpen(false)}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Close comments"
+          >
+            <ChevronRight size={18} />
+          </button>
+          <div className="flex items-center gap-2">
+            <MessageSquare size={15} className="text-[#f25011]" />
+            <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">Comments</span>
+            {commentCount > 0 && (
+              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {commentCount}
+              </span>
+            )}
+          </div>
+          <span className="ml-auto text-xs text-zinc-400 truncate max-w-[160px]">{doc.title}</span>
+        </div>
+
+        {/* Drawer body — scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          <CommentsPanel documentId={docId} defaultOpen />
+        </div>
       </div>
     </div>
   );

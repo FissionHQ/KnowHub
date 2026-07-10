@@ -233,6 +233,33 @@ export const attachments = pgTable(
   ],
 );
 
+// ─── Document Comments ───────────────────────────────────────────────────
+
+export const documentComments = pgTable(
+  "document_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id"),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    resolved: boolean("resolved").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("doc_comments_document_id_idx").on(t.documentId),
+    index("doc_comments_parent_id_idx").on(t.parentId),
+  ],
+);
+
 // ─── Audit Log ────────────────────────────────────────────────────────────
 
 export const auditLog = pgTable(

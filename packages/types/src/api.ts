@@ -111,6 +111,16 @@ export interface UpdateDocumentBody {
   status?: DocumentStatus;
 }
 
+export interface CreateCommentBody {
+  body: string;
+  parentId?: string;
+}
+
+export interface UpdateCommentBody {
+  body?: string;
+  resolved?: boolean;
+}
+
 export interface SetDocumentPermissionBody {
   groupId?: string;
   userId?: string;

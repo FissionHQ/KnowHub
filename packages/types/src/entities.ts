@@ -100,6 +100,19 @@ export interface DocumentVersion {
   editedAt: Date;
 }
 
+export interface Comment {
+  id: string;
+  documentId: string;
+  parentId?: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  resolved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  replies?: Comment[];
+}
+
 export interface Attachment {
   id: string;
   orgId: string;
