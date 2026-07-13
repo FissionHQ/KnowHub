@@ -3,6 +3,14 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   typedRoutes: false,
+  webpack: (config) => {
+    config.resolve.alias.canvas = false;
+    return config;
+  },
+  experimental: {
+    // Required for PDF/file uploads through /api/* rewrites (default is 10MB)
+    middlewareClientMaxBodySize: "100mb",
+  },
   async rewrites() {
     return [
       {

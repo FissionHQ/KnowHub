@@ -1,4 +1,5 @@
 import type { AccessLevel, DocumentStatus, DocumentType, UserRole } from "./enums.js";
+import type { Document } from "./entities.js";
 
 export interface ApiSuccess<T> {
   data: T;
@@ -109,6 +110,10 @@ export interface UpdateDocumentBody {
   content?: string;
   tags?: string[];
   status?: DocumentStatus;
+}
+
+export interface DocumentListItem extends Document {
+  canDelete: boolean;
 }
 
 export interface SetDocumentPermissionBody {
@@ -236,5 +241,69 @@ export interface UploadInitResponse {
 export interface AttachmentStatusResponse {
   attachmentId: string;
   scanStatus: string;
+  ready: boolean;
   s3Key?: string;
+}
+
+export interface AttachmentListItem {
+  id: string;
+  documentId: string;
+  originalName: string;
+  fileType: string;
+  sizeBytes: number;
+  scanStatus: string;
+  s3Key?: string;
+  createdAt: string;
+}
+
+// ─── Platform / Tenant ────────────────────────────────────────────────────
+
+export interface ProvisionOrgBody {
+  subdomain: string;
+  name: string;
+  adminEmail: string;
+  adminName: string;
+  adminPassword: string;
+  branding?: { logoUrl?: string; primaryColor?: string };
+}
+
+export interface ProvisionOrgResponse {
+  orgId: string;
+  subdomain: string;
+  adminUserId: string;
+  defaultGroupId: string;
+  loginUrl: string;
+}
+
+export interface PlatformOrgSummary {
+  id: string;
+  subdomain: string;
+  name: string;
+  status: string;
+  branding: Record<string, unknown>;
+  createdAt: string;
+  loginUrl: string;
+  domains: Array<{ id: string; domain: string; isPrimary: boolean }>;
+}
+
+export interface TenantResolveResponse {
+  resolved: boolean;
+  devMode?: boolean;
+  defaultSlug?: string;
+  orgId?: string;
+  slug?: string;
+  name?: string;
+  branding?: Record<string, unknown>;
+  status?: string;
+}
+
+export interface DocxImportResponse {
+  document: import("./entities.js").Document;
+  warnings: string[];
+}
+
+export interface PdfUploadResponse {
+  documentId: string;
+  attachmentId: string;
+  status: string;
 }

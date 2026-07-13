@@ -22,10 +22,24 @@ import type {
   InviteDetails,
   PendingInvite,
   GroupMembershipEntry,
+  PlatformOrgSummary,
+  ProvisionOrgBody,
+  ProvisionOrgResponse,
+  TenantResolveResponse,
+  DocxImportResponse,
+  PdfUploadResponse,
+  AttachmentListItem,
+  DocumentListItem,
 } from "@wiki/types";
 
 const BASE = "/api";
 const SEARCH_BASE = "/search";
+
+function platformHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const key = sessionStorage.getItem("platform_admin_key");
+  return key ? { "X-Platform-Key": key } : {};
+}
 
 function devAuthHeaders(): Record<string, string> {
   const token = process.env["NEXT_PUBLIC_DEV_JWT"];
@@ -109,7 +123,7 @@ export const spacesApi = {
 
 export const documentsApi = {
   listBySpace: (spaceId: string) =>
-    apiFetch<Document[]>(`${BASE}/spaces/${spaceId}/documents`),
+    apiFetch<DocumentListItem[]>(`${BASE}/spaces/${spaceId}/documents`),
   get: (id: string) => apiFetch<Document>(`${BASE}/documents/${id}`),
   create: (body: CreateDocumentBody) =>
     apiFetch<Document>(`${BASE}/documents`, { method: "POST", body: JSON.stringify(body) }),
@@ -121,6 +135,10 @@ export const documentsApi = {
     apiFetch<{ id: string; versionNumber: number; editedAt: string }[]>(
       `${BASE}/documents/${id}/versions`,
     ),
+  restoreVersion: (id: string, versionNumber: number) =>
+    apiFetch<Document>(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, {
+      method: "POST",
+    }),
   listPermissions: (id: string) =>
     apiFetch<DocumentPermissionsResponse>(`${BASE}/documents/${id}/permissions`),
   setPermission: (id: string, body: SetDocumentPermissionBody) =>
@@ -154,6 +172,38 @@ export const attachmentsApi = {
     });
     if (!res.ok) throw new Error("Upload failed");
     const json = await res.json() as { data: { attachmentId: string } };
+    return json.data;
+  },
+  uploadPdf: async (spaceId: string, file: File, title?: string): Promise<PdfUploadResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    if (title) form.append("title", title);
+    const res = await fetch(`${BASE}/spaces/${spaceId}/upload/pdf`, {
+      method: "POST",
+      body: form,
+      headers: devAuthHeaders(),
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: "Upload failed" } }));
+      throw new Error((err as { error?: { message?: string } }).error?.message ?? "Upload failed");
+    }
+    const json = await res.json() as { data: PdfUploadResponse };
+    return json.data;
+  },
+  listByDocument: (documentId: string) =>
+    apiFetch<AttachmentListItem[]>(`${BASE}/documents/${documentId}/attachments`),
+  uploadImage: async (file: File): Promise<{ url: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/upload/image`, {
+      method: "POST",
+      body: form,
+      headers: devAuthHeaders(),
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Image upload failed");
+    const json = await res.json() as { data: { url: string } };
     return json.data;
   },
   getStatus: (attachmentId: string) =>
@@ -229,6 +279,61 @@ export const adminApi = {
       `${BASE}/admin/audit-log${query ? `?${query}` : ""}`,
     );
   },
+};
+
+// ─── Import ───────────────────────────────────────────────────────────────
+
+export const importApi = {
+  uploadDocx: async (spaceId: string, file: File, title?: string): Promise<DocxImportResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    if (title) form.append("title", title);
+    const res = await fetch(`${BASE}/spaces/${spaceId}/import/docx`, {
+      method: "POST",
+      body: form,
+      headers: devAuthHeaders(),
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: "Import failed" } }));
+      throw new Error((err as { error?: { message?: string } }).error?.message ?? "Import failed");
+    }
+    const json = await res.json() as { data: DocxImportResponse };
+    return json.data;
+  },
+};
+
+// ─── Platform admin ───────────────────────────────────────────────────────
+
+export const platformApi = {
+  listOrgs: () =>
+    apiFetch<PlatformOrgSummary[]>(`${BASE}/platform/organizations`, {
+      headers: platformHeaders(),
+    }),
+  provisionOrg: (body: ProvisionOrgBody) =>
+    apiFetch<ProvisionOrgResponse>(`${BASE}/platform/organizations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: platformHeaders(),
+    }),
+  addDomain: (orgId: string, domain: string, isPrimary?: boolean) =>
+    apiFetch<{ id: string; domain: string }>(`${BASE}/platform/organizations/${orgId}/domains`, {
+      method: "POST",
+      body: JSON.stringify({ domain, isPrimary }),
+      headers: platformHeaders(),
+    }),
+  updateOrg: (orgId: string, body: { name?: string; status?: "active" | "suspended" }) =>
+    apiFetch<Organization>(`${BASE}/platform/organizations/${orgId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      headers: platformHeaders(),
+    }),
+};
+
+// ─── Tenant ───────────────────────────────────────────────────────────────
+
+export const tenantApi = {
+  resolve: () => apiFetch<TenantResolveResponse>(`${BASE}/tenant/resolve`),
 };
 
 // ─── Search ───────────────────────────────────────────────────────────────

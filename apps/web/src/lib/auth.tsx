@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { authApi, usersApi } from "@/lib/api";
+import { getOrgSlugForLogin } from "@/lib/tenant";
 import type { User } from "@wiki/types";
 
 interface AuthContextValue {
@@ -42,7 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const result = await authApi.login({ email, password });
+    const orgSlug = getOrgSlugForLogin();
+    const result = await authApi.login({
+      email,
+      password,
+      ...(orgSlug ? { orgSlug } : {}),
+    });
     setUser(result.user);
   }, []);
 

@@ -28,6 +28,8 @@ export const scanStatusEnum = pgEnum("scan_status", [
   "error",
 ]);
 
+export const orgStatusEnum = pgEnum("org_status", ["active", "suspended"]);
+
 // ─── Organizations ────────────────────────────────────────────────────────
 
 export const organizations = pgTable("organizations", {
@@ -35,12 +37,29 @@ export const organizations = pgTable("organizations", {
   subdomain: text("subdomain").notNull().unique(),
   name: text("name").notNull(),
   branding: jsonb("branding").notNull().default({}),
+  status: orgStatusEnum("status").notNull().default("active"),
   maxFileSizeBytes: bigint("max_file_size_bytes", { mode: "number" })
     .notNull()
     .default(104_857_600), // 100 MB
   trashRetentionDays: integer("trash_retention_days").notNull().default(30),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const organizationDomains = pgTable(
+  "organization_domains",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    domain: text("domain").notNull().unique(),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("organization_domains_org_id_idx").on(t.orgId),
+  ],
+);
 
 // ─── Users ────────────────────────────────────────────────────────────────
 

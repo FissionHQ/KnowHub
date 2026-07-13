@@ -15,6 +15,7 @@ import {
 import { hashPassword, verifyPassword, validatePasswordPolicy } from "../../lib/password.js";
 import { issueAccessToken } from "../../lib/jwt.js";
 import { recordAudit } from "../../lib/audit.js";
+import { resolveOrgByHost } from "../../lib/resolveOrgByHost.js";
 
 const TOKEN_COOKIE = "wiki_token";
 const TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -68,12 +69,16 @@ export function createAuthRouter(db: Db, env: ApiEnv, _ses: SESClient): Router {
     if (!body.success) throw new ValidationError(body.error.flatten());
 
     const host = req.headers.host ?? "";
-    const subdomain = host.split(".")[0] ?? "";
-    const orgSlug =
+    const resolved = await resolveOrgByHost(db, host, env.BASE_DOMAIN);
+    const orgSlug: string =
       body.data.orgSlug ??
-      (env.BASE_DOMAIN !== "localhost" && subdomain ? subdomain : "acme");
+      resolved?.subdomain ??
+      (env.BASE_DOMAIN !== "localhost" ? (host.split(".")[0] ?? "acme") : "acme");
 
     const org = await resolveOrgBySlug(db, orgSlug);
+    if (org.status === "suspended") {
+      throw new ForbiddenError("Organization is suspended");
+    }
     const rows = await db
       .select()
       .from(users)

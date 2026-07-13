@@ -161,7 +161,7 @@ Worker: PdfProcessor
   ├── Fetch from quarantine
   ├── Validate %PDF magic bytes
   ├── pdf-parse → extract text
-  ├── CopyObject → wiki-served (KMS encrypted)
+  ├── CopyObject → wiki-served (AES256 encrypted)
   ├── DeleteObject from quarantine
   ├── UPDATE attachments SET scanStatus = 'clean', s3Key = '...'
   └── Index in OpenSearch

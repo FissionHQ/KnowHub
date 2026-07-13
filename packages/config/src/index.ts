@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** S3 SSE-S3 algorithm used for all uploads and copies. No KMS. */
+export const S3_SERVER_SIDE_ENCRYPTION = "AES256" as const;
+
 const baseSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().url(),
@@ -19,6 +22,7 @@ const baseSchema = z.object({
   JWT_SECRET: z.string().min(32),
   SES_ENDPOINT: z.string().url().optional(),
   SES_FROM_ADDRESS: z.string().email(),
+  PLATFORM_ADMIN_SECRET: z.string().min(16).optional(),
 });
 
 const apiSchema = baseSchema.extend({

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { tenantApi } from "@/lib/api";
 import { Button, Card, CardContent } from "@heroui/react";
 import { Zap } from "lucide-react";
 
@@ -11,10 +12,17 @@ export default function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/spaces";
 
+  const [orgName, setOrgName] = useState("KnowHub");
   const [email, setEmail] = useState("admin@localhost");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    tenantApi.resolve().then((res) => {
+      if (res.name) setOrgName(res.name);
+    }).catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,7 +47,7 @@ export default function LoginForm() {
               <Zap size={18} className="text-white" strokeWidth={2.5} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">FissionDocs</h1>
+              <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{orgName}</h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">Sign in to your organization</p>
             </div>
           </div>

@@ -11,6 +11,7 @@ import type { Db } from "@wiki/db";
 import { attachments, documents, documentPermissions, spacePermissions, groupMemberships } from "@wiki/db";
 import type { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { INDEX_NAME } from "./opensearch.js";
+import { S3_SERVER_SIDE_ENCRYPTION } from "@wiki/config";
 import type { PdfProcessingMessage, SearchIndexDocument } from "@wiki/types";
 import { logger } from "./logger.js";
 
@@ -76,32 +77,40 @@ export class PdfProcessor {
 
     // Promote to served bucket
     const servedKey = `served/${orgId}/${attachmentId}/${originalName}`;
-    await this.s3.send(
-      new CopyObjectCommand({
-        CopySource: `${this.opts.quarantineBucket}/${quarantineKey}`,
-        Bucket: this.opts.servedBucket,
-        Key: servedKey,
-        ServerSideEncryption: "aws:kms",
-        MetadataDirective: "REPLACE",
-        Metadata: { "x-org-id": orgId, "x-attachment-id": attachmentId },
-      }),
-    );
+    try {
+      await this.s3.send(
+        new CopyObjectCommand({
+          CopySource: `${this.opts.quarantineBucket}/${quarantineKey}`,
+          Bucket: this.opts.servedBucket,
+          Key: servedKey,
+          ServerSideEncryption: S3_SERVER_SIDE_ENCRYPTION,
+          MetadataDirective: "REPLACE",
+          Metadata: { "x-org-id": orgId, "x-attachment-id": attachmentId },
+        }),
+      );
 
-    // Delete from quarantine
-    await this.s3.send(
-      new DeleteObjectCommand({ Bucket: this.opts.quarantineBucket, Key: quarantineKey }),
-    );
+      // Delete from quarantine
+      await this.s3.send(
+        new DeleteObjectCommand({ Bucket: this.opts.quarantineBucket, Key: quarantineKey }),
+      );
 
-    // Update attachment record
-    await this.db
-      .update(attachments)
-      .set({ scanStatus: "clean", s3Key: servedKey })
-      .where(eq(attachments.id, attachmentId));
+      // Update attachment record
+      await this.db
+        .update(attachments)
+        .set({ scanStatus: "clean", s3Key: servedKey })
+        .where(eq(attachments.id, attachmentId));
 
-    // Index in OpenSearch
-    await this.indexDocument(documentId, orgId, pdfText, attachmentId);
+      // Index in OpenSearch
+      await this.indexDocument(documentId, orgId, pdfText, attachmentId);
 
-    logger.info("PDF processed successfully", { attachmentId, servedKey });
+      logger.info("PDF processed successfully", { attachmentId, servedKey });
+    } catch (err) {
+      logger.error("PDF promotion/indexing failed — marking as error", { attachmentId, err });
+      await this.db
+        .update(attachments)
+        .set({ scanStatus: "error" })
+        .where(eq(attachments.id, attachmentId));
+    }
   }
 
   private async indexDocument(

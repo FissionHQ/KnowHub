@@ -2,11 +2,13 @@
 
 import type { Editor } from "@tiptap/react";
 import {
-  Bold, Italic, Strikethrough, Code, Heading2, Heading3,
+  Bold, Italic, Strikethrough, Underline, Code, Heading1, Heading2, Heading3,
   List, ListOrdered, Quote, Minus, Table, Undo, Redo,
 } from "lucide-react";
 import { Tooltip } from "@heroui/react";
 import clsx from "clsx";
+import { LinkPopover } from "./LinkPopover";
+import { ImageUploadButton } from "./ImageUploadButton";
 
 interface Props { editor: Editor }
 
@@ -58,6 +60,13 @@ export function EditorToolbar({ editor }: Props) {
       <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
 
       <ToolBtn
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        active={editor.isActive("heading", { level: 1 })}
+        label="Heading 1"
+      >
+        <Heading1 size={14} />
+      </ToolBtn>
+      <ToolBtn
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         active={editor.isActive("heading", { level: 2 })}
         label="Heading 2"
@@ -87,6 +96,13 @@ export function EditorToolbar({ editor }: Props) {
         label="Italic"
       >
         <Italic size={14} />
+      </ToolBtn>
+      <ToolBtn
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        active={editor.isActive("underline")}
+        label="Underline"
+      >
+        <Underline size={14} />
       </ToolBtn>
       <ToolBtn
         onClick={() => editor.chain().focus().toggleStrike().run()}
@@ -140,6 +156,11 @@ export function EditorToolbar({ editor }: Props) {
       >
         <Table size={14} />
       </ToolBtn>
+
+      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+
+      <LinkPopover editor={editor} />
+      <ImageUploadButton editor={editor} />
     </div>
   );
 }

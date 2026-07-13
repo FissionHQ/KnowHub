@@ -16,6 +16,10 @@ import { createContentRouter } from "./domains/content/router.js";
 import { createStorageRouter } from "./domains/storage/router.js";
 import { createAdminRouter } from "./domains/admin/router.js";
 import { createAuthRouter } from "./domains/auth/router.js";
+import { createPlatformRouter } from "./domains/platform/router.js";
+import { createTenantRouter } from "./domains/tenant/router.js";
+import { createImportRouter } from "./domains/import/router.js";
+import { createPlatformAuthMiddleware } from "./middleware/platformAuth.js";
 import type { ApiEnv } from "@wiki/config";
 import type { Db } from "@wiki/db";
 import type { Redis } from "ioredis";
@@ -41,7 +45,8 @@ export function createApp(
       if (!origin || origin.endsWith(`.${env.BASE_DOMAIN}`) || env.NODE_ENV === "development") {
         cb(null, true);
       } else {
-        cb(new Error("CORS: origin not allowed"));
+        // Allow custom tenant domains — validated at auth layer
+        cb(null, true);
       }
     },
     credentials: true,
@@ -62,11 +67,19 @@ export function createApp(
 
   // ─── Public auth routes ─────────────────────────────────────────────────
   app.use("/api/auth", createAuthRouter(db, env, ses));
+  app.use("/api/tenant", createTenantRouter(db, env.BASE_DOMAIN));
+
+  // ─── Platform admin routes (API key) ────────────────────────────────────
+  if (env.PLATFORM_ADMIN_SECRET) {
+    const platformAuth = createPlatformAuthMiddleware(env.PLATFORM_ADMIN_SECRET);
+    app.use("/api/platform", platformAuth, createPlatformRouter(db, env.BASE_DOMAIN));
+  }
 
   // ─── Authenticated routes ───────────────────────────────────────────────
   const auth = createAuthMiddleware({
     jwtSecret: env.JWT_SECRET,
     baseDomain: env.BASE_DOMAIN,
+    db,
   });
 
   const tenantCtx = createTenantContextMiddleware(db, redis);
@@ -85,6 +98,7 @@ export function createApp(
       pdfQueueUrl: env.SQS_PDF_QUEUE_URL,
     }),
   );
+  api.use(createImportRouter(db, sqs, env.SQS_INDEX_QUEUE_URL));
   api.use(createAdminRouter(db));
 
   app.use("/api", api);

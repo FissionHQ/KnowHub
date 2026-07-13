@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import * as jose from "jose";
+import type { Db } from "@wiki/db";
 import { UnauthorizedError } from "../lib/errors.js";
+import { resolveOrgByHost, extractSubdomainFromHost } from "../lib/resolveOrgByHost.js";
 import type { TenantContext, UserRole } from "@wiki/types";
 
 declare global {
@@ -14,6 +16,7 @@ declare global {
 export function createAuthMiddleware(opts: {
   jwtSecret: string;
   baseDomain: string;
+  db: Db;
 }) {
   const secret = new TextEncoder().encode(opts.jwtSecret);
 
@@ -33,7 +36,7 @@ export function createAuthMiddleware(opts: {
 
     try {
       const { payload } = await jose.jwtVerify(token, secret);
-      req.tenant = extractTenantContext(payload, req, opts.baseDomain);
+      req.tenant = await extractTenantContext(payload, req, opts.baseDomain, opts.db);
       next();
     } catch {
       throw new UnauthorizedError("Invalid or expired token");
@@ -41,11 +44,12 @@ export function createAuthMiddleware(opts: {
   };
 }
 
-function extractTenantContext(
+async function extractTenantContext(
   payload: jose.JWTPayload,
   req: Request,
   baseDomain: string,
-): TenantContext {
+  db: Db,
+): Promise<TenantContext> {
   const orgId = payload["custom:org_id"] as string;
   const orgSlug = payload["custom:org_slug"] as string;
   const userId = payload["sub"] as string;
@@ -55,12 +59,18 @@ function extractTenantContext(
     throw new UnauthorizedError("Token missing required claims");
   }
 
-  // Verify subdomain matches token — prevents cross-org token reuse in multi-tenant hosting
   const host = req.headers.host ?? "";
-  const subdomain = host.split(".")[0] ?? "";
+  const resolved = await resolveOrgByHost(db, host, baseDomain);
+  const subdomain = extractSubdomainFromHost(host, baseDomain);
 
-  if (baseDomain !== "localhost" && subdomain !== orgSlug) {
-    throw new UnauthorizedError("Token org mismatch");
+  if (baseDomain !== "localhost") {
+    if (resolved) {
+      if (resolved.subdomain !== orgSlug || resolved.id !== orgId) {
+        throw new UnauthorizedError("Token org mismatch");
+      }
+    } else if (subdomain && subdomain !== orgSlug) {
+      throw new UnauthorizedError("Token org mismatch");
+    }
   }
 
   return {
@@ -68,6 +78,6 @@ function extractTenantContext(
     orgSlug,
     userId,
     userRole: role,
-    groupIds: [], // Populated by tenantContext middleware after DB lookup
+    groupIds: [],
   };
 }

@@ -181,7 +181,7 @@ Triggered by `PDF_PROCESSING` messages:
 2. Fetches file from quarantine S3 bucket
 3. Validates PDF magic bytes (`%PDF` header check — basic malformed-file rejection)
 4. Extracts text via `pdf-parse` (continues with empty body on extraction failure)
-5. Copies file to served bucket with KMS encryption; deletes from quarantine
+5. Copies file to served bucket with AES256 encryption; deletes from quarantine
 6. Sets `scanStatus = clean`, updates `s3Key`
 7. Builds `SearchIndexDocument` (resolves ACL from space + document permissions) and indexes in OpenSearch
 

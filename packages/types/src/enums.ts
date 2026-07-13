@@ -23,6 +23,7 @@ export type AuditAction =
   | "space.delete"
   | "space.permission_change"
   | "document.create"
+  | "document.import"
   | "document.update"
   | "document.delete"
   | "document.restore"

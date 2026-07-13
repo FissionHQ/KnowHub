@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ne } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
 import {
@@ -11,8 +11,8 @@ import {
   groups,
   users,
 } from "@wiki/db";
-import { ValidationError, NotFoundError } from "../../lib/errors.js";
-import { assertDocumentAccess, assertSpaceAccess } from "../access/permissionResolver.js";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../lib/errors.js";
+import { assertDocumentAccess, assertSpaceAccess, canDeleteDocument } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
 import type { SQSClient } from "@aws-sdk/client-sqs";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
@@ -21,6 +21,7 @@ import type { SearchIndexMessage } from "@wiki/types";
 const createDocSchema = z.object({
   spaceId: z.string().uuid(),
   parentId: z.string().uuid().optional(),
+  type: z.enum(["page", "pdf"]).default("page"),
   title: z.string().min(1).max(500),
   content: z.string().default(""),
   tags: z.array(z.string()).default([]),
@@ -70,9 +71,30 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
     const rows = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.spaceId, spaceId ?? ""), eq(documents.orgId, req.tenant.orgId)));
+      .where(
+        and(
+          eq(documents.spaceId, spaceId ?? ""),
+          eq(documents.orgId, req.tenant.orgId),
+          ne(documents.status, "trashed"),
+        ),
+      );
 
-    res.json({ data: rows });
+    const data = await Promise.all(
+      rows.map(async (doc) => ({
+        ...doc,
+        canDelete: await canDeleteDocument({
+          db,
+          userRole,
+          userId,
+          groupIds,
+          documentId: doc.id,
+          spaceId: doc.spaceId,
+          ownerId: doc.ownerId,
+        }),
+      })),
+    );
+
+    res.json({ data });
   });
 
   // POST /documents
@@ -96,9 +118,9 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
         orgId,
         spaceId: body.data.spaceId,
         parentId: body.data.parentId ?? null,
-        type: "page",
+        type: body.data.type,
         title: body.data.title,
-        contentRef: body.data.content,
+        contentRef: body.data.type === "page" ? body.data.content : null,
         ownerId: userId,
         status: "draft",
         version: 1,
@@ -106,14 +128,16 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
       })
       .returning();
 
-    // Save initial version
-    await db.insert(documentVersions).values({
-      id: uuidv4(),
-      documentId: docId,
-      versionNumber: 1,
-      contentSnapshot: body.data.content,
-      editedBy: userId,
-    });
+    // Save initial version for page documents
+    if (body.data.type === "page") {
+      await db.insert(documentVersions).values({
+        id: uuidv4(),
+        documentId: docId,
+        versionNumber: 1,
+        contentSnapshot: body.data.content,
+        editedBy: userId,
+      });
+    }
 
     await enqueueIndex(docId, orgId, "upsert");
 
@@ -210,12 +234,20 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
     if (!rows.length) throw new NotFoundError("Document");
     const doc = rows[0]!;
 
-    await assertDocumentAccess({
-      db, userRole, userId, groupIds,
-      documentId: doc.id,
-      spaceId: doc.spaceId,
-      required: "edit",
-    });
+    const allowed =
+      userRole === "admin" ||
+      doc.ownerId === userId ||
+      await canDeleteDocument({
+        db,
+        userRole,
+        userId,
+        groupIds,
+        documentId: doc.id,
+        spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
+      });
+
+    if (!allowed) throw new ForbiddenError();
 
     await db
       .update(documents)
@@ -254,6 +286,56 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
       .orderBy(desc(documentVersions.versionNumber));
 
     res.json({ data: versions });
+  });
+
+  // POST /documents/:documentId/versions/:versionNumber/restore
+  router.post("/documents/:documentId/versions/:versionNumber/restore", async (req, res) => {
+    const { orgId, userRole, userId, groupIds } = req.tenant;
+    const { documentId, versionNumber } = req.params;
+    const versionNum = parseInt(versionNumber ?? "", 10);
+    if (isNaN(versionNum)) throw new ValidationError("Invalid version number");
+
+    const doc = await loadDocument(orgId, documentId ?? "");
+    await assertDocumentAccess({
+      db, userRole, userId, groupIds,
+      documentId: doc.id,
+      spaceId: doc.spaceId,
+      required: "edit",
+    });
+
+    const versionRows = await db
+      .select()
+      .from(documentVersions)
+      .where(
+        and(
+          eq(documentVersions.documentId, documentId ?? ""),
+          eq(documentVersions.versionNumber, versionNum),
+        ),
+      );
+    if (!versionRows.length) throw new NotFoundError("Version");
+    const snapshot = versionRows[0]!;
+
+    const newVersion = doc.version + 1;
+    const updated = await db
+      .update(documents)
+      .set({
+        contentRef: snapshot.contentSnapshot,
+        version: newVersion,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
+      .returning();
+
+    await db.insert(documentVersions).values({
+      id: uuidv4(),
+      documentId: documentId ?? "",
+      versionNumber: newVersion,
+      contentSnapshot: snapshot.contentSnapshot,
+      editedBy: userId,
+    });
+
+    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    res.json({ data: updated[0] });
   });
 
   async function loadDocument(orgId: string, documentId: string) {

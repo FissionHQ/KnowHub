@@ -1,20 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { documentsApi, spacesApi } from "@/lib/api";
-import type { Document, Space } from "@wiki/types";
-import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
-import { FileText, Plus, File } from "lucide-react";
+import type { DocumentListItem, Space } from "@wiki/types";
+import { Button, Card, CardContent, Skeleton, Separator } from "@heroui/react";
+import { FileText, Plus, Upload, FileInput } from "lucide-react";
+import { PdfUploadModal } from "@/components/pdf/PdfUploadDropzone";
+import { DocxImportModal } from "@/components/import/DocxImportModal";
+import { DocumentListRow } from "@/components/documents/DocumentListRow";
 
 interface Props { spaceId: string }
 
 export function SpaceView({ spaceId }: Props) {
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [docxModalOpen, setDocxModalOpen] = useState(false);
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceId}`,
     () => spacesApi.get(spaceId),
   );
-  const { data: docs = [], isLoading: docsLoading } = useSWR<Document[]>(
+  const { data: docs = [], isLoading: docsLoading, mutate: mutateDocs } = useSWR<DocumentListItem[]>(
     `space:${spaceId}:docs`,
     () => documentsApi.listBySpace(spaceId),
   );
@@ -46,12 +52,22 @@ export function SpaceView({ spaceId }: Props) {
             </div>
           </>
         )}
-        <Link href={`/spaces/${spaceId}/new` as never}>
-          <Button variant="primary" size="sm" className="shrink-0 flex items-center gap-1.5">
-            <Plus size={14} />
-            New Page
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="secondary" size="sm" className="flex items-center gap-1.5" onClick={() => setPdfModalOpen(true)}>
+            <Upload size={14} />
+            Upload PDF
           </Button>
-        </Link>
+          <Button variant="secondary" size="sm" className="flex items-center gap-1.5" onClick={() => setDocxModalOpen(true)}>
+            <FileInput size={14} />
+            Import DOCX
+          </Button>
+          <Link href={`/spaces/${spaceId}/new` as never}>
+            <Button variant="primary" size="sm" className="flex items-center gap-1.5">
+              <Plus size={14} />
+              New Page
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Separator className="mb-6" />
@@ -79,48 +95,17 @@ export function SpaceView({ spaceId }: Props) {
       ) : (
         <div className="flex flex-col gap-1.5">
           {docs.map((doc) => (
-            <Link key={doc.id} href={`/spaces/${spaceId}/docs/${doc.id}`} className="group block">
-              <Card className="transition-all hover:shadow-sm hover:border-zinc-300 dark:hover:border-zinc-600 cursor-pointer">
-                <CardContent className="flex flex-row items-center gap-3 px-4 py-3">
-                  <div
-                    className={
-                      doc.type === "pdf"
-                        ? "p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
-                        : "p-1.5 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 shrink-0"
-                    }
-                  >
-                    {doc.type === "pdf" ? <File size={16} /> : <FileText size={16} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate group-hover:text-violet-700 dark:group-hover:text-violet-300 transition-colors">
-                      {doc.title}
-                    </p>
-                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
-                      {new Date(doc.updatedAt).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {doc.tags.slice(0, 2).map((tag) => (
-                      <Chip key={tag} size="sm" variant="secondary" className="text-xs">
-                        {tag}
-                      </Chip>
-                    ))}
-                    {doc.status === "draft" && (
-                      <Chip size="sm" color="warning" variant="soft" className="text-xs">
-                        Draft
-                      </Chip>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+            <DocumentListRow
+              key={doc.id}
+              doc={doc}
+              spaceId={spaceId}
+              onDeleted={() => mutateDocs()}
+            />
           ))}
         </div>
       )}
+      <PdfUploadModal spaceId={spaceId} open={pdfModalOpen} onClose={() => setPdfModalOpen(false)} />
+      <DocxImportModal spaceId={spaceId} open={docxModalOpen} onClose={() => setDocxModalOpen(false)} />
     </div>
   );
 }

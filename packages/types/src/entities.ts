@@ -8,13 +8,24 @@ import type {
   UserStatus,
 } from "./enums.js";
 
+export type OrgStatus = "active" | "suspended";
+
 export interface Organization {
   id: string;
   subdomain: string;
   name: string;
   branding: OrgBranding;
+  status?: OrgStatus;
   maxFileSizeBytes: number;
   trashRetentionDays: number;
+  createdAt: Date;
+}
+
+export interface OrganizationDomain {
+  id: string;
+  orgId: string;
+  domain: string;
+  isPrimary: boolean;
   createdAt: Date;
 }
 
