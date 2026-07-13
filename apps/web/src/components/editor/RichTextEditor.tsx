@@ -14,6 +14,7 @@ import { common, createLowlight } from "lowlight";
 import { useEffect, useRef, useCallback } from "react";
 import { EditorToolbar } from "./EditorToolbar";
 import Underline from "@tiptap/extension-underline";
+import { FileEmbedExtension } from "./FileEmbedExtension";
 
 const lowlight = createLowlight(common);
 
@@ -24,6 +25,7 @@ interface Props {
   autoSaveMs?: number;
   onAutoSave?: (content: string) => void;
   title?: string;
+  documentId?: string;
 }
 
 export function RichTextEditor({
@@ -33,6 +35,7 @@ export function RichTextEditor({
   autoSaveMs = 3000,
   onAutoSave,
   title = "document",
+  documentId,
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -48,6 +51,7 @@ export function RichTextEditor({
       TableCell,
       TableHeader,
       CodeBlockLowlight.configure({ lowlight }),
+      FileEmbedExtension,
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -83,7 +87,7 @@ export function RichTextEditor({
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} />
+      <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} documentId={documentId} />
       <EditorContent
         editor={editor}
         className="prose prose-sm max-w-none"

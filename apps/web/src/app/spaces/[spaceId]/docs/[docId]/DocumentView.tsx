@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { documentsApi, attachmentsApi, spacesApi, commentsApi } from "@/lib/api";
 import type { Document, Space, Comment } from "@wiki/types";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
-import { PdfViewer } from "@/components/pdf/PdfViewer";
+import dynamic from "next/dynamic";
+const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer").then(m => ({ default: m.PdfViewer })), { ssr: false });
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
 import { VersionHistoryPanel } from "@/components/editor/VersionHistoryPanel";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
@@ -203,6 +204,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               onChange={setContent}
               onAutoSave={handleAutoSave}
               title={doc.title}
+              documentId={docId}
             />
           </div>
         )}

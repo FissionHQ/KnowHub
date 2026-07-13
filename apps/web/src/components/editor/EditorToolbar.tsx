@@ -6,15 +6,19 @@ import {
   Bold, Italic, Strikethrough, Code, Heading2, Heading3,
   List, ListOrdered, Quote, Minus, Table, Image, Undo, Redo,
   UnderlineIcon, Pilcrow, SquareCode, LinkIcon, Download, Upload,
+  Paperclip,
 } from "lucide-react";
 import { Tooltip } from "@heroui/react";
 import clsx from "clsx";
 import { htmlToMarkdown, markdownToHtml, downloadFile, readTextFile } from "@/lib/markdownUtils";
+import { attachmentsApi } from "@/lib/api";
+import type { FileEmbedAttributes } from "./FileEmbedExtension";
 
 interface Props {
   editor: Editor;
   onInsertImage: (src: string) => void;
   title?: string;
+  documentId?: string;
 }
 
 function ToolBtn({
@@ -52,9 +56,10 @@ function ToolBtn({
   );
 }
 
-export function EditorToolbar({ editor, onInsertImage, title = "document" }: Props) {
+export function EditorToolbar({ editor, onInsertImage, title = "document", documentId }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mdImportRef = useRef<HTMLInputElement>(null);
+  const fileUploadRef = useRef<HTMLInputElement>(null);
 
   async function handleExportMarkdown() {
     const md = htmlToMarkdown(editor.getHTML());
@@ -68,6 +73,25 @@ export function EditorToolbar({ editor, onInsertImage, title = "document" }: Pro
     const md = await readTextFile(file);
     const html = await markdownToHtml(md);
     editor.commands.setContent(html);
+    e.target.value = "";
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !documentId) return;
+    try {
+      const { attachmentId } = await attachmentsApi.upload(documentId, file);
+      const attrs: FileEmbedAttributes = {
+        attachmentId,
+        fileName: file.name,
+        fileType: file.type || "application/octet-stream",
+        fileSize: file.size,
+      };
+      (editor.commands as unknown as Record<string, (attrs: FileEmbedAttributes) => boolean>).insertFileEmbed(attrs);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      alert(`Upload failed: ${message}`);
+    }
     e.target.value = "";
   }
 
@@ -94,6 +118,12 @@ export function EditorToolbar({ editor, onInsertImage, title = "document" }: Pro
         accept=".md,.markdown,text/markdown,text/plain"
         className="hidden"
         onChange={handleImportMarkdown}
+      />
+      <input
+        ref={fileUploadRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileUpload}
       />
 
       <ToolBtn onClick={() => editor.chain().focus().undo().run()} label="Undo">
@@ -228,6 +258,12 @@ export function EditorToolbar({ editor, onInsertImage, title = "document" }: Pro
         label="Image"
       >
         <Image size={14} />
+      </ToolBtn>
+      <ToolBtn
+        onClick={() => fileUploadRef.current?.click()}
+        label="Attach File"
+      >
+        <Paperclip size={14} />
       </ToolBtn>
 
       <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
