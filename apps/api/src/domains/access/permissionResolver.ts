@@ -78,6 +78,25 @@ function satisfies(granted: AccessLevel, required: AccessLevel): boolean {
 }
 
 /** True if user is admin, document owner, or has edit access on the document/space. */
+export async function canEditDocument(
+  opts: PermissionCheck & {
+    documentId: string;
+    spaceId: string;
+    ownerId: string;
+  },
+): Promise<boolean> {
+  if (opts.userRole === "admin") return true;
+  if (opts.ownerId === opts.userId) return true;
+
+  try {
+    await assertDocumentAccess({ ...opts, required: "edit" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** True if user is admin, document owner, or has edit access on the document/space. */
 export async function canDeleteDocument(
   opts: PermissionCheck & {
     documentId: string;

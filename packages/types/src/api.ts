@@ -114,6 +114,12 @@ export interface UpdateDocumentBody {
 
 export interface DocumentListItem extends Document {
   canDelete: boolean;
+  canEdit: boolean;
+  ownerName: string;
+  ownerEmail: string;
+  attachmentScanStatus: string | null;
+  fileSizeBytes: number | null;
+  fileType: string | null;
 }
 
 export interface SetDocumentPermissionBody {

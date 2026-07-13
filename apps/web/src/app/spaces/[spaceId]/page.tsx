@@ -11,7 +11,7 @@ export default async function SpacePage({ params }: Props) {
     <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950">
       <Sidebar />
       <main
-        className="flex-1 overflow-y-auto"
+        className="flex-1 min-h-0 overflow-hidden flex flex-col"
         style={{ marginLeft: "var(--sidebar-width)" }}
       >
         <SpaceView spaceId={spaceId} />

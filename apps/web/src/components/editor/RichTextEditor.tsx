@@ -13,6 +13,7 @@ import TableHeader from "@tiptap/extension-table-header";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import { useEffect, useRef } from "react";
+import clsx from "clsx";
 import { EditorToolbar } from "./EditorToolbar";
 
 const lowlight = createLowlight(common);
@@ -23,6 +24,7 @@ interface Props {
   placeholder?: string;
   autoSaveMs?: number;
   onAutoSave?: (content: string) => void;
+  variant?: "default" | "embedded";
 }
 
 export function RichTextEditor({
@@ -31,6 +33,7 @@ export function RichTextEditor({
   placeholder = "Start writing...",
   autoSaveMs = 3000,
   onAutoSave,
+  variant = "default",
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -75,10 +78,30 @@ export function RichTextEditor({
 
   if (!editor) return null;
 
+  const isEmbedded = variant === "embedded";
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <EditorToolbar editor={editor} />
-      <EditorContent editor={editor} className="prose prose-sm max-w-none" />
+    <div
+      className={clsx(
+        isEmbedded
+          ? "flex flex-col"
+          : "border border-gray-200 rounded-lg overflow-hidden",
+      )}
+    >
+      <div
+        className={clsx(
+          isEmbedded && "shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950",
+        )}
+      >
+        <EditorToolbar editor={editor} />
+      </div>
+      <EditorContent
+        editor={editor}
+        className={clsx(
+          "prose prose-sm dark:prose-invert max-w-none",
+          isEmbedded && "px-1 py-3 [&_.ProseMirror]:min-h-[8rem] [&_.ProseMirror]:outline-none",
+        )}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc, ne } from "drizzle-orm";
+import { eq, and, desc, ne, inArray } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
 import {
@@ -10,9 +10,10 @@ import {
   spacePermissions,
   groups,
   users,
+  attachments,
 } from "@wiki/db";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../lib/errors.js";
-import { assertDocumentAccess, assertSpaceAccess, canDeleteDocument } from "../access/permissionResolver.js";
+import { assertDocumentAccess, assertSpaceAccess, canDeleteDocument, canEditDocument } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
 import type { SQSClient } from "@aws-sdk/client-sqs";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
@@ -77,21 +78,62 @@ export function createContentRouter(db: Db, sqs: SQSClient, indexQueueUrl: strin
           eq(documents.orgId, req.tenant.orgId),
           ne(documents.status, "trashed"),
         ),
-      );
+      )
+      .orderBy(desc(documents.updatedAt));
+
+    const ownerIds = [...new Set(rows.map((d) => d.ownerId))];
+    const ownerRows = ownerIds.length
+      ? await db
+          .select({ id: users.id, name: users.name, email: users.email })
+          .from(users)
+          .where(inArray(users.id, ownerIds))
+      : [];
+    const ownersById = new Map(ownerRows.map((u) => [u.id, u]));
+
+    const pdfDocIds = rows.filter((d) => d.type === "pdf").map((d) => d.id);
+    const attachmentRows = pdfDocIds.length
+      ? await db
+          .select()
+          .from(attachments)
+          .where(inArray(attachments.documentId, pdfDocIds))
+          .orderBy(desc(attachments.createdAt))
+      : [];
+    const attachmentByDoc = new Map<string, (typeof attachmentRows)[number]>();
+    for (const att of attachmentRows) {
+      if (!attachmentByDoc.has(att.documentId)) attachmentByDoc.set(att.documentId, att);
+    }
 
     const data = await Promise.all(
-      rows.map(async (doc) => ({
-        ...doc,
-        canDelete: await canDeleteDocument({
-          db,
-          userRole,
-          userId,
-          groupIds,
-          documentId: doc.id,
-          spaceId: doc.spaceId,
-          ownerId: doc.ownerId,
-        }),
-      })),
+      rows.map(async (doc) => {
+        const owner = ownersById.get(doc.ownerId);
+        const att = doc.type === "pdf" ? attachmentByDoc.get(doc.id) : undefined;
+        return {
+          ...doc,
+          ownerName: owner?.name ?? "Unknown",
+          ownerEmail: owner?.email ?? "",
+          attachmentScanStatus: att?.scanStatus ?? null,
+          fileSizeBytes: att?.sizeBytes ?? null,
+          fileType: att?.fileType ?? (doc.type === "page" ? "text/html" : null),
+          canDelete: await canDeleteDocument({
+            db,
+            userRole,
+            userId,
+            groupIds,
+            documentId: doc.id,
+            spaceId: doc.spaceId,
+            ownerId: doc.ownerId,
+          }),
+          canEdit: await canEditDocument({
+            db,
+            userRole,
+            userId,
+            groupIds,
+            documentId: doc.id,
+            spaceId: doc.spaceId,
+            ownerId: doc.ownerId,
+          }),
+        };
+      }),
     );
 
     res.json({ data });
