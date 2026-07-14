@@ -78,16 +78,45 @@ export function createAuthRouter(db: Db, env: ApiEnv, _ses: SESClient): Router {
       .select()
       .from(users)
       .where(and(eq(users.orgId, org.id), eq(users.email, body.data.email)));
-    if (!rows.length) throw new UnauthorizedError("Invalid email or password");
+    if (!rows.length) {
+      await recordAudit(db, {
+        orgId: org.id,
+        action: "auth.login_failed",
+        target: { email: body.data.email, reason: "user_not_found" },
+        req,
+      });
+      throw new UnauthorizedError("Invalid email or password");
+    }
 
     const user = rows[0]!;
     if (user.status === "deactivated") {
+      await recordAudit(db, {
+        orgId: org.id,
+        actorId: user.id,
+        action: "auth.login_failed",
+        target: { email: user.email, reason: "deactivated" },
+        req,
+      });
       throw new ForbiddenError("Account is deactivated");
     }
     if (user.status === "invited") {
+      await recordAudit(db, {
+        orgId: org.id,
+        actorId: user.id,
+        action: "auth.login_failed",
+        target: { email: user.email, reason: "invited" },
+        req,
+      });
       throw new ForbiddenError("Please accept your invitation before signing in");
     }
     if (!user.passwordHash || !verifyPassword(body.data.password, user.passwordHash)) {
+      await recordAudit(db, {
+        orgId: org.id,
+        actorId: user.id,
+        action: "auth.login_failed",
+        target: { email: user.email, reason: "invalid_password" },
+        req,
+      });
       throw new UnauthorizedError("Invalid email or password");
     }
 

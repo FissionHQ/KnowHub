@@ -87,10 +87,8 @@ export interface CreateSpaceBody {
   groupPermissions: Array<{ groupId: string; accessLevel: AccessLevel }>;
 }
 
-export interface UpdateSpaceBody {
-  name?: string;
-  description?: string;
-  iconEmoji?: string;
+export interface UpdateSpacePermissionsBody {
+  groupPermissions: Array<{ groupId: string; accessLevel: AccessLevel }>;
 }
 
 // ─── Documents ────────────────────────────────────────────────────────────
@@ -112,8 +110,7 @@ export interface UpdateDocumentBody {
 }
 
 export interface SetDocumentPermissionBody {
-  groupId?: string;
-  userId?: string;
+  groupId: string;
   accessLevel: AccessLevel;
 }
 

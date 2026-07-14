@@ -110,3 +110,28 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* Real-time collaboration cursors */
+.collaboration-cursor__caret {
+  border-left: 2px solid currentColor;
+  margin-left: -1px;
+  margin-right: -1px;
+  pointer-events: none;
+  position: relative;
+  word-break: normal;
+}
+
+.collaboration-cursor__label {
+  border-radius: 3px 3px 3px 0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  left: -1px;
+  line-height: normal;
+  padding: 0.1rem 0.35rem;
+  position: absolute;
+  top: -1.35em;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 10;
+}

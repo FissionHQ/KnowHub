@@ -29,6 +29,10 @@ const searchSchema = baseSchema.extend({
   SEARCH_PORT: z.coerce.number().default(3002),
 });
 
+const collabSchema = baseSchema.extend({
+  COLLAB_PORT: z.coerce.number().default(3003),
+});
+
 const workerSchema = baseSchema;
 
 export function parseApiEnv(env: NodeJS.ProcessEnv = process.env) {
@@ -58,6 +62,16 @@ export function parseWorkerEnv(env: NodeJS.ProcessEnv = process.env) {
   return result.data;
 }
 
+export function parseCollabEnv(env: NodeJS.ProcessEnv = process.env) {
+  const result = collabSchema.safeParse(env);
+  if (!result.success) {
+    console.error("Invalid environment variables:", result.error.flatten().fieldErrors);
+    process.exit(1);
+  }
+  return result.data;
+}
+
 export type ApiEnv = ReturnType<typeof parseApiEnv>;
 export type SearchEnv = ReturnType<typeof parseSearchEnv>;
 export type WorkerEnv = ReturnType<typeof parseWorkerEnv>;
+export type CollabEnv = ReturnType<typeof parseCollabEnv>;

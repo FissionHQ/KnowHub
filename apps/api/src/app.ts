@@ -77,7 +77,7 @@ export function createApp(
   api.use(createIdentityRouter(db, redis, ses, env));
   api.use(createAccessRouter(db, redis));
   api.use(createNavigationRouter(db));
-  api.use(createContentRouter(db, sqs, env.SQS_INDEX_QUEUE_URL));
+  api.use(createContentRouter(db, sqs, env.SQS_INDEX_QUEUE_URL, redis));
   api.use(
     createStorageRouter(db, s3, sqs, {
       quarantineBucket: env.S3_QUARANTINE_BUCKET,

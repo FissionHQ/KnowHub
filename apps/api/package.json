@@ -19,6 +19,7 @@
     "@aws-sdk/s3-request-presigner": "^3.700.0",
     "@wiki/config": "workspace:*",
     "@wiki/db": "workspace:*",
+    "@wiki/doc-collab": "workspace:*",
     "@wiki/types": "workspace:*",
     "dotenv": "^16.4.0",
     "cookie-parser": "^1.4.7",

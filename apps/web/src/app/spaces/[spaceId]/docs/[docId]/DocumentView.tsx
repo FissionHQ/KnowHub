@@ -1,21 +1,25 @@
 "use client";
 
-import { useState, useCallback } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { documentsApi, attachmentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
-import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { PdfViewer } from "@/components/pdf/PdfViewer";
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
+import { DocumentVersionHistory } from "@/components/DocumentVersionHistory";
+import { CollaborativeEditor } from "@/components/editor/CollaborativeEditor";
+import { EditorCountBadge } from "@/components/editor/EditorCountBadge";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { useCollaboration } from "@/hooks/useCollaboration";
+import { useAuth } from "@/lib/auth";
 import { Chip, Skeleton, Card, CardContent } from "@heroui/react";
 import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
-
-type SaveStatus = "saved" | "saving" | "unsaved";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props { spaceId: string; docId: string }
 
 export function DocumentView({ spaceId, docId }: Props) {
+  const { user } = useAuth();
   const { data: doc, mutate } = useSWR<Document>(
     `doc:${docId}`,
     () => documentsApi.get(docId),
@@ -25,13 +29,38 @@ export function DocumentView({ spaceId, docId }: Props) {
     () => spacesApi.get(spaceId),
   );
 
-  const [content, setContent] = useState<string>("");
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [content, setContent] = useState("");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const [useFallbackEditor, setUseFallbackEditor] = useState(false);
+  const loadedDocId = useRef<string | null>(null);
 
-  if (doc && content === "" && doc.contentRef) {
-    setContent(doc.contentRef);
-  }
+  const collab = useCollaboration({
+    orgId: user?.orgId ?? doc?.orgId ?? "",
+    documentId: docId,
+    userId: user?.id ?? "",
+    userName: user?.name ?? "You",
+    enabled: Boolean(user && doc?.type === "page" && !useFallbackEditor),
+  });
+
+  useEffect(() => {
+    if (!doc) return;
+    if (loadedDocId.current === doc.id) return;
+    loadedDocId.current = doc.id;
+    setContent(doc.contentRef ?? "");
+  }, [doc]);
+
+  useEffect(() => {
+    if (doc?.type !== "page" || collab.provider) return;
+
+    const timer = setTimeout(() => {
+      if (!collab.provider && collab.status === "disconnected") {
+        setUseFallbackEditor(true);
+      }
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [doc?.type, collab.provider, collab.status]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
@@ -71,16 +100,19 @@ export function DocumentView({ spaceId, docId }: Props) {
     );
   }
 
+  const showCollab = doc.type === "page" && collab.provider && user && !useFallbackEditor;
+  const showFallback = doc.type === "page" && useFallbackEditor && user;
+  const canEdit = doc.accessLevel === "edit";
+  const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
+  const isConnected = showFallback ? true : collab.status === "connected";
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <nav
         aria-label="Breadcrumb"
         className="text-xs text-zinc-400 mb-5 flex items-center gap-1.5 flex-wrap"
       >
-        <Link
-          href="/spaces"
-          className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-        >
+        <Link href="/spaces" className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
           Spaces
         </Link>
         <span aria-hidden="true">/</span>
@@ -96,13 +128,20 @@ export function DocumentView({ spaceId, docId }: Props) {
         </span>
       </nav>
 
-      {/* Title + save status */}
-      <div className="flex items-start gap-3 mb-4">
-        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex-1 leading-tight">{doc.title}</h1>
-        <SaveIndicator status={saveStatus} />
+      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex-1 leading-tight">
+          {doc.title}
+        </h1>
+        {doc.type === "page" && user && (
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {!showFallback && (
+              <EditorCountBadge count={collab.editorCount} status={collab.status} />
+            )}
+            <SaveIndicator status={activeSaveStatus} connected={isConnected} />
+          </div>
+        )}
       </div>
 
-      {/* Tags */}
       {doc.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-5">
           {doc.tags.map((tag) => (
@@ -113,9 +152,18 @@ export function DocumentView({ spaceId, docId }: Props) {
         </div>
       )}
 
-      <DocumentPermissionsPanel documentId={docId} />
+      {(user?.role === "admin" || doc.ownerId === user?.id) && (
+        <DocumentPermissionsPanel documentId={docId} />
+      )}
 
-      {/* Content */}
+      {doc.type === "page" && user && canEdit && (
+        <DocumentVersionHistory
+          documentId={docId}
+          currentVersion={doc.version}
+          canEdit
+        />
+      )}
+
       {doc.type === "pdf" ? (
         pdfUrl ? (
           <PdfViewer url={pdfUrl} filename={doc.title} />
@@ -127,39 +175,69 @@ export function DocumentView({ spaceId, docId }: Props) {
             </CardContent>
           </Card>
         )
-      ) : (
+      ) : showCollab ? (
+        <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+          <CollaborativeEditor
+            ydoc={collab.ydoc}
+            provider={collab.provider!}
+            readOnly={!canEdit}
+          />
+        </div>
+      ) : showFallback ? (
         <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
           <RichTextEditor
             content={content}
             onChange={setContent}
-            onAutoSave={handleAutoSave}
+            {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
+            readOnly={!canEdit}
           />
         </div>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
+            <Clock size={18} className="animate-pulse" />
+            <span className="text-sm">Connecting to editor…</span>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
 
-function SaveIndicator({ status }: { status: SaveStatus }) {
-  if (status === "saved") {
+function SaveIndicator({
+  status,
+  connected,
+}: {
+  status: "saved" | "saving" | "unsaved";
+  connected: boolean;
+}) {
+  if (!connected) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full shrink-0 mt-1">
-        <CheckCircle2 size={11} />
-        Saved
+      <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
+        <AlertCircle size={11} />
+        Reconnecting…
       </span>
     );
   }
   if (status === "saving") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1 rounded-full animate-pulse shrink-0 mt-1">
+      <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1 rounded-full animate-pulse shrink-0">
         Saving…
       </span>
     );
   }
+  if (status === "unsaved") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
+        <AlertCircle size={11} />
+        Unsaved
+      </span>
+    );
+  }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0 mt-1">
-      <AlertCircle size={11} />
-      Unsaved
+    <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full shrink-0">
+      <CheckCircle2 size={11} />
+      Saved
     </span>
   );
 }

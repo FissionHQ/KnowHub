@@ -22,6 +22,7 @@ interface Props {
   placeholder?: string;
   autoSaveMs?: number;
   onAutoSave?: (content: string) => void;
+  readOnly?: boolean;
 }
 
 export function RichTextEditor({
@@ -30,6 +31,7 @@ export function RichTextEditor({
   placeholder = "Start writing...",
   autoSaveMs = 3000,
   onAutoSave,
+  readOnly = false,
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -46,7 +48,9 @@ export function RichTextEditor({
       CodeBlockLowlight.configure({ lowlight }),
     ],
     content,
+    editable: !readOnly,
     onUpdate: ({ editor }) => {
+      if (readOnly) return;
       const html = editor.getHTML();
       onChange(html);
 
@@ -66,6 +70,12 @@ export function RichTextEditor({
   }, [content, editor]);
 
   useEffect(() => {
+    if (editor) {
+      editor.setEditable(!readOnly);
+    }
+  }, [editor, readOnly]);
+
+  useEffect(() => {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
@@ -75,7 +85,7 @@ export function RichTextEditor({
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <EditorToolbar editor={editor} />
+      {!readOnly && <EditorToolbar editor={editor} />}
       <EditorContent editor={editor} className="prose prose-sm max-w-none" />
     </div>
   );

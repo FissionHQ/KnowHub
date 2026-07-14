@@ -26,9 +26,11 @@ export type AuditAction =
   | "document.update"
   | "document.delete"
   | "document.restore"
+  | "document.version_restore"
   | "document.permission_change"
   | "attachment.upload"
   | "attachment.scan_result"
   | "auth.login"
+  | "auth.login_failed"
   | "auth.logout"
   | "org.settings_update";

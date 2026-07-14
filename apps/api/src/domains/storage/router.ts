@@ -9,6 +9,7 @@ import type { Db } from "@wiki/db";
 import { attachments, documents } from "@wiki/db";
 import { NotFoundError, ForbiddenError, ValidationError } from "../../lib/errors.js";
 import { assertDocumentAccess, assertSpaceAccess } from "../access/permissionResolver.js";
+import { recordAudit } from "../../lib/audit.js";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { SQSClient } from "@aws-sdk/client-sqs";
 import type { PdfProcessingMessage } from "@wiki/types";
@@ -102,6 +103,20 @@ export function createStorageRouter(
           MessageBody: JSON.stringify(msg),
         }),
       );
+
+      await recordAudit(db, {
+        orgId,
+        actorId: userId,
+        action: "attachment.upload",
+        target: {
+          attachmentId,
+          documentId,
+          fileName: req.file.originalname,
+          sizeBytes: req.file.size,
+          fileType: req.file.mimetype,
+        },
+        req,
+      });
 
       res.status(202).json({ data: { attachmentId, status: "pending" } });
     },
