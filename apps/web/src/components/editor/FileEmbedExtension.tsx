@@ -20,36 +20,46 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getFileIcon(fileType: string): string {
+function getFileIcon(fileType: string, fileName: string): string {
   if (fileType === "application/pdf") return "📄";
   if (fileType.startsWith("image/")) return "🖼️";
+  if (fileType.startsWith("video/")) return "🎬";
+  if (fileType.startsWith("audio/")) return "🎵";
   if (fileType.includes("word") || fileType.includes("document")) return "📝";
-  if (fileType.includes("sheet") || fileType.includes("excel")) return "📊";
+  if (fileType.includes("sheet") || fileType.includes("excel") || fileType.includes("csv")) return "📊";
   if (fileType.includes("presentation") || fileType.includes("powerpoint")) return "📽️";
+  const ext = getExtension(fileName);
+  if (CODE_EXTENSIONS.has(ext)) return "💻";
+  if (TEXT_EXTENSIONS.has(ext)) return "📃";
   return "📎";
 }
 
-function canPreview(fileType: string): boolean {
+const TEXT_EXTENSIONS = new Set([
+  "txt", "csv", "md", "json", "xml", "log", "ini", "cfg", "conf", "env", "yml", "yaml", "toml",
+]);
+const CODE_EXTENSIONS = new Set([
+  "js", "mjs", "cjs", "jsx", "ts", "tsx", "py", "rb", "go", "rs", "java", "kt", "scala",
+  "c", "cpp", "cc", "h", "hpp", "cs", "php", "sh", "bash", "zsh", "sql", "lua", "swift", "r",
+  "html", "css", "scss", "less",
+]);
+
+function getExtension(fileName: string): string {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function canPreview(fileType: string, fileName: string): boolean {
   if (fileType === "application/pdf") return true;
   if (fileType.startsWith("image/")) return true;
-  if (
-    fileType.includes("word") ||
-    fileType.includes("document") ||
-    fileType.includes("sheet") ||
-    fileType.includes("excel") ||
-    fileType.includes("presentation") ||
-    fileType.includes("powerpoint") ||
-    fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    fileType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-    fileType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-    fileType === "application/msword" ||
-    fileType === "application/vnd.ms-excel" ||
-    fileType === "application/vnd.ms-powerpoint"
-  ) return true;
+  if (fileType.startsWith("video/")) return true;
+  if (fileType.startsWith("audio/")) return true;
+  if (fileType.includes("word") || fileType.includes("document")) return true;
+  if (fileType.includes("sheet") || fileType.includes("excel") || fileType.includes("csv")) return true;
+  const ext = getExtension(fileName);
+  if (TEXT_EXTENSIONS.has(ext) || CODE_EXTENSIONS.has(ext)) return true;
   return false;
 }
 
-function FilePreview({ fileType, url, attachmentId }: { fileType: string; url: string; attachmentId: string }) {
+function FilePreview({ fileType, url, attachmentId, fileName }: { fileType: string; url: string; attachmentId: string; fileName: string }) {
   if (fileType === "application/pdf") {
     return <InlinePdfViewer url={url} />;
   }
@@ -62,8 +72,24 @@ function FilePreview({ fileType, url, attachmentId }: { fileType: string; url: s
     );
   }
 
-  // Office documents — convert to HTML via server-side mammoth
-  const previewUrl = `/proxy/attachments/${attachmentId}/preview`;
+  if (fileType.startsWith("video/")) {
+    return (
+      <div className="p-3 flex justify-center">
+        <video src={url} controls className="max-w-full max-h-[400px] rounded" />
+      </div>
+    );
+  }
+
+  if (fileType.startsWith("audio/")) {
+    return (
+      <div className="p-3 flex justify-center">
+        <audio src={url} controls className="w-full" />
+      </div>
+    );
+  }
+
+  // Server-side preview (DOCX, XLSX, text, code)
+  const previewUrl = `/proxy/attachments/${attachmentId}/preview?name=${encodeURIComponent(fileName)}`;
 
   return (
     <div className="p-2">
@@ -82,7 +108,7 @@ function FileEmbedComponent({ node, deleteNode }: { node: { attrs: FileEmbedAttr
   const [showPreview, setShowPreview] = useState(false);
 
   const proxyUrl = `/proxy/attachments/${attachmentId}`;
-  const previewable = canPreview(fileType);
+  const previewable = canPreview(fileType, fileName);
 
   const pollStatus = useCallback(async () => {
     try {
@@ -131,7 +157,7 @@ function FileEmbedComponent({ node, deleteNode }: { node: { attrs: FileEmbedAttr
       <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden bg-zinc-50 dark:bg-zinc-800/50">
         {/* File info bar */}
         <div className="flex items-center gap-2.5 px-3 py-2.5">
-          <span className="text-base shrink-0">{getFileIcon(fileType)}</span>
+          <span className="text-base shrink-0">{getFileIcon(fileType, fileName)}</span>
           <div className="flex-1 min-w-0">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200 truncate block">
               {fileName}
@@ -187,7 +213,7 @@ function FileEmbedComponent({ node, deleteNode }: { node: { attrs: FileEmbedAttr
         {/* Preview panel — only shown on click */}
         {showPreview && status === "ready" && (
           <div className="border-t border-zinc-200 dark:border-zinc-700">
-            <FilePreview fileType={fileType} url={proxyUrl} attachmentId={attachmentId} />
+            <FilePreview fileType={fileType} url={proxyUrl} attachmentId={attachmentId} fileName={fileName} />
           </div>
         )}
       </div>
