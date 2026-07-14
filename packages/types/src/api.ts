@@ -109,6 +109,7 @@ export interface UpdateDocumentBody {
   content?: string;
   tags?: string[];
   status?: DocumentStatus;
+  restrictDownload?: boolean;
 }
 
 export interface CreateCommentBody {

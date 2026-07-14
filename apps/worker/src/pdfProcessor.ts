@@ -2,6 +2,7 @@ import {
   GetObjectCommand,
   CopyObjectCommand,
   DeleteObjectCommand,
+  PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
@@ -85,6 +86,22 @@ export class PdfProcessor {
         Metadata: { "x-org-id": orgId, "x-attachment-id": attachmentId },
       }),
     );
+
+    // Generate thumbnail (PDF-9) — store first page text snippet as metadata
+    // Full image thumbnail would require canvas/sharp; we store a text preview for listings
+    const thumbnailKey = `thumbnails/${orgId}/${attachmentId}.txt`;
+    const preview = pdfText.slice(0, 500).replace(/\s+/g, " ").trim();
+    if (preview) {
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.opts.servedBucket,
+          Key: thumbnailKey,
+          Body: preview,
+          ContentType: "text/plain",
+          Metadata: { "x-org-id": orgId, "x-document-id": documentId },
+        }),
+      );
+    }
 
     // Delete from quarantine
     await this.s3.send(

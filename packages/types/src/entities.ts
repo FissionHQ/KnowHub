@@ -80,6 +80,7 @@ export interface Document {
   createdAt: Date;
   updatedAt: Date;
   tags: string[];
+  restrictDownload: boolean;
 }
 
 export interface DocumentPermission {

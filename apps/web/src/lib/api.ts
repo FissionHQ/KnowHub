@@ -162,6 +162,19 @@ export const attachmentsApi = {
     const json = await res.json() as { data: { attachmentId: string } };
     return json.data;
   },
+  replacePdf: async (documentId: string, file: File): Promise<{ attachmentId: string; version: number }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/documents/${documentId}/attachments/replace`, {
+      method: "POST",
+      body: form,
+      headers: devAuthHeaders(),
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Replace failed");
+    const json = await res.json() as { data: { attachmentId: string; version: number } };
+    return json.data;
+  },
   getStatus: (attachmentId: string) =>
     apiFetch<{ attachmentId: string; scanStatus: string; ready: boolean }>(
       `${BASE}/attachments/${attachmentId}/status`,
@@ -256,6 +269,30 @@ export const commentsApi = {
     apiFetch<{ deleted: boolean }>(`${BASE}/documents/${documentId}/comments/${commentId}`, {
       method: "DELETE",
     }),
+};
+
+// ─── User Activity ────────────────────────────────────────────────────────
+
+export const activityApi = {
+  recordView: (documentId: string) =>
+    apiFetch<{ recorded: boolean }>(`${BASE}/documents/${documentId}/view`, { method: "POST", body: "{}" }),
+  getRecent: () => apiFetch<Document[]>(`${BASE}/users/me/recent`),
+  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/documents/recent`),
+  toggleFavorite: (documentId: string) =>
+    apiFetch<{ favorited: boolean }>(`${BASE}/documents/${documentId}/favorite`, { method: "POST", body: "{}" }),
+  isFavorited: (documentId: string) =>
+    apiFetch<{ favorited: boolean }>(`${BASE}/documents/${documentId}/favorite`),
+  getFavorites: () => apiFetch<Document[]>(`${BASE}/users/me/favorites`),
+};
+
+// ─── Trash ────────────────────────────────────────────────────────────────
+
+export const trashApi = {
+  list: () => apiFetch<Document[]>(`${BASE}/trash`),
+  restore: (documentId: string) =>
+    apiFetch<Document>(`${BASE}/trash/${documentId}/restore`, { method: "POST", body: "{}" }),
+  permanentDelete: (documentId: string) =>
+    apiFetch<{ deleted: boolean }>(`${BASE}/trash/${documentId}`, { method: "DELETE" }),
 };
 
 // ─── Search ───────────────────────────────────────────────────────────────

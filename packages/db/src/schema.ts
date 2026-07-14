@@ -160,6 +160,7 @@ export const documents = pgTable(
     status: documentStatusEnum("status").notNull().default("draft"),
     version: integer("version").notNull().default(1),
     tags: text("tags").array().notNull().default([]),
+    restrictDownload: boolean("restrict_download").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -279,6 +280,44 @@ export const auditLog = pgTable(
     index("audit_log_org_id_idx").on(t.orgId),
     index("audit_log_timestamp_idx").on(t.timestamp),
     index("audit_log_actor_id_idx").on(t.actorId),
+  ],
+);
+
+// ─── Recently Viewed ──────────────────────────────────────────────────────
+
+export const recentlyViewed = pgTable(
+  "recently_viewed",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.documentId] }),
+    index("recently_viewed_user_id_idx").on(t.userId),
+  ],
+);
+
+// ─── Favorites ────────────────────────────────────────────────────────────
+
+export const favorites = pgTable(
+  "favorites",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.documentId] }),
+    index("favorites_user_id_idx").on(t.userId),
   ],
 );
 

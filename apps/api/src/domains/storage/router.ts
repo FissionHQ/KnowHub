@@ -6,7 +6,7 @@ import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import type { Db } from "@wiki/db";
-import { attachments, documents } from "@wiki/db";
+import { attachments, documents, organizations } from "@wiki/db";
 import { NotFoundError, ForbiddenError, ValidationError } from "../../lib/errors.js";
 import { assertDocumentAccess, assertSpaceAccess } from "../access/permissionResolver.js";
 import type { S3Client } from "@aws-sdk/client-s3";
@@ -41,6 +41,16 @@ export function createStorageRouter(
       const { documentId } = req.params;
 
       if (!req.file) throw new ValidationError("No file uploaded");
+
+      // Enforce per-org file size limit (PDF-2)
+      let maxSize = 104_857_600; // 100MB default
+      try {
+        const orgRows = await db.select({ maxFileSizeBytes: organizations.maxFileSizeBytes }).from(organizations).where(eq(organizations.id, orgId));
+        if (orgRows[0]?.maxFileSizeBytes) maxSize = orgRows[0].maxFileSizeBytes;
+      } catch { /* column may not exist yet */ }
+      if (req.file.size > maxSize) {
+        throw new ValidationError(`File exceeds maximum allowed size of ${Math.round(maxSize / 1_048_576)}MB`);
+      }
 
       const rows = await db
         .select()
@@ -101,9 +111,82 @@ export function createStorageRouter(
           QueueUrl: opts.pdfQueueUrl,
           MessageBody: JSON.stringify(msg),
         }),
-      );
+      ).catch(() => null);
 
       res.status(202).json({ data: { attachmentId, status: "pending" } });
+    },
+  );
+
+  // POST /documents/:documentId/attachments/replace — replace PDF (PDF-7)
+  router.post(
+    "/documents/:documentId/attachments/replace",
+    upload.single("file"),
+    async (req, res) => {
+      const { orgId, userRole, userId, groupIds } = req.tenant;
+      const { documentId } = req.params;
+
+      if (!req.file) throw new ValidationError("No file uploaded");
+
+      const rows = await db
+        .select()
+        .from(documents)
+        .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+      if (!rows.length) throw new NotFoundError("Document");
+      const doc = rows[0]!;
+
+      await assertDocumentAccess({
+        db, userRole, userId, groupIds,
+        documentId: doc.id,
+        spaceId: doc.spaceId,
+        required: "edit",
+      });
+
+      // Increment document version
+      const newVersion = doc.version + 1;
+      await db
+        .update(documents)
+        .set({ version: newVersion, updatedAt: new Date() })
+        .where(eq(documents.id, documentId ?? ""));
+
+      const attachmentId = uuidv4();
+      const quarantineKey = `quarantine/${orgId}/${attachmentId}/${req.file.originalname}`;
+
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: opts.quarantineBucket,
+          Key: quarantineKey,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype,
+          Metadata: { "x-org-id": orgId, "x-attachment-id": attachmentId },
+        }),
+      );
+
+      await db.insert(attachments).values({
+        id: attachmentId,
+        orgId,
+        documentId: documentId ?? "",
+        originalName: req.file.originalname,
+        quarantineKey,
+        fileType: req.file.mimetype,
+        sizeBytes: req.file.size,
+        scanStatus: "pending",
+      });
+
+      const msg: PdfProcessingMessage = {
+        type: "PDF_PROCESSING",
+        attachmentId,
+        documentId: documentId ?? "",
+        orgId,
+        quarantineKey,
+        originalName: req.file.originalname,
+        sizeBytes: req.file.size,
+      };
+      await sqs.send(
+        new SendMessageCommand({ QueueUrl: opts.pdfQueueUrl, MessageBody: JSON.stringify(msg) }),
+      ).catch(() => null);
+
+      res.status(202).json({ data: { attachmentId, version: newVersion, status: "pending" } });
     },
   );
 

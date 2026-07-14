@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
-import { Tag, User, Clock, X, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Tag, User, Clock, X, Plus, ChevronDown, ChevronUp, ShieldAlert } from "lucide-react";
 import { Chip } from "@heroui/react";
 
 interface Props {
@@ -115,6 +115,34 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
               </div>
             </div>
           </div>
+
+          {/* Restrict Download (PDF-6) */}
+          {doc.type === "pdf" && (
+            <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+              <ShieldAlert size={13} className="shrink-0" />
+              <span className="text-zinc-400 flex-1">Restrict download/print:</span>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const updated = await documentsApi.update(doc.id, { restrictDownload: !doc.restrictDownload });
+                    onUpdate(updated);
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                className={`text-xs px-2 py-0.5 rounded-md font-medium transition-colors ${
+                  doc.restrictDownload
+                    ? "bg-red-100 dark:bg-red-950/40 text-red-600"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                }`}
+              >
+                {doc.restrictDownload ? "Restricted" : "Allowed"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

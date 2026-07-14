@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { documentsApi, attachmentsApi, spacesApi, commentsApi } from "@/lib/api";
+import { documentsApi, attachmentsApi, spacesApi, commentsApi, activityApi } from "@/lib/api";
 import type { Document, Space, Comment } from "@wiki/types";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import dynamic from "next/dynamic";
@@ -14,7 +14,7 @@ import { VersionHistoryPanel } from "@/components/editor/VersionHistoryPanel";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
-import { CheckCircle2, Clock, AlertCircle, Globe, PenLine, MessageSquare, ChevronRight } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, Globe, PenLine, MessageSquare, ChevronRight, Star } from "lucide-react";
 
 type SaveStatus = "saved" | "saving" | "unsaved";
 
@@ -40,6 +40,17 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+
+  // Record view + favorites
+  const { data: favData, mutate: mutateFav } = useSWR(
+    doc ? `fav:${docId}` : null,
+    () => activityApi.isFavorited(docId),
+  );
+  const isFavorited = favData?.favorited ?? false;
+
+  useEffect(() => {
+    if (doc) activityApi.recordView(docId).catch(() => {});
+  }, [doc?.id]);
 
   // Fetch comment count for the badge
   const { data: comments = [] } = useSWR<Comment[]>(
@@ -159,6 +170,25 @@ export function DocumentView({ spaceId, docId }: Props) {
             placeholder="Untitled"
           />
           <div className="flex items-center gap-2 shrink-0 mt-1">
+            <button
+              type="button"
+              onClick={async () => {
+                await activityApi.toggleFavorite(docId);
+                mutateFav();
+              }}
+              title={isFavorited ? "Remove from bookmarks" : "Bookmark this page"}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isFavorited
+                  ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-amber-500"
+              }`}
+            >
+              <Star
+                size={14}
+                className={isFavorited ? "fill-amber-500 text-amber-500" : ""}
+              />
+              {isFavorited ? "Bookmarked" : "Bookmark"}
+            </button>
             <SaveIndicator status={saveStatus} />
             <PublishButton doc={doc} onUpdate={(updated) => mutate(updated, false)} />
           </div>
@@ -188,7 +218,7 @@ export function DocumentView({ spaceId, docId }: Props) {
         <DocumentPermissionsPanel documentId={docId} />
         {doc.type === "pdf" ? (
           pdfUrl ? (
-            <PdfViewer url={pdfUrl} filename={doc.title} />
+            <PdfViewer url={pdfUrl} filename={doc.title} restrictDownload={doc.restrictDownload} />
           ) : (
             <Card>
               <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
@@ -280,7 +310,7 @@ function PublishButton({ doc, onUpdate }: { doc: Document; onUpdate: (updated: D
   return (
     <Button
   size="sm"
-  isLoading={loading}
+  isDisabled={loading}
   onPress={toggle}
   className={`
     flex items-center gap-1.5 text-white transition-colors duration-200
@@ -292,7 +322,7 @@ function PublishButton({ doc, onUpdate }: { doc: Document; onUpdate: (updated: D
   `}
 >
   {isPublished ? <PenLine size={12} /> : <Globe size={12} />}
-  {isPublished ? "Unpublish" : "Publish"}
+  {loading ? "…" : isPublished ? "Unpublish" : "Publish"}
 </Button>
   );
 }

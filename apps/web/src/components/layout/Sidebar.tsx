@@ -1,13 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { spacesApi } from "@/lib/api";
+import { spacesApi, activityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { Space } from "@wiki/types";
+import type { Space, Document } from "@wiki/types";
 import { Separator } from "@heroui/react";
-import { LogOut, Search, Settings, User, Zap, ChevronRight } from "lucide-react";
+import { LogOut, Search, Settings, User, Zap, ChevronRight, ChevronDown, Clock, Star, Trash2, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { ThemeToggle } from "./ThemeToggle";
 import { SpaceDocTree } from "./SpaceDocTree";
@@ -16,6 +17,12 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { data: spaces = [] } = useSWR<Space[]>(user ? "spaces" : null, spacesApi.list);
+  const { data: recentDocs = [] } = useSWR<Document[]>(user ? "recent" : null, activityApi.getRecent);
+  const { data: recentlyUpdated = [] } = useSWR<Document[]>(user ? "recently-updated" : null, activityApi.getRecentlyUpdated);
+  const { data: favDocs = [] } = useSWR<Document[]>(user ? "favorites" : null, activityApi.getFavorites);
+
+  const [showBookmarks, setShowBookmarks] = useState(true);
+  const [showRecent, setShowRecent] = useState(false);
 
   // Detect active space from URL: /spaces/:spaceId/...
   const spaceMatch = pathname.match(/^\/spaces\/([^/]+)/);
@@ -56,7 +63,8 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-1">
-        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-3 pb-1">
+        {/* Spaces — always at top */}
+        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-2 pb-1">
           Spaces
         </p>
         <div className="flex flex-col gap-0.5">
@@ -89,6 +97,69 @@ export function Sidebar() {
             <p className="text-xs text-zinc-500 px-3 py-2">No spaces yet</p>
           )}
         </div>
+
+        {/* Bookmarks — collapsible */}
+        <button
+          type="button"
+          onClick={() => setShowBookmarks((v) => !v)}
+          className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-4 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
+        >
+          {showBookmarks ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          Bookmarks
+          {favDocs.length > 0 && (
+            <span className="ml-auto text-[9px] bg-white/10 text-zinc-500 px-1.5 py-0.5 rounded-full">{favDocs.length}</span>
+          )}
+        </button>
+        {showBookmarks && (
+          favDocs.length > 0 ? (
+            <div className="flex flex-col gap-0.5 mb-1">
+              {favDocs.slice(0, 5).map((doc) => (
+                <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                    <Star size={11} className="text-amber-400 fill-amber-400 shrink-0" />
+                    <span className="truncate">{doc.title}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-zinc-600 px-3 py-1 mb-1">Click &quot;Bookmark&quot; on any page</p>
+          )
+        )}
+
+        {/* Recent — collapsible */}
+        {(recentDocs.length > 0 || recentlyUpdated.length > 0) && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowRecent((v) => !v)}
+              className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-3 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
+            >
+              {showRecent ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+              Recent
+            </button>
+            {showRecent && (
+              <div className="flex flex-col gap-0.5 mb-1">
+                {recentDocs.slice(0, 4).map((doc) => (
+                  <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                      <Clock size={11} className="text-zinc-500 shrink-0" />
+                      <span className="truncate">{doc.title}</span>
+                    </div>
+                  </Link>
+                ))}
+                {recentlyUpdated.slice(0, 3).map((doc) => (
+                  <Link key={`upd-${doc.id}`} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                      <RefreshCw size={11} className="text-zinc-500 shrink-0" />
+                      <span className="truncate">{doc.title}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </nav>
 
       <Separator />
@@ -106,6 +177,14 @@ export function Sidebar() {
           </div>
         )}
         <ThemeToggle />
+        {user?.role === "admin" && (
+          <Link href="/admin/trash">
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-white/10 transition-colors cursor-pointer">
+              <Trash2 size={14} />
+              <span>Trash</span>
+            </div>
+          </Link>
+        )}
         {user?.role === "admin" && (
           <Link href="/admin">
             <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-white/10 transition-colors cursor-pointer">
