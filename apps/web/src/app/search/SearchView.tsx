@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { searchApi, spacesApi } from "@/lib/api";
-import type { SearchResponse, Space } from "@wiki/types";
+import type { SearchResponse } from "@wiki/types";
 import { Button, Chip, Card, CardContent, Skeleton } from "@heroui/react";
 import { Search, FileText, File, X, SlidersHorizontal } from "lucide-react";
 import useSWR from "swr";
@@ -25,7 +25,7 @@ export function SearchView() {
   // Suggestions
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const suggestTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const suggestTimeout = useRef<ReturnType<typeof setTimeout>>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: spaces } = useSWR("spaces", spacesApi.list);
@@ -116,7 +116,7 @@ export function SearchView() {
         </div>
         <Button
           type="button"
-          variant="bordered"
+          variant="outline"
           size="md"
           onPress={() => setShowFilters(!showFilters)}
           className="h-11 px-3 border-zinc-200 dark:border-zinc-700"
@@ -252,8 +252,7 @@ export function SearchView() {
                       </div>
                       <Chip
                         size="sm"
-                        variant="flat"
-                        color={hit.type === "pdf" ? "danger" : "default"}
+                        variant="soft"
                         className="text-xs shrink-0"
                       >
                         {hit.type.toUpperCase()}

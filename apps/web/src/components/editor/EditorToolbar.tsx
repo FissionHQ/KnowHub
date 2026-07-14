@@ -18,7 +18,7 @@ interface Props {
   editor: Editor;
   onInsertImage: (src: string) => void;
   title?: string;
-  documentId?: string;
+  documentId?: string | undefined;
 }
 
 function ToolBtn({
@@ -87,7 +87,8 @@ export function EditorToolbar({ editor, onInsertImage, title = "document", docum
         fileType: file.type || "application/octet-stream",
         fileSize: file.size,
       };
-      (editor.commands as unknown as Record<string, (attrs: FileEmbedAttributes) => boolean>).insertFileEmbed(attrs);
+      const cmd = (editor.commands as unknown as Record<string, (attrs: FileEmbedAttributes) => boolean>)["insertFileEmbed"];
+      if (cmd) cmd(attrs);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       alert(`Upload failed: ${message}`);

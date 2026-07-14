@@ -4,7 +4,6 @@ import { useState } from "react";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
 import { Tag, User, Clock, X, Plus, ChevronDown, ChevronUp, ShieldAlert } from "lucide-react";
-import { Chip } from "@heroui/react";
 
 interface Props {
   doc: Document;
@@ -77,24 +76,20 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
             <Tag size={13} className="shrink-0 mt-1 text-zinc-400" />
             <div className="flex flex-wrap gap-1.5 flex-1">
               {doc.tags.map((tag) => (
-                <Chip
+                <span
                   key={tag}
-                  size="sm"
-                  variant="secondary"
-                  className="text-xs flex items-center gap-1"
-                  endContent={
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      disabled={saving}
-                      className="ml-0.5 hover:text-red-500"
-                    >
-                      <X size={10} />
-                    </button>
-                  }
+                  className="inline-flex items-center gap-1 text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-md"
                 >
                   {tag}
-                </Chip>
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    disabled={saving}
+                    className="hover:text-red-500"
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
               ))}
               <div className="flex items-center gap-1">
                 <input

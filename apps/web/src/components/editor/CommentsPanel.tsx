@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import useSWR from "swr";
 import { commentsApi, usersApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -45,13 +45,13 @@ interface ComposerProps {
 }
 
 function MentionComposer({
-  documentId,
-  parentId,
+  documentId: _documentId,
+  parentId: _parentId,
   placeholder,
   initialValue = "",
   onSubmit,
   onCancel,
-  submitLabel,
+  submitLabel: _submitLabel,
 }: ComposerProps) {
   const [body, setBody] = useState(initialValue);
   const [submitting, setSubmitting] = useState(false);

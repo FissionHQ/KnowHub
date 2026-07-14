@@ -65,15 +65,15 @@ export default function TrashPage() {
                   </p>
                   <p className="text-xs text-zinc-400 mt-0.5">
                     Deleted {new Date(doc.updatedAt).toLocaleDateString()}
-                    {(doc as any).ownerName && ` · by ${(doc as any).ownerName}`}
+                    {(doc as unknown as { ownerName?: string }).ownerName && ` · by ${(doc as unknown as { ownerName?: string }).ownerName}`}
                   </p>
                 </div>
-                <Chip size="sm" variant="flat" className="text-xs shrink-0">
+                <Chip size="sm" variant="secondary" className="text-xs shrink-0">
                   {doc.type.toUpperCase()}
                 </Chip>
                 <Button
                   size="sm"
-                  variant="bordered"
+                  variant="outline"
                   isDisabled={loading === doc.id}
                   onPress={() => handleRestore(doc.id)}
                   className="shrink-0 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
@@ -83,7 +83,7 @@ export default function TrashPage() {
                 </Button>
                 <Button
                   size="sm"
-                  variant="bordered"
+                  variant="outline"
                   isDisabled={loading === doc.id}
                   onPress={() => handleDelete(doc.id)}
                   className="shrink-0 text-red-600 border-red-200 hover:bg-red-50"

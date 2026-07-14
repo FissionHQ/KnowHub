@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { documentsApi, attachmentsApi, spacesApi, commentsApi, activityApi } from "@/lib/api";
 import type { Document, Space, Comment } from "@wiki/types";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
@@ -21,7 +20,6 @@ type SaveStatus = "saved" | "saving" | "unsaved";
 interface Props { spaceId: string; docId: string }
 
 export function DocumentView({ spaceId, docId }: Props) {
-  const router = useRouter();
   const { data: doc, mutate } = useSWR<Document>(
     `doc:${docId}`,
     () => documentsApi.get(docId),

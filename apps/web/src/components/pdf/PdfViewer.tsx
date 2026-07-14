@@ -57,6 +57,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
   const [searchResults, setSearchResults] = useState<number[]>([]);
   const [searchIdx, setSearchIdx] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfDocRef = useRef<any>(null);
 
   const onLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
@@ -75,6 +76,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
       try {
         const page = await doc.getPage(i);
         const textContent = await page.getTextContent();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const text = textContent.items.map((item: any) => item.str).join(" ").toLowerCase();
         if (text.includes(q)) matches.push(i);
       } catch { /* skip unreadable pages */ }
