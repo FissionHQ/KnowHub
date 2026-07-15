@@ -3,18 +3,18 @@
 import useSWR from "swr";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { documentsApi, attachmentsApi, spacesApi, commentsApi, activityApi } from "@/lib/api";
 import type { Document, Space, Comment } from "@wiki/types";
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
 import { DocumentVersionHistory } from "@/components/DocumentVersionHistory";
 import { CollaborativeEditor } from "@/components/editor/CollaborativeEditor";
-import { EditorCountBadge } from "@/components/editor/EditorCountBadge";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useAuth } from "@/lib/auth";
-import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
+import { Chip, Skeleton, Card, CardContent } from "@heroui/react";
 import {
   CheckCircle2,
   Clock,
@@ -24,8 +24,12 @@ import {
   MessageSquare,
   ChevronRight,
   Star,
+  Trash2,
+  MoreVertical,
+  Users,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const PdfViewer = dynamic(
   () => import("@/components/pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -40,7 +44,8 @@ interface Props {
 }
 
 export function DocumentView({ spaceId, docId }: Props) {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { data: doc, mutate } = useSWR<Document>(`doc:${docId}`, () => documentsApi.get(docId));
   const { data: space } = useSWR<Space>(`space:${spaceId}`, () => spacesApi.get(spaceId));
   const { data: parentDoc } = useSWR<Document>(
@@ -54,6 +59,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [useFallbackEditor, setUseFallbackEditor] = useState(false);
   const [title, setTitle] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
 
   const { data: favData, mutate: mutateFav } = useSWR(
@@ -82,6 +88,7 @@ export function DocumentView({ spaceId, docId }: Props) {
     loadedDocId.current = doc.id;
     setContent(doc.contentRef ?? "");
     setTitle(doc.title);
+    setUseFallbackEditor(false);
   }, [doc]);
 
   useEffect(() => {
@@ -89,16 +96,18 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc?.id, docId]);
 
   useEffect(() => {
-    if (doc?.type !== "page" || collab.provider) return;
+    if (doc?.type !== "page" || useFallbackEditor) return;
 
     const timer = setTimeout(() => {
-      if (!collab.provider && collab.status === "disconnected") {
-        setUseFallbackEditor(true);
-      }
-    }, 4000);
+      setUseFallbackEditor((prev) => {
+        if (prev) return prev;
+        if (collab.status !== "connected") return true;
+        return prev;
+      });
+    }, 3000);
 
     return () => clearTimeout(timer);
-  }, [doc?.type, collab.provider, collab.status]);
+  }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
@@ -128,6 +137,17 @@ export function DocumentView({ spaceId, docId }: Props) {
     [doc, docId, mutate],
   );
 
+  async function handleMoveToTrash() {
+    if (!doc || !confirm(`Move "${doc.title}" to trash?`)) return;
+    setDeleting(true);
+    try {
+      await documentsApi.delete(docId);
+      router.push(`/spaces/${spaceId}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (!doc) {
     return (
       <div className="flex gap-6 p-8 max-w-6xl mx-auto">
@@ -145,9 +165,15 @@ export function DocumentView({ spaceId, docId }: Props) {
   }
 
   const currentDoc = doc;
-  const showCollab = currentDoc.type === "page" && collab.provider && user && !useFallbackEditor;
-  const showFallback = currentDoc.type === "page" && useFallbackEditor && user;
-  const canEdit = currentDoc.accessLevel === "edit";
+  const showPageEditor = currentDoc.type === "page" && Boolean(user);
+  const showCollab =
+    showPageEditor &&
+    !useFallbackEditor &&
+    collab.status === "connected" &&
+    Boolean(collab.provider);
+  const showConnecting = showPageEditor && authLoading;
+  const showFallback = showPageEditor && !showCollab && !showConnecting;
+  const canEdit = user?.role === "admin" || currentDoc.accessLevel === "edit";
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const isConnected = showFallback ? true : collab.status === "connected";
 
@@ -218,7 +244,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             </h1>
           )}
 
-          <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {user && (
               <button
                 type="button"
@@ -241,15 +267,15 @@ export function DocumentView({ spaceId, docId }: Props) {
               </button>
             )}
             {doc.type === "page" && user && (
-              <>
-                {!showFallback && (
-                  <EditorCountBadge count={collab.editorCount} status={collab.status} />
-                )}
-                <SaveIndicator status={activeSaveStatus} connected={isConnected} />
-              </>
+              <SaveIndicator status={activeSaveStatus} connected={isConnected} />
             )}
             {canEdit && (
-              <PublishButton doc={doc} onUpdate={(updated) => mutate(updated, false)} />
+              <DocumentActionsMenu
+                doc={doc}
+                deleting={deleting}
+                onUpdate={(updated) => mutate(updated, false)}
+                onMoveToTrash={handleMoveToTrash}
+              />
             )}
           </div>
         </div>
@@ -274,6 +300,9 @@ export function DocumentView({ spaceId, docId }: Props) {
               </span>
             )}
           </button>
+          {doc.type === "page" && user && (
+            <EditorCountInline count={collab.editorCount} status={collab.status} />
+          )}
         </div>
 
         {(user?.role === "admin" || doc.ownerId === user?.id) && (
@@ -295,14 +324,21 @@ export function DocumentView({ spaceId, docId }: Props) {
               </CardContent>
             </Card>
           )
-        ) : showCollab ? (
+        ) : showCollab && collab.provider ? (
           <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
             <CollaborativeEditor
               ydoc={collab.ydoc}
-              provider={collab.provider!}
+              provider={collab.provider}
               readOnly={!canEdit}
             />
           </div>
+        ) : showConnecting ? (
+          <Card>
+            <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
+              <Clock size={18} className="animate-pulse" />
+              <span className="text-sm">Loading…</span>
+            </CardContent>
+          </Card>
         ) : showFallback ? (
           <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
             <RichTextEditor
@@ -314,14 +350,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               documentId={docId}
             />
           </div>
-        ) : (
-          <Card>
-            <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
-              <Clock size={18} className="animate-pulse" />
-              <span className="text-sm">Connecting to editor…</span>
-            </CardContent>
-          </Card>
-        )}
+        ) : null}
       </div>
 
       <div className="w-64 shrink-0 flex flex-col sticky top-18">
@@ -375,33 +404,134 @@ export function DocumentView({ spaceId, docId }: Props) {
   );
 }
 
-function PublishButton({
+function DocumentActionsMenu({
   doc,
+  deleting,
   onUpdate,
+  onMoveToTrash,
 }: {
   doc: Document;
+  deleting: boolean;
   onUpdate: (updated: Document) => void;
+  onMoveToTrash: () => void;
 }) {
-  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
   const isPublished = doc.status === "published";
 
-  async function toggle() {
-    setLoading(true);
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        !menuRef.current?.contains(e.target as Node) &&
+        !btnRef.current?.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  async function togglePublish() {
+    setPublishing(true);
+    setOpen(false);
     try {
       const updated = await documentsApi.update(doc.id, {
         status: isPublished ? "draft" : "published",
       });
       onUpdate(updated);
     } finally {
-      setLoading(false);
+      setPublishing(false);
     }
   }
 
+  function handleTrash() {
+    setOpen(false);
+    onMoveToTrash();
+  }
+
   return (
-    <Button size="sm" isDisabled={loading} onPress={toggle} variant="primary">
-      {isPublished ? <PenLine size={12} /> : <Globe size={12} />}
-      {loading ? "…" : isPublished ? "Unpublish" : "Publish"}
-    </Button>
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          const rect = btnRef.current!.getBoundingClientRect();
+          setMenuPos({ top: rect.bottom + 4, left: rect.right - 160 });
+          setOpen((v) => !v);
+        }}
+        title="More options"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {open &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-[9999] w-40 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
+          >
+            <button
+              type="button"
+              disabled={publishing}
+              onClick={togglePublish}
+              className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {isPublished ? <PenLine size={14} /> : <Globe size={14} />}
+              {publishing ? "…" : isPublished ? "Unpublish" : "Publish"}
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={handleTrash}
+              className="w-full text-left px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              {deleting ? "Moving…" : "Move to trash"}
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+function EditorCountInline({
+  count,
+  status,
+}: {
+  count: number;
+  status: "connecting" | "connected" | "disconnected";
+}) {
+  const label =
+    status === "connecting"
+      ? "Connecting…"
+      : status === "disconnected"
+        ? "Offline"
+        : count === 1
+          ? "1 editing"
+          : `${count} editing`;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${
+        status === "disconnected"
+          ? "text-amber-600 bg-amber-50 dark:bg-amber-950/30"
+          : "text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800"
+      }`}
+    >
+      <Users size={12} />
+      {label}
+    </span>
   );
 }
 

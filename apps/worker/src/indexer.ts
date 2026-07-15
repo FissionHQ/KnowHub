@@ -37,6 +37,12 @@ export class Indexer {
     }
     const doc = rows[0]!;
 
+    if (doc.status === "trashed") {
+      await this.os.delete({ index: INDEX_NAME, id: documentId, refresh: "wait_for" });
+      logger.info("Trashed document kept out of index", { documentId });
+      return;
+    }
+
     const spacePerm = await this.db
       .select({ groupId: spacePermissions.groupId })
       .from(spacePermissions)

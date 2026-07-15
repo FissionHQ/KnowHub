@@ -10,21 +10,30 @@ import { GroupsSection } from "./sections/GroupsSection";
 import { SpacesSection } from "./sections/SpacesSection";
 import { SettingsSection } from "./sections/SettingsSection";
 import { AuditLogSection } from "./sections/AuditLogSection";
+import { TrashSection } from "./sections/TrashSection";
 import clsx from "clsx";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 const TABS = [
   { id: "settings", label: "Organization" },
   { id: "users", label: "Users" },
   { id: "groups", label: "Groups" },
   { id: "spaces", label: "Spaces" },
+  { id: "trash", label: "Trash" },
   { id: "audit", label: "Audit log" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
 export function AdminView() {
-  const [tab, setTab] = useState<TabId>("settings");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [tab, setTab] = useState<TabId>(
+    initialTab === "trash" || initialTab === "users" || initialTab === "groups" || initialTab === "spaces" || initialTab === "audit" || initialTab === "settings"
+      ? initialTab
+      : "settings",
+  );
   const { data: me, isLoading, error } = useSWR("users:me", usersApi.me);
 
   if (isLoading) {
@@ -64,7 +73,7 @@ export function AdminView() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Administration</h1>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-          Manage organization settings, users, groups, spaces, and audit history.
+          Manage organization settings, users, groups, spaces, trash, and audit history.
         </p>
       </div>
 
@@ -90,6 +99,7 @@ export function AdminView() {
       {tab === "users" && <UsersSection />}
       {tab === "groups" && <GroupsSection />}
       {tab === "spaces" && <SpacesSection />}
+      {tab === "trash" && <TrashSection />}
       {tab === "audit" && <AuditLogSection />}
     </div>
   );

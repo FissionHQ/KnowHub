@@ -96,6 +96,10 @@ export async function authenticateCollabConnection(
   if (!docRows.length) throw new Error("Document not found");
   const doc = docRows[0]!;
 
+  if (doc.status === "trashed") {
+    throw new Error("Document is in trash");
+  }
+
   const groupIds = await loadGroupIds(db, redis, orgId, userId);
 
   await assertDocumentAccess({

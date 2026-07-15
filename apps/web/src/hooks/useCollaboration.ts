@@ -41,7 +41,11 @@ export function useCollaboration({
   }, [provider, userId, userName, userColor]);
 
   useEffect(() => {
-    if (!enabled || !orgId || !documentId || !userId) return;
+    if (!enabled || !orgId || !documentId || !userId) {
+      setStatus("disconnected");
+      setEditorCount(1);
+      return;
+    }
 
     const token = getCollaborationToken();
     if (!token) {

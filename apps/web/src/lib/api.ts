@@ -22,6 +22,7 @@ import type {
   DocumentPermissionRecord,
   SetDocumentPermissionBody,
   DocumentVersionListItem,
+  TrashedDocument,
   AccessLevel,
   LoginBody,
   LoginResponse,
@@ -133,6 +134,7 @@ export const documentsApi = {
     apiFetch<{ trashed: boolean }>(`${BASE}/documents/${id}`, { method: "DELETE" }),
   restore: (id: string) =>
     apiFetch<Document>(`${BASE}/documents/${id}/restore`, { method: "POST" }),
+  listTrash: () => apiFetch<TrashedDocument[]>(`${BASE}/trash`),
   getVersions: (id: string) =>
     apiFetch<DocumentVersionListItem[]>(`${BASE}/documents/${id}/versions`),
     restoreVersion: async (id: string, versionNumber: number) => {
