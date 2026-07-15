@@ -15,6 +15,7 @@ export interface Organization {
   branding: OrgBranding;
   maxFileSizeBytes: number;
   trashRetentionDays: number;
+  auditRetentionDays: number;
   createdAt: Date;
 }
 
@@ -81,6 +82,7 @@ export interface Document {
   updatedAt: Date;
   tags: string[];
   restrictDownload: boolean;
+  accessLevel?: AccessLevel;
 }
 
 export interface DocumentPermission {
@@ -112,6 +114,10 @@ export interface Comment {
   createdAt: Date;
   updatedAt: Date;
   replies?: Comment[];
+}
+
+export interface DocumentVersionListItem extends DocumentVersion {
+  editorName: string | null;
 }
 
 export interface Attachment {

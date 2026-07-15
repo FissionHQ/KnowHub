@@ -8,7 +8,7 @@
     "start": "next start",
     "type-check": "tsc --noEmit",
     "lint": "next lint",
-    "postinstall": "node scripts/copy-heroui-styles.mjs"
+    "postinstall": "node scripts/copy-heroui-css.js"
   },
   "dependencies": {
     "@heroui/react": "^3.2.2",
@@ -16,6 +16,8 @@
     "@heroui/system": "^2.4.28",
     "@heroui/theme": "^2.4.26",
     "@tiptap/extension-code-block-lowlight": "^2.9.0",
+    "@tiptap/extension-collaboration": "^2.9.0",
+    "@tiptap/extension-collaboration-cursor": "^2.9.0",
     "@tiptap/extension-image": "^2.9.0",
     "@tiptap/extension-link": "^2.9.0",
     "@tiptap/extension-placeholder": "^2.9.0",
@@ -26,7 +28,6 @@
     "@tiptap/extension-underline": "^3.27.3",
     "@tiptap/react": "^2.9.0",
     "@tiptap/starter-kit": "^2.9.0",
-    "@types/turndown": "^5.0.6",
     "@wiki/types": "workspace:*",
     "clsx": "^2.1.0",
     "framer-motion": "^12.42.2",
@@ -40,8 +41,6 @@
     "react-dom": "^19.2.7",
     "react-pdf": "^9.1.0",
     "swr": "^2.2.5",
-    "turndown": "^7.2.4",
-    "xlsx": "^0.18.5",
     "zod": "^3.23.0"
   },
   "devDependencies": {

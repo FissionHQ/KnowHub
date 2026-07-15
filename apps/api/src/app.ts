@@ -80,7 +80,7 @@ export function createApp(
   api.use(createAccessRouter(db, redis));
   api.use(createNavigationRouter(db));
   api.use(createUserActivityRouter(db));
-  api.use(createContentRouter(db, sqs, env.SQS_INDEX_QUEUE_URL));
+  api.use(createContentRouter(db, sqs, env.SQS_INDEX_QUEUE_URL, redis));
   api.use(createCommentsRouter(db));
   api.use(
     createStorageRouter(db, s3, sqs, {

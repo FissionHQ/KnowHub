@@ -9,7 +9,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { eq, and } from "drizzle-orm";
 import pdfParse from "pdf-parse";
 import type { Db } from "@wiki/db";
-import { attachments, documents, documentPermissions, spacePermissions, groupMemberships } from "@wiki/db";
+import { attachments, documents, documentPermissions, spacePermissions, recordAudit } from "@wiki/db";
 import type { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { INDEX_NAME } from "./opensearch.js";
 import type { PdfProcessingMessage, SearchIndexDocument } from "@wiki/types";
@@ -72,6 +72,12 @@ export class PdfProcessor {
         .update(attachments)
         .set({ scanStatus: "error" })
         .where(eq(attachments.id, attachmentId));
+
+      await recordAudit(this.db, {
+        orgId,
+        action: "attachment.scan_result",
+        target: { attachmentId, documentId, scanStatus: "error" },
+      });
       return;
     }
 
@@ -118,6 +124,11 @@ export class PdfProcessor {
     if (isPdf) {
       await this.indexDocument(documentId, orgId, pdfText, attachmentId);
     }
+    await recordAudit(this.db, {
+      orgId,
+      action: "attachment.scan_result",
+      target: { attachmentId, documentId, scanStatus: "clean" },
+    });
 
     logger.info("Attachment processed successfully", { attachmentId, servedKey });
   }

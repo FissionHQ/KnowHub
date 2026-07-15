@@ -39,6 +39,7 @@ export const organizations = pgTable("organizations", {
     .notNull()
     .default(104_857_600), // 100 MB
   trashRetentionDays: integer("trash_retention_days").notNull().default(30),
+  auditRetentionDays: integer("audit_retention_days").notNull().default(365),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -205,6 +206,22 @@ export const documentVersions = pgTable(
     unique("doc_versions_unique").on(t.documentId, t.versionNumber),
     index("doc_versions_document_id_idx").on(t.documentId),
   ],
+);
+
+export const documentCollabState = pgTable(
+  "document_collab_state",
+  {
+    documentId: uuid("document_id")
+      .primaryKey()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Base64-encoded Yjs state update */
+    state: text("state").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("document_collab_state_org_id_idx").on(t.orgId)],
 );
 
 // ─── Attachments ──────────────────────────────────────────────────────────

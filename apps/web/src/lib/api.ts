@@ -13,12 +13,15 @@ import type {
   CreateCommentBody,
   UpdateCommentBody,
   CreateSpaceBody,
+  UpdateSpacePermissionsBody,
+  SpacePermissionRecord,
   InviteUserBody,
   UpdateOrgSettingsBody,
   AuditLogQuery,
   DocumentPermissionsResponse,
   DocumentPermissionRecord,
   SetDocumentPermissionBody,
+  DocumentVersionListItem,
   AccessLevel,
   LoginBody,
   LoginResponse,
@@ -105,6 +108,13 @@ export const spacesApi = {
   get: (id: string) => apiFetch<Space>(`${BASE}/spaces/${id}`),
   create: (body: CreateSpaceBody) =>
     apiFetch<Space>(`${BASE}/spaces`, { method: "POST", body: JSON.stringify(body) }),
+  getPermissions: (id: string) =>
+    apiFetch<SpacePermissionRecord[]>(`${BASE}/spaces/${id}/permissions`),
+  updatePermissions: (id: string, body: UpdateSpacePermissionsBody) =>
+    apiFetch<{ spaceId: string; groupPermissions: UpdateSpacePermissionsBody["groupPermissions"] }>(
+      `${BASE}/spaces/${id}/permissions`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    ),
   delete: (id: string) =>
     apiFetch<{ deleted: boolean }>(`${BASE}/spaces/${id}`, { method: "DELETE" }),
 };
@@ -121,13 +131,29 @@ export const documentsApi = {
     apiFetch<Document>(`${BASE}/documents/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   delete: (id: string) =>
     apiFetch<{ trashed: boolean }>(`${BASE}/documents/${id}`, { method: "DELETE" }),
+  restore: (id: string) =>
+    apiFetch<Document>(`${BASE}/documents/${id}/restore`, { method: "POST" }),
   getVersions: (id: string) =>
-    apiFetch<DocumentVersion[]>(`${BASE}/documents/${id}/versions`),
-  restoreVersion: (id: string, versionNumber: number) =>
-    apiFetch<Document>(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, { method: "POST", body: "{}" }),
-  listChildren: (id: string) =>
-    apiFetch<Document[]>(`${BASE}/documents/${id}/children`),
-  listPermissions: (id: string) =>
+    apiFetch<DocumentVersionListItem[]>(`${BASE}/documents/${id}/versions`),
+    restoreVersion: async (id: string, versionNumber: number) => {
+      const res = await fetch(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...devAuthHeaders(),
+        },
+        credentials: "include",
+      });
+  
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: "Unknown error" } }));
+        throw new Error((err as { error?: { message?: string } }).error?.message ?? "Request failed");
+      }
+  
+      const json = (await res.json()) as { data: Document; reloadRequired?: boolean };
+      return { document: json.data, reloadRequired: json.reloadRequired ?? false };
+    },
+    listPermissions: (id: string) =>
     apiFetch<DocumentPermissionsResponse>(`${BASE}/documents/${id}/permissions`),
   setPermission: (id: string, body: SetDocumentPermissionBody) =>
     apiFetch<DocumentPermissionRecord>(`${BASE}/documents/${id}/permissions`, {

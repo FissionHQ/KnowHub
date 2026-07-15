@@ -26,6 +26,7 @@ interface Props {
   onAutoSave?: (content: string) => void;
   title?: string;
   documentId?: string;
+  readOnly?: boolean;
 }
 
 export function RichTextEditor({
@@ -36,6 +37,7 @@ export function RichTextEditor({
   onAutoSave,
   title = "document",
   documentId,
+  readOnly = false,
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,7 +56,9 @@ export function RichTextEditor({
       FileEmbedExtension,
     ],
     content,
+    editable: !readOnly,
     onUpdate: ({ editor }) => {
+      if (readOnly) return;
       const html = editor.getHTML();
       onChange(html);
 
@@ -74,6 +78,12 @@ export function RichTextEditor({
   }, [content, editor]);
 
   useEffect(() => {
+    if (editor) {
+      editor.setEditable(!readOnly);
+    }
+  }, [editor, readOnly]);
+
+  useEffect(() => {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
@@ -87,7 +97,7 @@ export function RichTextEditor({
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} documentId={documentId} />
+      {!readOnly && <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} documentId={documentId} />}
       <EditorContent
         editor={editor}
         className="prose prose-sm max-w-none"

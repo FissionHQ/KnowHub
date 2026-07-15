@@ -2,7 +2,6 @@ import type { Db } from "@wiki/db";
 import { documentPermissions, spacePermissions } from "@wiki/db";
 import { eq, and, inArray, or } from "drizzle-orm";
 import type { AccessLevel, UserRole } from "@wiki/types";
-import { ForbiddenError } from "../../lib/errors.js";
 
 export interface PermissionCheck {
   db: Db;
@@ -18,18 +17,6 @@ function documentPermissionMatch(userId: string, groupIds: string[]) {
   );
 }
 
-/**
- * Resolves the effective access level for a user on a document.
- *
- * Requires space-level access first (space_permissions). Document overrides
- * only refine access after that gate.
- *
- * Per group: document override (if any) else space permission.
- * User-specific document override wins outright.
- *
- * Document-level "view" on any of the user's groups caps access to view
- * unless another of the user's groups has document-level "edit" on this doc.
- */
 export async function resolveDocumentAccess(
   opts: PermissionCheck & { documentId: string; spaceId: string },
 ): Promise<AccessLevel> {
@@ -132,39 +119,6 @@ export async function resolveSpaceAccess(
   return rows.some((r) => r.accessLevel === "edit") ? "edit" : "view";
 }
 
-/** Admin or document owner may change document-level permissions. */
-export function assertCanManageDocumentPermissions(opts: {
-  userRole: UserRole;
-  userId: string;
-  ownerId: string;
-}): void {
-  if (opts.userRole === "admin") return;
-  if (opts.userRole === "member" && opts.userId === opts.ownerId) return;
-  throw new ForbiddenError();
-}
-
-/**
- * Members may edit/delete own documents or documents their groups can edit.
- * Viewers cannot mutate content.
- */
-export async function assertCanMutateDocumentContent(
-  opts: PermissionCheck & { documentId: string; spaceId: string; ownerId: string },
-): Promise<void> {
-  if (opts.userRole === "admin") return;
-  if (opts.userRole === "viewer") throw new ForbiddenError();
-  if (opts.userRole === "member" && opts.userId === opts.ownerId) return;
-
-  await assertDocumentAccess({
-    db: opts.db,
-    userRole: opts.userRole,
-    userId: opts.userId,
-    groupIds: opts.groupIds,
-    documentId: opts.documentId,
-    spaceId: opts.spaceId,
-    required: "edit",
-  });
-}
-
 export async function assertDocumentAccess(
   opts: PermissionCheck & {
     documentId: string;
@@ -190,4 +144,11 @@ export async function assertSpaceAccess(
 function satisfies(granted: AccessLevel, required: AccessLevel): boolean {
   if (required === "view") return true;
   return granted === "edit";
+}
+
+class ForbiddenError extends Error {
+  constructor() {
+    super("Forbidden");
+    this.name = "ForbiddenError";
+  }
 }

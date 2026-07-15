@@ -13,7 +13,7 @@ import {
 import { S3Client } from "@aws-sdk/client-s3";
 import { SESClient } from "@aws-sdk/client-ses";
 import { parseWorkerEnv } from "@wiki/config";
-import { getDb, setTenantContext } from "@wiki/db";
+import { getDb, setTenantContext, purgeExpiredAuditLogs } from "@wiki/db";
 import { createOpenSearchClient, ensureIndex } from "./opensearch.js";
 import { PdfProcessor } from "./pdfProcessor.js";
 import { Indexer } from "./indexer.js";
@@ -107,6 +107,18 @@ function sleep(ms: number) {
 async function main() {
   await ensureIndex(os);
   logger.info("Worker started, polling queues...");
+
+  // Purge expired audit logs every 24 hours
+  const purgeAudit = async () => {
+    try {
+      await purgeExpiredAuditLogs(db);
+      logger.info("Audit log retention purge completed");
+    } catch (err) {
+      logger.error("Audit log purge failed", { err });
+    }
+  };
+  await purgeAudit();
+  setInterval(purgeAudit, 24 * 60 * 60 * 1000);
 
   // Poll both queues concurrently
   await Promise.all([
