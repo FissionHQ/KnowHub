@@ -40,10 +40,15 @@ const updateDocSchema = z.object({
   restrictDownload: z.boolean().optional(),
 });
 
-const setPermissionSchema = z.object({
-  groupId: z.string().uuid(),
-  accessLevel: z.enum(["view", "edit"]),
-});
+const setPermissionSchema = z
+  .object({
+    groupId: z.string().uuid().optional(),
+    userId: z.string().uuid().optional(),
+    accessLevel: z.enum(["view", "edit"]),
+  })
+  .refine((d) => Boolean(d.groupId) !== Boolean(d.userId), {
+    message: "Exactly one of groupId or userId is required",
+  });
 
 const updatePermissionSchema = z.object({
   accessLevel: z.enum(["view", "edit"]),
@@ -404,11 +409,19 @@ export function createContentRouter(
       required: "view",
     });
 
-    const groupRows = await db
-      .select({ id: groups.id })
-      .from(groups)
-      .where(and(eq(groups.id, body.data.groupId), eq(groups.orgId, orgId)));
-    if (!groupRows.length) throw new NotFoundError("Group");
+    if (body.data.groupId) {
+      const groupRows = await db
+        .select({ id: groups.id })
+        .from(groups)
+        .where(and(eq(groups.id, body.data.groupId), eq(groups.orgId, orgId)));
+      if (!groupRows.length) throw new NotFoundError("Group");
+    } else if (body.data.userId) {
+      const userRows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.id, body.data.userId), eq(users.orgId, orgId)));
+      if (!userRows.length) throw new NotFoundError("User");
+    }
 
     const existing = await db
       .select()
@@ -416,7 +429,9 @@ export function createContentRouter(
       .where(
         and(
           eq(documentPermissions.documentId, documentId ?? ""),
-          eq(documentPermissions.groupId, body.data.groupId),
+          body.data.groupId
+            ? eq(documentPermissions.groupId, body.data.groupId)
+            : eq(documentPermissions.userId, body.data.userId!),
         ),
       );
 
@@ -432,8 +447,8 @@ export function createContentRouter(
       await db.insert(documentPermissions).values({
         id: permissionId,
         documentId: documentId ?? "",
-        groupId: body.data.groupId,
-        userId: null,
+        groupId: body.data.groupId ?? null,
+        userId: body.data.userId ?? null,
         accessLevel: body.data.accessLevel,
       });
     }
@@ -448,6 +463,7 @@ export function createContentRouter(
         documentId,
         permissionId,
         groupId: body.data.groupId,
+        userId: body.data.userId,
         accessLevel: body.data.accessLevel,
         operation: existing.length ? "update" : "add",
       },
@@ -459,6 +475,7 @@ export function createContentRouter(
         id: permissionId,
         documentId: documentId ?? "",
         groupId: body.data.groupId,
+        userId: body.data.userId,
         accessLevel: body.data.accessLevel,
       },
     });
@@ -493,9 +510,6 @@ export function createContentRouter(
         ),
       );
     if (!permRows.length) throw new NotFoundError("Permission");
-    if (permRows[0]!.userId) {
-      throw new ForbiddenError("Per-user document sharing is not enabled");
-    }
 
     await db
       .update(documentPermissions)
@@ -554,9 +568,6 @@ export function createContentRouter(
         ),
       );
     if (!permRows.length) throw new NotFoundError("Permission");
-    if (permRows[0]!.userId) {
-      throw new ForbiddenError("Per-user document sharing is not enabled");
-    }
 
     await db.delete(documentPermissions).where(eq(documentPermissions.id, permissionId ?? ""));
 

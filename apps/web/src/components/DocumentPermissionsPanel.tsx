@@ -2,18 +2,21 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { documentsApi, groupsApi } from "@/lib/api";
+import { documentsApi, groupsApi, usersApi } from "@/lib/api";
 import type { AccessLevel } from "@wiki/types";
 import { Button, Card, CardContent } from "@heroui/react";
-import { ChevronDown, ChevronUp, Shield, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, Shield, Users, User } from "lucide-react";
 
 interface Props {
   documentId: string;
 }
 
+type GranteeType = "group" | "user";
+
 export function DocumentPermissionsPanel({ documentId }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [groupId, setGroupId] = useState("");
+  const [granteeType, setGranteeType] = useState<GranteeType>("group");
+  const [granteeId, setGranteeId] = useState("");
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("view");
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,25 +25,33 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
     () => documentsApi.listPermissions(documentId),
   );
   const { data: groups = [] } = useSWR(expanded ? "groups" : null, groupsApi.list);
+  const { data: users = [] } = useSWR(expanded ? "users" : null, usersApi.list);
 
   if (error || isLoading || !data) return null;
 
-  const groupOverrides = data.overrides.filter((o) => o.groupId);
   const availableGroups = groups.filter(
-    (g) => !groupOverrides.some((o) => o.groupId === g.id),
+    (g) => !data.overrides.some((o) => o.groupId === g.id),
   );
-  const selectedGroupId = groupId || availableGroups[0]?.id || "";
+  const availableUsers = users.filter(
+    (u) => u.status === "active" && !data.overrides.some((o) => o.userId === u.id),
+  );
+  const selectedGranteeId =
+    granteeId ||
+    (granteeType === "group" ? availableGroups[0]?.id : availableUsers[0]?.id) ||
+    "";
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedGroupId) return;
+    if (!selectedGranteeId) return;
     setSubmitting(true);
     try {
       await documentsApi.setPermission(documentId, {
-        groupId: selectedGroupId,
+        ...(granteeType === "group"
+          ? { groupId: selectedGranteeId }
+          : { userId: selectedGranteeId }),
         accessLevel,
       });
-      setGroupId("");
+      setGranteeId("");
       await mutate();
     } finally {
       setSubmitting(false);
@@ -112,22 +123,34 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
                 Document overrides
               </h3>
-              {groupOverrides.length === 0 ? (
+              {data.overrides.length === 0 ? (
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
-                  No document-specific permissions. Add a group override to restrict or grant access.
+                  No document-specific permissions. Add an override to restrict or grant access
+                  for a group or user.
                 </p>
               ) : (
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden mb-3">
-                  {groupOverrides.map((perm) => {
-                    const label = perm.groupName ?? "Group";
+                  {data.overrides.map((perm) => {
+                    const label = perm.groupId
+                      ? (perm.groupName ?? "Group")
+                      : (perm.userName ?? perm.userEmail ?? "User");
                     return (
                       <li
                         key={perm.id}
                         className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white dark:bg-zinc-900 text-sm"
                       >
                         <span className="inline-flex items-center gap-2 min-w-0 text-zinc-700 dark:text-zinc-300">
-                          <Users size={14} className="text-zinc-400 shrink-0" />
-                          <span className="truncate">{label}</span>
+                          {perm.groupId ? (
+                            <Users size={14} className="text-zinc-400 shrink-0" />
+                          ) : (
+                            <User size={14} className="text-zinc-400 shrink-0" />
+                          )}
+                          <span className="truncate">
+                            {label}
+                            {perm.userEmail && perm.userName && (
+                              <span className="text-zinc-400 ml-1">({perm.userEmail})</span>
+                            )}
+                          </span>
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
                           <select
@@ -154,17 +177,37 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                 </ul>
               )}
 
-              <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <form
+                onSubmit={handleAdd}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
+              >
                 <select
-                  value={selectedGroupId}
-                  onChange={(e) => setGroupId(e.target.value)}
+                  value={granteeType}
+                  onChange={(e) => {
+                    setGranteeType(e.target.value as GranteeType);
+                    setGranteeId("");
+                  }}
                   className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
                 >
-                  {availableGroups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
+                  <option value="group">Group</option>
+                  <option value="user">User</option>
+                </select>
+                <select
+                  value={selectedGranteeId}
+                  onChange={(e) => setGranteeId(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+                >
+                  {granteeType === "group"
+                    ? availableGroups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))
+                    : availableUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.email})
+                        </option>
+                      ))}
                 </select>
                 <select
                   value={accessLevel}
@@ -178,7 +221,7 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                   type="submit"
                   variant="primary"
                   size="sm"
-                  isDisabled={submitting || !selectedGroupId}
+                  isDisabled={submitting || !selectedGranteeId}
                 >
                   Add override
                 </Button>

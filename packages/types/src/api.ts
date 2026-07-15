@@ -121,7 +121,8 @@ export interface UpdateCommentBody {
 }
 
 export interface SetDocumentPermissionBody {
-  groupId: string;
+  groupId?: string;
+  userId?: string;
   accessLevel: AccessLevel;
 }
 
