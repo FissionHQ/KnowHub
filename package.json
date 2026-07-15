@@ -4,6 +4,7 @@
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "scripts": {
+    "postinstall": "turbo run build --filter=@wiki/types --filter=@wiki/config --filter=@wiki/db",
     "prepare": "pnpm --filter @wiki/types --filter @wiki/config --filter @wiki/db --filter @wiki/doc-collab build",
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",

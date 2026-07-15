@@ -77,7 +77,7 @@ export function AdminView() {
             className={clsx(
               "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
               tab === item.id
-                ? "bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300"
+                ? "bg-orange-50 dark:bg-orange-950/30 text-[#f25011]"
                 : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800",
             )}
           >

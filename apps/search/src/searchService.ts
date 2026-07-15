@@ -50,24 +50,38 @@ export class SearchService {
     };
   }
 
-  async suggest(q: string, orgId: string, userGroupIds: string[]): Promise<string[]> {
+  async suggest(q: string, orgId: string, userGroupIds: string[], userId?: string): Promise<string[]> {
     if (!q.trim()) return [];
 
     const result = await this.os.search({
       index: INDEX,
       body: {
         _source: ["title"],
-        size: 5,
+        size: 7,
         query: {
           bool: {
             must: [
-              { match_phrase_prefix: { title: { query: q, max_expansions: 20 } } },
+              {
+                bool: {
+                  should: [
+                    { match_phrase_prefix: { title: { query: q, max_expansions: 20, boost: 3 } } },
+                    { match: { title: { query: q, fuzziness: "AUTO" } } },
+                  ],
+                  minimum_should_match: 1,
+                },
+              },
             ],
             filter: [
               { term: { org_id: orgId } },
-              ...(userGroupIds.length
-                ? [{ terms: { acl_group_ids: userGroupIds } }]
-                : [{ term: { acl_user_ids: "" } }]), // effectively deny all if no groups
+              {
+                bool: {
+                  should: [
+                    ...(userGroupIds.length ? [{ terms: { acl_group_ids: userGroupIds } }] : []),
+                    ...(userId ? [{ term: { acl_user_ids: userId } }] : []),
+                  ],
+                  minimum_should_match: 1,
+                },
+              },
             ],
           },
         },
@@ -128,9 +142,30 @@ export class SearchService {
             },
           ],
           filter: filters,
+          should: [
+            // SR-4: recency boost
+            {
+              range: {
+                updated_at: {
+                  gte: "now-7d",
+                  boost: 2,
+                },
+              },
+            },
+            {
+              range: {
+                updated_at: {
+                  gte: "now-30d",
+                  boost: 1,
+                },
+              },
+            },
+          ],
         },
       },
       highlight: {
+        pre_tags: ["<mark>"],
+        post_tags: ["</mark>"],
         fields: {
           title: { number_of_fragments: 1, fragment_size: 100 },
           body: { number_of_fragments: 3, fragment_size: 200 },

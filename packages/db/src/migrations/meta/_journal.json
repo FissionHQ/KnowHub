@@ -19,22 +19,36 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1783881000000,
-      "tag": "0002_audit_retention_days",
+      "when": 1783600000000,
+      "tag": "0002_document_comments",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1783882000000,
-      "tag": "0003_document_last_edited_by",
+      "when": 1784011210674,
+      "tag": "0003_illegal_johnny_blaze",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
+      "when": 1783881000000,
+      "tag": "0004_audit_retention_days",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783882000000,
+      "tag": "0005_document_last_edited_by",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
       "when": 1783883000000,
-      "tag": "0004_document_collab_state",
+      "tag": "0006_document_collab_state",
       "breakpoints": true
     }
   ]

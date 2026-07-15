@@ -107,6 +107,17 @@ export interface UpdateDocumentBody {
   content?: string;
   tags?: string[];
   status?: DocumentStatus;
+  restrictDownload?: boolean;
+}
+
+export interface CreateCommentBody {
+  body: string;
+  parentId?: string;
+}
+
+export interface UpdateCommentBody {
+  body?: string;
+  resolved?: boolean;
 }
 
 export interface SetDocumentPermissionBody {

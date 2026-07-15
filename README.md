@@ -54,7 +54,7 @@ cd KnowHub
 pnpm install
 ```
 
-The `postinstall` script in `apps/web` copies the HeroUI stylesheet into `src/styles/heroui.css`.
+The root `postinstall` builds shared packages (`@wiki/types`, `@wiki/config`, `@wiki/db`). The `apps/web` postinstall copies the HeroUI stylesheet into `src/styles/heroui.css`.
 
 ### 2. Configure environment variables
 
@@ -62,24 +62,7 @@ The `postinstall` script in `apps/web` copies the HeroUI stylesheet into `src/st
 cp .env.example .env
 ```
 
-For local development with Docker Compose, use these values (they match the port mappings in `docker-compose.yml`):
-
-| Variable | Local value |
-|----------|-------------|
-| `DATABASE_URL` | `postgresql://wiki:wiki@localhost:5434/wiki` |
-| `DATABASE_URL_READER` | `postgresql://wiki:wiki@localhost:5434/wiki` |
-| `REDIS_URL` | `redis://localhost:6380` |
-| `OPENSEARCH_URL` | `http://localhost:9200` |
-| `S3_ENDPOINT` | `http://localhost:4566` |
-| `SQS_ENDPOINT` | `http://localhost:4566` |
-| `SQS_PDF_QUEUE_URL` | `http://localhost:4566/000000000000/wiki-pdf-processing` |
-| `SQS_INDEX_QUEUE_URL` | `http://localhost:4566/000000000000/wiki-search-indexing` |
-| `SES_ENDPOINT` | `http://localhost:1025` |
-| `SES_FROM_ADDRESS` | `noreply@localhost` |
-| `JWT_SECRET` | Any string of 32+ characters |
-| `BASE_DOMAIN` | `localhost` |
-
-> **Note:** `.env.example` uses default Postgres/Redis ports (`5432`, `6379`). When running infrastructure via Docker Compose, update those to `5434` and `6380` as shown above.
+The defaults in `.env.example` match Docker Compose. The most common misconfiguration is `JWT_SECRET` — it must be **at least 32 characters** or the API will refuse to start.
 
 ### 3. Start infrastructure
 
@@ -112,13 +95,13 @@ pnpm db:generate && pnpm db:migrate
 
 Run this once on first setup, and again whenever the Drizzle schema changes.
 
-### 5. (Optional) Seed development data
+### 5. Seed development data (required for login)
 
 ```bash
 pnpm db:seed
 ```
 
-This creates a sample organization, users, spaces, and documents. After seeding, sign in at [http://localhost:3000/login](http://localhost:3000/login) with:
+This creates a sample organization, users, spaces, and documents. **Login will fail without this step.** Sign in at [http://localhost:3000/login](http://localhost:3000/login) with:
 
 | Field | Value |
 |-------|-------|
@@ -226,6 +209,24 @@ KnowHub/
 
 ## Troubleshooting
 
+**Login returns 500**
+
+The web app proxies login to the API on port 3001. A 500 usually means the API is not running. Check the terminal where you ran `pnpm dev` for errors from `@wiki/api`.
+
+Common causes:
+
+1. **`JWT_SECRET` too short** — must be 32+ characters. The API exits immediately if invalid.
+2. **Wrong database/redis ports** — use `5434` and `6380` (Docker Compose), not `5432`/`6379`.
+3. **Database not seeded** — run `pnpm db:seed` (returns 404 without seed, not 500).
+4. **Shared packages not built** — run `pnpm install` again (root postinstall builds them).
+
+Verify the API is up:
+
+```bash
+curl http://localhost:3001/health
+# should return: {"status":"ok"}
+```
+
 **Ports already in use**
 
 ```bash
@@ -257,7 +258,7 @@ Re-run the postinstall copy step:
 ```bash
 pnpm install
 # or directly:
-cp apps/web/node_modules/@heroui/styles/dist/heroui.min.css apps/web/src/styles/heroui.css
+node apps/web/scripts/copy-heroui-styles.mjs
 ```
 
 **Worker not processing messages**

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ne } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
 import {
@@ -11,7 +11,8 @@ import {
   spacePermissions,
   groups,
   users,
-  setTenantContext,
+  organizations,
+  setTenantContext
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64 } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
@@ -36,6 +37,7 @@ const updateDocSchema = z.object({
   content: z.string().optional(),
   tags: z.array(z.string()).optional(),
   status: z.enum(["draft", "published", "trashed"]).optional(),
+  restrictDownload: z.boolean().optional(),
 });
 
 const setPermissionSchema = z.object({
@@ -82,7 +84,27 @@ export function createContentRouter(
     const rows = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.spaceId, spaceId ?? ""), eq(documents.orgId, req.tenant.orgId)));
+      .where(
+        and(
+          eq(documents.spaceId, spaceId ?? ""),
+          eq(documents.orgId, req.tenant.orgId),
+          ne(documents.status, "trashed"),
+        ),
+      );
+
+    res.json({ data: rows });
+  });
+
+  // GET /documents/recent — recently updated documents
+  router.get("/documents/recent", async (req, res) => {
+    const { orgId } = req.tenant;
+
+    const rows = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.orgId, orgId), ne(documents.status, "trashed")))
+      .orderBy(desc(documents.updatedAt))
+      .limit(20);
 
     res.json({ data: rows });
   });
@@ -132,14 +154,6 @@ export function createContentRouter(
 
     await enqueueIndex(docId, orgId, "upsert");
 
-    await recordAudit(db, {
-      orgId,
-      actorId: userId,
-      action: "document.create",
-      target: { documentId: docId, spaceId: body.data.spaceId, title: body.data.title },
-      req,
-    });
-
     res.status(201).json({ data: inserted[0] });
   });
 
@@ -149,8 +163,25 @@ export function createContentRouter(
     const { documentId } = req.params;
 
     const rows = await db
-      .select()
+      .select({
+        id: documents.id,
+        orgId: documents.orgId,
+        spaceId: documents.spaceId,
+        parentId: documents.parentId,
+        type: documents.type,
+        title: documents.title,
+        contentRef: documents.contentRef,
+        ownerId: documents.ownerId,
+        ownerName: users.name,
+        status: documents.status,
+        version: documents.version,
+        tags: documents.tags,
+        restrictDownload: documents.restrictDownload,
+        createdAt: documents.createdAt,
+        updatedAt: documents.updatedAt,
+      })
       .from(documents)
+      .leftJoin(users, eq(documents.ownerId, users.id))
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
 
     if (!rows.length) throw new NotFoundError("Document");
@@ -163,16 +194,7 @@ export function createContentRouter(
       required: "view",
     });
 
-    const accessLevel = await resolveDocumentAccess({
-      db,
-      userRole,
-      userId,
-      groupIds,
-      documentId: doc.id,
-      spaceId: doc.spaceId,
-    });
-
-    res.json({ data: { ...doc, accessLevel } });
+    res.json({ data: doc });
   });
 
   // PATCH /documents/:documentId
@@ -207,6 +229,7 @@ export function createContentRouter(
         ...(body.data.content !== undefined ? { contentRef: body.data.content } : {}),
         ...(body.data.tags !== undefined ? { tags: body.data.tags } : {}),
         ...(body.data.status !== undefined ? { status: body.data.status } : {}),
+        ...(body.data.restrictDownload !== undefined ? { restrictDownload: body.data.restrictDownload } : {}),
         version: newVersion,
         updatedAt: new Date(),
       })
@@ -225,23 +248,6 @@ export function createContentRouter(
     }
 
     await enqueueIndex(documentId ?? "", orgId, "upsert");
-
-    await recordAudit(db, {
-      orgId,
-      actorId: userId,
-      action: "document.update",
-      target: {
-        documentId,
-        changes: {
-          ...(body.data.title !== undefined ? { title: body.data.title } : {}),
-          ...(body.data.content !== undefined ? { contentChanged: true } : {}),
-          ...(body.data.tags !== undefined ? { tags: body.data.tags } : {}),
-          ...(body.data.status !== undefined ? { status: body.data.status } : {}),
-        },
-        version: newVersion,
-      },
-      req,
-    });
 
     res.json({ data: updated[0] });
   });
@@ -273,53 +279,7 @@ export function createContentRouter(
 
     await enqueueIndex(documentId ?? "", orgId, "delete");
 
-    await recordAudit(db, {
-      orgId,
-      actorId: userId,
-      action: "document.delete",
-      target: { documentId, title: doc.title, spaceId: doc.spaceId },
-      req,
-    });
-
     res.json({ data: { trashed: true } });
-  });
-
-  // POST /documents/:documentId/restore — restore from trash (admin only)
-  router.post("/documents/:documentId/restore", async (req, res) => {
-    const { orgId, userRole, userId } = req.tenant;
-    const { documentId } = req.params;
-
-    if (userRole !== "admin") throw new ForbiddenError();
-
-    const rows = await db
-      .select()
-      .from(documents)
-      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
-
-    if (!rows.length) throw new NotFoundError("Document");
-    const doc = rows[0]!;
-
-    if (doc.status !== "trashed") {
-      throw new ConflictError("Document is not in trash");
-    }
-
-    const restored = await db
-      .update(documents)
-      .set({ status: "published", updatedAt: new Date() })
-      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
-      .returning();
-
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
-
-    await recordAudit(db, {
-      orgId,
-      actorId: userId,
-      action: "document.restore",
-      target: { documentId, title: doc.title, spaceId: doc.spaceId },
-      req,
-    });
-
-    res.json({ data: restored[0] });
   });
 
   // GET /documents/:documentId/versions
@@ -343,136 +303,13 @@ export function createContentRouter(
     });
 
     const versions = await db
-      .select({
-        id: documentVersions.id,
-        documentId: documentVersions.documentId,
-        versionNumber: documentVersions.versionNumber,
-        contentSnapshot: documentVersions.contentSnapshot,
-        editedBy: documentVersions.editedBy,
-        editedAt: documentVersions.editedAt,
-        editorName: users.name,
-      })
+      .select()
       .from(documentVersions)
       .leftJoin(users, eq(documentVersions.editedBy, users.id))
       .where(eq(documentVersions.documentId, documentId ?? ""))
       .orderBy(desc(documentVersions.versionNumber));
 
     res.json({ data: versions });
-  });
-
-  // POST /documents/:documentId/versions/:versionNumber/restore
-  router.post("/documents/:documentId/versions/:versionNumber/restore", async (req, res) => {
-    const { orgId, userRole, userId, groupIds } = req.tenant;
-    const { documentId } = req.params;
-    const versionNumber = Number.parseInt(req.params.versionNumber ?? "", 10);
-
-    if (!Number.isFinite(versionNumber) || versionNumber < 1) {
-      throw new ValidationError({ versionNumber: ["Invalid version number"] });
-    }
-
-    const rows = await db
-      .select()
-      .from(documents)
-      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
-
-    if (!rows.length) throw new NotFoundError("Document");
-    const doc = rows[0]!;
-
-    if (doc.status === "trashed") {
-      throw new ConflictError("Cannot restore a version of a trashed document");
-    }
-
-    await assertCanMutateDocumentContent({
-      db,
-      userRole,
-      userId,
-      groupIds,
-      documentId: doc.id,
-      spaceId: doc.spaceId,
-      ownerId: doc.ownerId,
-    });
-
-    const versionRows = await db
-      .select()
-      .from(documentVersions)
-      .where(
-        and(
-          eq(documentVersions.documentId, documentId ?? ""),
-          eq(documentVersions.versionNumber, versionNumber),
-        ),
-      );
-
-    if (!versionRows.length) throw new NotFoundError("Document version");
-    const sourceVersion = versionRows[0]!;
-
-    const restoredDoc = await db.transaction(async (tx) => {
-      await setTenantContext(tx, orgId);
-
-      const locked = await tx
-        .select()
-        .from(documents)
-        .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
-        .for("update");
-
-      const current = locked[0];
-      if (!current) throw new NotFoundError("Document");
-
-      const newVersion = current.version + 1;
-      const collabState = encodeHtmlAsYjsStateBase64(sourceVersion.contentSnapshot);
-
-      const updated = await tx
-        .update(documents)
-        .set({
-          contentRef: sourceVersion.contentSnapshot,
-          version: newVersion,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
-        .returning();
-
-      await tx.insert(documentVersions).values({
-        id: uuidv4(),
-        documentId: documentId ?? "",
-        versionNumber: newVersion,
-        contentSnapshot: sourceVersion.contentSnapshot,
-        editedBy: userId,
-      });
-
-      await tx
-        .insert(documentCollabState)
-        .values({
-          documentId: documentId ?? "",
-          orgId,
-          state: collabState,
-          updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: documentCollabState.documentId,
-          set: { state: collabState, updatedAt: new Date() },
-        });
-
-      return updated[0]!;
-    });
-
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
-    await notifyCollabDocumentReset(redis, orgId, documentId ?? "");
-
-    await recordAudit(db, {
-      orgId,
-      actorId: userId,
-      action: "document.version_restore",
-      target: {
-        documentId,
-        restoredFromVersion: versionNumber,
-        newVersion: restoredDoc.version,
-      },
-      req,
-    });
-
-    res.json({
-      data: restoredDoc,
-      reloadRequired: true,
-    });
   });
 
   async function loadDocument(orgId: string, documentId: string) {
@@ -601,7 +438,7 @@ export function createContentRouter(
       });
     }
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await enqueueIndex(documentId ?? "", orgId, "upsert").catch(() => null);
 
     await recordAudit(db, {
       orgId,
@@ -665,7 +502,7 @@ export function createContentRouter(
       .set({ accessLevel: body.data.accessLevel })
       .where(eq(documentPermissions.id, permissionId ?? ""));
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await enqueueIndex(documentId ?? "", orgId, "upsert").catch(() => null);
 
     await recordAudit(db, {
       orgId,
@@ -723,7 +560,7 @@ export function createContentRouter(
 
     await db.delete(documentPermissions).where(eq(documentPermissions.id, permissionId ?? ""));
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await enqueueIndex(documentId ?? "", orgId, "upsert").catch(() => null);
 
     await recordAudit(db, {
       orgId,
