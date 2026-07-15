@@ -82,7 +82,20 @@ export interface Document {
   updatedAt: Date;
   tags: string[];
   restrictDownload: boolean;
+  trashedAt?: Date;
+  /** Present on GET /documents/:id — effective access for the current user */
   accessLevel?: AccessLevel;
+}
+
+export interface TrashedDocument {
+  id: string;
+  title: string;
+  type: DocumentType;
+  spaceId: string;
+  spaceName: string;
+  ownerId: string;
+  trashedAt: Date;
+  purgeAt: Date;
 }
 
 export interface DocumentPermission {

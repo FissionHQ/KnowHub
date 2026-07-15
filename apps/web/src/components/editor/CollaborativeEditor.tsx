@@ -74,9 +74,13 @@ export function CollaborativeEditor({
     );
   }
 
+  const handleInsertImage = (src: string) => {
+    editor.chain().focus().setImage({ src }).run();
+  };
+
   return (
     <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
-      {!readOnly && <EditorToolbar editor={editor} />}
+      {!readOnly && <EditorToolbar editor={editor} onInsertImage={handleInsertImage} />}
       <EditorContent editor={editor} className="prose prose-sm max-w-none" />
     </div>
   );

@@ -42,6 +42,7 @@ export function RichTextEditor({
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       Placeholder.configure({ placeholder }),
@@ -93,7 +94,13 @@ export function RichTextEditor({
     editor?.chain().focus().setImage({ src }).run();
   }, [editor]);
 
-  if (!editor) return null;
+  if (!editor) {
+    return (
+      <div className="flex items-center justify-center py-16 text-sm text-zinc-400">
+        Loading editor…
+      </div>
+    );
+  }
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">

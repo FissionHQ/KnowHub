@@ -25,6 +25,7 @@ export type AuditAction =
   | "document.create"
   | "document.update"
   | "document.delete"
+  | "document.purge"
   | "document.restore"
   | "document.version_restore"
   | "document.permission_change"

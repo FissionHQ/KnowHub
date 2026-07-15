@@ -162,6 +162,7 @@ export const documents = pgTable(
     version: integer("version").notNull().default(1),
     tags: text("tags").array().notNull().default([]),
     restrictDownload: boolean("restrict_download").notNull().default(false),
+    trashedAt: timestamp("trashed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -171,6 +172,7 @@ export const documents = pgTable(
     index("documents_parent_id_idx").on(t.parentId),
     index("documents_owner_id_idx").on(t.ownerId),
     index("documents_status_idx").on(t.status),
+    index("documents_trashed_at_idx").on(t.trashedAt),
   ],
 );
 

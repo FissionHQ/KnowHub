@@ -3,7 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { documentsApi } from "@/lib/api";
-import type { DocumentVersion } from "@wiki/types";
+import type { DocumentVersionListItem } from "@wiki/types";
 import { History, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { Spinner } from "@heroui/react";
 
@@ -16,12 +16,12 @@ export function VersionHistoryPanel({ documentId, onRestore }: Props) {
   const [open, setOpen] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
 
-  const { data: versions, isLoading } = useSWR<DocumentVersion[]>(
+  const { data: versions, isLoading } = useSWR<DocumentVersionListItem[]>(
     open ? `versions:${documentId}` : null,
     () => documentsApi.getVersions(documentId),
   );
 
-  async function handleRestore(v: DocumentVersion) {
+  async function handleRestore(v: DocumentVersionListItem) {
     setRestoring(v.id);
     try {
       await documentsApi.restoreVersion(documentId, v.versionNumber);
@@ -54,7 +54,7 @@ export function VersionHistoryPanel({ documentId, onRestore }: Props) {
           )}
           {versions?.map((v) => (
             <div
-              key={v.id}
+              key={v.id ?? `v${v.versionNumber}`}
               className="flex items-center justify-between px-4 py-2.5 text-sm bg-white dark:bg-zinc-900"
             >
               <div>
@@ -64,8 +64,8 @@ export function VersionHistoryPanel({ documentId, onRestore }: Props) {
                 <span className="text-zinc-400 ml-2">
                   {new Date(v.editedAt).toLocaleString()}
                 </span>
-                {v.editedByName && (
-                  <span className="text-zinc-400 ml-2">by {v.editedByName}</span>
+                {v.editorName && (
+                  <span className="text-zinc-400 ml-2">by {v.editorName}</span>
                 )}
               </div>
               <button

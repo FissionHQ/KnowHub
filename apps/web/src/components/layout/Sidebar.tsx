@@ -8,7 +8,7 @@ import { spacesApi, activityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Space, Document } from "@wiki/types";
 import { Separator } from "@heroui/react";
-import { LogOut, Search, Settings, User, Zap, ChevronRight, ChevronDown, Clock, Star, Trash2, RefreshCw } from "lucide-react";
+import { LogOut, Search, Settings, User, Zap, ChevronRight, ChevronDown, Clock, Star, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { ThemeToggle } from "./ThemeToggle";
 import { SpaceDocTree } from "./SpaceDocTree";
@@ -177,14 +177,6 @@ export function Sidebar() {
           </div>
         )}
         <ThemeToggle />
-        {user?.role === "admin" && (
-          <Link href="/admin/trash">
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-white/10 transition-colors cursor-pointer">
-              <Trash2 size={14} />
-              <span>Trash</span>
-            </div>
-          </Link>
-        )}
         {user?.role === "admin" && (
           <Link href="/admin">
             <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-white/10 transition-colors cursor-pointer">

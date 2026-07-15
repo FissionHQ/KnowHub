@@ -13,8 +13,8 @@ import {
 import { S3Client } from "@aws-sdk/client-s3";
 import { SESClient } from "@aws-sdk/client-ses";
 import { parseWorkerEnv } from "@wiki/config";
-import { getDb, setTenantContext, purgeExpiredAuditLogs } from "@wiki/db";
-import { createOpenSearchClient, ensureIndex } from "./opensearch.js";
+import { getDb, setTenantContext, purgeExpiredAuditLogs, purgeExpiredTrash } from "@wiki/db";
+import { createOpenSearchClient, ensureIndex, INDEX_NAME } from "./opensearch.js";
 import { PdfProcessor } from "./pdfProcessor.js";
 import { Indexer } from "./indexer.js";
 import { logger } from "./logger.js";
@@ -119,6 +119,35 @@ async function main() {
   };
   await purgeAudit();
   setInterval(purgeAudit, 24 * 60 * 60 * 1000);
+
+  const purgeTrash = async () => {
+    try {
+      const purged = await purgeExpiredTrash(db);
+      for (const doc of purged) {
+        try {
+          await setTenantContext(db, doc.orgId);
+          await os.delete({ index: INDEX_NAME, id: doc.documentId, refresh: "wait_for" });
+        } catch (err) {
+          logger.warn("Failed to remove purged document from search index", {
+            documentId: doc.documentId,
+            err,
+          });
+        }
+        logger.info("Permanently purged trashed document", {
+          documentId: doc.documentId,
+          orgId: doc.orgId,
+          title: doc.title,
+        });
+      }
+      if (purged.length) {
+        logger.info("Trash retention purge completed", { count: purged.length });
+      }
+    } catch (err) {
+      logger.error("Trash purge failed", { err });
+    }
+  };
+  await purgeTrash();
+  setInterval(purgeTrash, 24 * 60 * 60 * 1000);
 
   // Poll both queues concurrently
   await Promise.all([
