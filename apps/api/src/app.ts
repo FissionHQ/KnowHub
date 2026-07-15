@@ -12,7 +12,9 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { createIdentityRouter } from "./domains/identity/router.js";
 import { createAccessRouter } from "./domains/access/router.js";
 import { createNavigationRouter } from "./domains/navigation/router.js";
+import { createUserActivityRouter } from "./domains/navigation/userActivityRouter.js";
 import { createContentRouter } from "./domains/content/router.js";
+import { createCommentsRouter } from "./domains/content/commentsRouter.js";
 import { createStorageRouter } from "./domains/storage/router.js";
 import { createAdminRouter } from "./domains/admin/router.js";
 import { createAuthRouter } from "./domains/auth/router.js";
@@ -77,7 +79,9 @@ export function createApp(
   api.use(createIdentityRouter(db, redis, ses, env));
   api.use(createAccessRouter(db, redis));
   api.use(createNavigationRouter(db));
+  api.use(createUserActivityRouter(db));
   api.use(createContentRouter(db, sqs, env.SQS_INDEX_QUEUE_URL));
+  api.use(createCommentsRouter(db));
   api.use(
     createStorageRouter(db, s3, sqs, {
       quarantineBucket: env.S3_QUARANTINE_BUCKET,

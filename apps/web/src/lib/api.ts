@@ -1,5 +1,7 @@
 import type {
   Document,
+  DocumentVersion,
+  Comment,
   Space,
   Group,
   User,
@@ -8,6 +10,8 @@ import type {
   SearchResponse,
   CreateDocumentBody,
   UpdateDocumentBody,
+  CreateCommentBody,
+  UpdateCommentBody,
   CreateSpaceBody,
   InviteUserBody,
   UpdateOrgSettingsBody,
@@ -118,9 +122,11 @@ export const documentsApi = {
   delete: (id: string) =>
     apiFetch<{ trashed: boolean }>(`${BASE}/documents/${id}`, { method: "DELETE" }),
   getVersions: (id: string) =>
-    apiFetch<{ id: string; versionNumber: number; editedAt: string }[]>(
-      `${BASE}/documents/${id}/versions`,
-    ),
+    apiFetch<DocumentVersion[]>(`${BASE}/documents/${id}/versions`),
+  restoreVersion: (id: string, versionNumber: number) =>
+    apiFetch<Document>(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, { method: "POST", body: "{}" }),
+  listChildren: (id: string) =>
+    apiFetch<Document[]>(`${BASE}/documents/${id}/children`),
   listPermissions: (id: string) =>
     apiFetch<DocumentPermissionsResponse>(`${BASE}/documents/${id}/permissions`),
   setPermission: (id: string, body: SetDocumentPermissionBody) =>
@@ -154,6 +160,19 @@ export const attachmentsApi = {
     });
     if (!res.ok) throw new Error("Upload failed");
     const json = await res.json() as { data: { attachmentId: string } };
+    return json.data;
+  },
+  replacePdf: async (documentId: string, file: File): Promise<{ attachmentId: string; version: number }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE}/documents/${documentId}/attachments/replace`, {
+      method: "POST",
+      body: form,
+      headers: devAuthHeaders(),
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Replace failed");
+    const json = await res.json() as { data: { attachmentId: string; version: number } };
     return json.data;
   },
   getStatus: (attachmentId: string) =>
@@ -229,6 +248,51 @@ export const adminApi = {
       `${BASE}/admin/audit-log${query ? `?${query}` : ""}`,
     );
   },
+};
+
+// ─── Comments ─────────────────────────────────────────────────────────────
+
+export const commentsApi = {
+  list: (documentId: string) =>
+    apiFetch<Comment[]>(`${BASE}/documents/${documentId}/comments`),
+  create: (documentId: string, body: CreateCommentBody) =>
+    apiFetch<Comment>(`${BASE}/documents/${documentId}/comments`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  update: (documentId: string, commentId: string, body: UpdateCommentBody) =>
+    apiFetch<Comment>(`${BASE}/documents/${documentId}/comments/${commentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  delete: (documentId: string, commentId: string) =>
+    apiFetch<{ deleted: boolean }>(`${BASE}/documents/${documentId}/comments/${commentId}`, {
+      method: "DELETE",
+    }),
+};
+
+// ─── User Activity ────────────────────────────────────────────────────────
+
+export const activityApi = {
+  recordView: (documentId: string) =>
+    apiFetch<{ recorded: boolean }>(`${BASE}/documents/${documentId}/view`, { method: "POST", body: "{}" }),
+  getRecent: () => apiFetch<Document[]>(`${BASE}/users/me/recent`),
+  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/documents/recent`),
+  toggleFavorite: (documentId: string) =>
+    apiFetch<{ favorited: boolean }>(`${BASE}/documents/${documentId}/favorite`, { method: "POST", body: "{}" }),
+  isFavorited: (documentId: string) =>
+    apiFetch<{ favorited: boolean }>(`${BASE}/documents/${documentId}/favorite`),
+  getFavorites: () => apiFetch<Document[]>(`${BASE}/users/me/favorites`),
+};
+
+// ─── Trash ────────────────────────────────────────────────────────────────
+
+export const trashApi = {
+  list: () => apiFetch<Document[]>(`${BASE}/trash`),
+  restore: (documentId: string) =>
+    apiFetch<Document>(`${BASE}/trash/${documentId}/restore`, { method: "POST", body: "{}" }),
+  permanentDelete: (documentId: string) =>
+    apiFetch<{ deleted: boolean }>(`${BASE}/trash/${documentId}`, { method: "DELETE" }),
 };
 
 // ─── Search ───────────────────────────────────────────────────────────────

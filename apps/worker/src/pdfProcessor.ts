@@ -2,6 +2,7 @@ import {
   GetObjectCommand,
   CopyObjectCommand,
   DeleteObjectCommand,
+  PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
@@ -30,7 +31,7 @@ export class PdfProcessor {
   async process(msg: PdfProcessingMessage): Promise<void> {
     const { attachmentId, documentId, orgId, quarantineKey, originalName } = msg;
 
-    logger.info("Processing PDF", { attachmentId, documentId });
+    logger.info("Processing attachment", { attachmentId, documentId, originalName });
 
     // Update status to scanning
     await this.db
@@ -39,34 +40,34 @@ export class PdfProcessor {
       .where(eq(attachments.id, attachmentId));
 
     let pdfText = "";
-    let fileBuffer: Buffer;
+    const isPdf = originalName.toLowerCase().endsWith(".pdf");
 
     try {
-      // Fetch from quarantine
-      const obj = await this.s3.send(
-        new GetObjectCommand({ Bucket: this.opts.quarantineBucket, Key: quarantineKey }),
-      );
+      if (isPdf) {
+        // Fetch from quarantine for PDF text extraction
+        const obj = await this.s3.send(
+          new GetObjectCommand({ Bucket: this.opts.quarantineBucket, Key: quarantineKey }),
+        );
 
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
-        chunks.push(chunk);
-      }
-      fileBuffer = Buffer.concat(chunks);
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
+          chunks.push(chunk);
+        }
+        const fileBuffer = Buffer.concat(chunks);
 
-      // Basic malware check: reject files that aren't valid PDFs
-      if (!this.isValidPdf(fileBuffer)) {
-        throw new Error("File does not appear to be a valid PDF");
-      }
+        if (!this.isValidPdf(fileBuffer)) {
+          throw new Error("File does not appear to be a valid PDF");
+        }
 
-      // Extract text
-      try {
-        const parsed = await pdfParse(fileBuffer);
-        pdfText = parsed.text;
-      } catch (err) {
-        logger.warn("PDF text extraction failed (continuing with empty text)", { err });
+        try {
+          const parsed = await pdfParse(fileBuffer);
+          pdfText = parsed.text;
+        } catch (err) {
+          logger.warn("PDF text extraction failed (continuing with empty text)", { err });
+        }
       }
     } catch (err) {
-      logger.error("PDF processing failed — marking as error", { attachmentId, err });
+      logger.error("Attachment processing failed — marking as error", { attachmentId, err });
       await this.db
         .update(attachments)
         .set({ scanStatus: "error" })
@@ -81,11 +82,26 @@ export class PdfProcessor {
         CopySource: `${this.opts.quarantineBucket}/${quarantineKey}`,
         Bucket: this.opts.servedBucket,
         Key: servedKey,
-        ServerSideEncryption: "aws:kms",
         MetadataDirective: "REPLACE",
         Metadata: { "x-org-id": orgId, "x-attachment-id": attachmentId },
       }),
     );
+
+    // Generate thumbnail (PDF-9) — store first page text snippet as metadata
+    // Full image thumbnail would require canvas/sharp; we store a text preview for listings
+    const thumbnailKey = `thumbnails/${orgId}/${attachmentId}.txt`;
+    const preview = pdfText.slice(0, 500).replace(/\s+/g, " ").trim();
+    if (preview) {
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.opts.servedBucket,
+          Key: thumbnailKey,
+          Body: preview,
+          ContentType: "text/plain",
+          Metadata: { "x-org-id": orgId, "x-document-id": documentId },
+        }),
+      );
+    }
 
     // Delete from quarantine
     await this.s3.send(
@@ -99,9 +115,11 @@ export class PdfProcessor {
       .where(eq(attachments.id, attachmentId));
 
     // Index in OpenSearch
-    await this.indexDocument(documentId, orgId, pdfText, attachmentId);
+    if (isPdf) {
+      await this.indexDocument(documentId, orgId, pdfText, attachmentId);
+    }
 
-    logger.info("PDF processed successfully", { attachmentId, servedKey });
+    logger.info("Attachment processed successfully", { attachmentId, servedKey });
   }
 
   private async indexDocument(

@@ -15,6 +15,20 @@
       "when": 1783512000000,
       "tag": "0001_user_password_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783600000000,
+      "tag": "0002_document_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784011210674,
+      "tag": "0003_illegal_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

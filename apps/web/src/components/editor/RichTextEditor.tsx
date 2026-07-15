@@ -11,8 +11,10 @@ import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { EditorToolbar } from "./EditorToolbar";
+import Underline from "@tiptap/extension-underline";
+import { FileEmbedExtension } from "./FileEmbedExtension";
 
 const lowlight = createLowlight(common);
 
@@ -22,6 +24,8 @@ interface Props {
   placeholder?: string;
   autoSaveMs?: number;
   onAutoSave?: (content: string) => void;
+  title?: string;
+  documentId?: string;
 }
 
 export function RichTextEditor({
@@ -30,6 +34,8 @@ export function RichTextEditor({
   placeholder = "Start writing...",
   autoSaveMs = 3000,
   onAutoSave,
+  title = "document",
+  documentId,
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -37,6 +43,7 @@ export function RichTextEditor({
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       Placeholder.configure({ placeholder }),
+      Underline,
       Image,
       Link.configure({ openOnClick: false }),
       Table.configure({ resizable: true }),
@@ -44,6 +51,7 @@ export function RichTextEditor({
       TableCell,
       TableHeader,
       CodeBlockLowlight.configure({ lowlight }),
+      FileEmbedExtension,
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -71,12 +79,27 @@ export function RichTextEditor({
     };
   }, []);
 
+  const handleInsertImage = useCallback((src: string) => {
+    editor?.chain().focus().setImage({ src }).run();
+  }, [editor]);
+
   if (!editor) return null;
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <EditorToolbar editor={editor} />
-      <EditorContent editor={editor} className="prose prose-sm max-w-none" />
+      <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} documentId={documentId} />
+      <EditorContent
+        editor={editor}
+        className="prose prose-sm max-w-none"
+        onMouseDown={(e) => {
+          if (!(e.metaKey || e.ctrlKey)) return;
+          const target = (e.target as HTMLElement).closest("a");
+          if (target) {
+            e.preventDefault();
+            window.open((target as HTMLAnchorElement).href, "_blank", "noopener,noreferrer");
+          }
+        }}
+      />
     </div>
   );
 }

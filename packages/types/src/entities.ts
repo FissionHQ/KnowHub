@@ -73,11 +73,14 @@ export interface Document {
   title: string;
   contentRef?: string;
   ownerId: string;
+  ownerName?: string;
+  lastEditedByName?: string;
   status: DocumentStatus;
   version: number;
   createdAt: Date;
   updatedAt: Date;
   tags: string[];
+  restrictDownload: boolean;
 }
 
 export interface DocumentPermission {
@@ -94,7 +97,21 @@ export interface DocumentVersion {
   versionNumber: number;
   contentSnapshot: string;
   editedBy: string;
+  editedByName?: string;
   editedAt: Date;
+}
+
+export interface Comment {
+  id: string;
+  documentId: string;
+  parentId?: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  resolved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  replies?: Comment[];
 }
 
 export interface Attachment {

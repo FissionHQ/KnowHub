@@ -43,7 +43,7 @@ export function AuditLogSection() {
                 <td className="px-4 py-3 whitespace-nowrap text-zinc-500 dark:text-zinc-400">
                   {new Date(entry.timestamp).toLocaleString()}
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-violet-700 dark:text-violet-300">
+                <td className="px-4 py-3 font-mono text-xs text-[#f25011]">
                   {entry.action}
                 </td>
                 <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">

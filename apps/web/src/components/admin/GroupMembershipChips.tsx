@@ -74,7 +74,7 @@ export function UserGroupChips({
         {inlineGroups.map((group) => (
           <span
             key={group.id}
-            className="px-2 py-0.5 rounded-full text-xs border border-violet-400 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 truncate max-w-[120px]"
+            className="px-2 py-0.5 rounded-full text-xs border border-[#f25011] bg-orange-50 dark:bg-orange-950/40 text-[#f25011] truncate max-w-[120px]"
             title={group.name}
           >
             {group.name}
@@ -95,7 +95,7 @@ export function UserGroupChips({
           className={clsx(
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors",
             "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400",
-            "hover:border-violet-300 hover:text-violet-700 dark:hover:text-violet-300",
+            "hover:border-[#f25011]/50 hover:text-[#f25011]",
             disabled && "opacity-50 cursor-not-allowed",
           )}
         >
@@ -157,7 +157,7 @@ export function UserGroupChips({
                         className={clsx(
                           "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide",
                           isMember
-                            ? "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
+                            ? "bg-orange-50 text-[#f25011] dark:bg-orange-950/30"
                             : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
                         )}
                       >
@@ -237,7 +237,7 @@ export function GroupSelectChips({
             className={clsx(
               "px-2.5 py-1 rounded-full text-xs border transition-colors",
               selected.has(group.id)
-                ? "border-violet-400 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300"
+                ? "border-[#f25011] bg-orange-50 dark:bg-orange-950/40 text-[#f25011]"
                 : "border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300",
             )}
           >
