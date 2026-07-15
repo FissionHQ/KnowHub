@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AdminView } from "./AdminView";
 
@@ -9,7 +10,9 @@ export default function AdminPage() {
         className="flex-1 overflow-y-auto"
         style={{ marginLeft: "var(--sidebar-width)" }}
       >
-        <AdminView />
+        <Suspense fallback={null}>
+          <AdminView />
+        </Suspense>
       </main>
     </div>
   );

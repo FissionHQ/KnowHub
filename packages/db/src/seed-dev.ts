@@ -216,7 +216,10 @@ async function main() {
     .sign(new TextEncoder().encode(jwtSecret));
 
   const envLocalPath = path.resolve(__dirname, "../../../apps/web/.env.local");
-  writeFileSync(envLocalPath, `NEXT_PUBLIC_DEV_JWT=${token}\n`);
+  writeFileSync(
+    envLocalPath,
+    `NEXT_PUBLIC_DEV_JWT=${token}\nNEXT_PUBLIC_COLLAB_WS_URL=ws://localhost:3003\n`,
+  );
 
   console.log("\nSeed complete!\n");
   console.log("Organization: Acme Corp (subdomain: acme)");

@@ -35,7 +35,7 @@ export default function LoginForm() {
       <Card className="w-full max-w-md">
         <CardContent className="p-8">
           <div className="flex items-center gap-3 mb-8">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#f25011]">
               <Zap size={18} className="text-white" strokeWidth={2.5} />
             </div>
             <div>

@@ -1,13 +1,15 @@
 import type { Db } from "./client.js";
 import { sql } from "drizzle-orm";
 
+type DbExecutor = Pick<Db, "execute">;
+
 /**
  * Sets the PostgreSQL session variable used by RLS policies.
  * Must be called at the start of every transaction/request.
  *
  * Uses SET LOCAL so the value is scoped to the current transaction only.
  */
-export async function setTenantContext(db: Db, orgId: string): Promise<void> {
+export async function setTenantContext(db: DbExecutor, orgId: string): Promise<void> {
   await db.execute(sql`SELECT set_config('app.current_org_id', ${orgId}, true)`);
 }
 

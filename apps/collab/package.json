@@ -1,0 +1,43 @@
+{
+  "name": "@wiki/collab",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.700.0",
+    "@hocuspocus/extension-redis": "^2.15.0",
+    "@hocuspocus/server": "^2.15.0",
+    "@hocuspocus/transformer": "^2.15.0",
+    "@tiptap/extension-code-block-lowlight": "^2.9.0",
+    "@tiptap/extension-image": "^2.9.0",
+    "@tiptap/extension-link": "^2.9.0",
+    "@tiptap/extension-table": "^2.9.0",
+    "@tiptap/extension-table-cell": "^2.9.0",
+    "@tiptap/extension-table-header": "^2.9.0",
+    "@tiptap/extension-table-row": "^2.9.0",
+    "@tiptap/html": "^2.9.0",
+    "@tiptap/starter-kit": "^2.9.0",
+    "@wiki/config": "workspace:*",
+    "@wiki/db": "workspace:*",
+    "@wiki/doc-collab": "workspace:*",
+    "@wiki/types": "workspace:*",
+    "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.36.0",
+    "ioredis": "^5.4.1",
+    "jose": "^5.9.6",
+    "lowlight": "^3.1.0",
+    "winston": "^3.17.0",
+    "yjs": "^13.6.20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

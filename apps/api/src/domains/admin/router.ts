@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 import type { Db } from "@wiki/db";
 import { auditLog, organizations } from "@wiki/db";
 import { ForbiddenError, NotFoundError, ValidationError } from "../../lib/errors.js";
@@ -16,6 +16,7 @@ const orgSettingsSchema = z.object({
   branding: brandingSchema.optional(),
   maxFileSizeBytes: z.number().int().min(1_048_576).max(524_288_000).optional(),
   trashRetentionDays: z.number().int().min(1).max(365).optional(),
+  auditRetentionDays: z.number().int().min(30).max(3650).optional(),
 });
 
 export function createAdminRouter(db: Db): Router {
@@ -44,11 +45,29 @@ export function createAdminRouter(db: Db): Router {
     const { orgId } = req.tenant;
     const limit = Math.min(Number(req.query["limit"] ?? 50), 200);
     const offset = Number(req.query["offset"] ?? 0);
+    const action = req.query["action"];
+    const actorId = req.query["actorId"];
+    const from = req.query["from"];
+    const to = req.query["to"];
+
+    const conditions = [eq(auditLog.orgId, orgId)];
+    if (typeof action === "string" && action.length) {
+      conditions.push(eq(auditLog.action, action));
+    }
+    if (typeof actorId === "string" && actorId.length) {
+      conditions.push(eq(auditLog.actorId, actorId));
+    }
+    if (typeof from === "string" && from.length) {
+      conditions.push(gte(auditLog.timestamp, new Date(from)));
+    }
+    if (typeof to === "string" && to.length) {
+      conditions.push(lte(auditLog.timestamp, new Date(to)));
+    }
 
     const rows = await db
       .select()
       .from(auditLog)
-      .where(eq(auditLog.orgId, orgId))
+      .where(and(...conditions))
       .orderBy(desc(auditLog.timestamp))
       .limit(limit)
       .offset(offset);
@@ -72,6 +91,9 @@ export function createAdminRouter(db: Db): Router {
           : {}),
         ...(body.data.trashRetentionDays !== undefined
           ? { trashRetentionDays: body.data.trashRetentionDays }
+          : {}),
+        ...(body.data.auditRetentionDays !== undefined
+          ? { auditRetentionDays: body.data.auditRetentionDays }
           : {}),
       })
       .where(eq(organizations.id, orgId))

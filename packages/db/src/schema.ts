@@ -39,6 +39,7 @@ export const organizations = pgTable("organizations", {
     .notNull()
     .default(104_857_600), // 100 MB
   trashRetentionDays: integer("trash_retention_days").notNull().default(30),
+  auditRetentionDays: integer("audit_retention_days").notNull().default(365),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -160,6 +161,8 @@ export const documents = pgTable(
     status: documentStatusEnum("status").notNull().default("draft"),
     version: integer("version").notNull().default(1),
     tags: text("tags").array().notNull().default([]),
+    restrictDownload: boolean("restrict_download").notNull().default(false),
+    trashedAt: timestamp("trashed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -169,6 +172,7 @@ export const documents = pgTable(
     index("documents_parent_id_idx").on(t.parentId),
     index("documents_owner_id_idx").on(t.ownerId),
     index("documents_status_idx").on(t.status),
+    index("documents_trashed_at_idx").on(t.trashedAt),
   ],
 );
 
@@ -206,6 +210,22 @@ export const documentVersions = pgTable(
   ],
 );
 
+export const documentCollabState = pgTable(
+  "document_collab_state",
+  {
+    documentId: uuid("document_id")
+      .primaryKey()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Base64-encoded Yjs state update */
+    state: text("state").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("document_collab_state_org_id_idx").on(t.orgId)],
+);
+
 // ─── Attachments ──────────────────────────────────────────────────────────
 
 export const attachments = pgTable(
@@ -233,6 +253,33 @@ export const attachments = pgTable(
   ],
 );
 
+// ─── Document Comments ───────────────────────────────────────────────────
+
+export const documentComments = pgTable(
+  "document_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id"),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    resolved: boolean("resolved").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("doc_comments_document_id_idx").on(t.documentId),
+    index("doc_comments_parent_id_idx").on(t.parentId),
+  ],
+);
+
 // ─── Audit Log ────────────────────────────────────────────────────────────
 
 export const auditLog = pgTable(
@@ -252,6 +299,44 @@ export const auditLog = pgTable(
     index("audit_log_org_id_idx").on(t.orgId),
     index("audit_log_timestamp_idx").on(t.timestamp),
     index("audit_log_actor_id_idx").on(t.actorId),
+  ],
+);
+
+// ─── Recently Viewed ──────────────────────────────────────────────────────
+
+export const recentlyViewed = pgTable(
+  "recently_viewed",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.documentId] }),
+    index("recently_viewed_user_id_idx").on(t.userId),
+  ],
+);
+
+// ─── Favorites ────────────────────────────────────────────────────────────
+
+export const favorites = pgTable(
+  "favorites",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.documentId] }),
+    index("favorites_user_id_idx").on(t.userId),
   ],
 );
 

@@ -132,8 +132,8 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden mb-3">
                   {data.overrides.map((perm) => {
                     const label = perm.groupId
-                      ? perm.groupName ?? "Group"
-                      : perm.userName ?? perm.userEmail ?? "User";
+                      ? (perm.groupName ?? "Group")
+                      : (perm.userName ?? perm.userEmail ?? "User");
                     return (
                       <li
                         key={perm.id}
@@ -177,7 +177,10 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                 </ul>
               )}
 
-              <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <form
+                onSubmit={handleAdd}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2"
+              >
                 <select
                   value={granteeType}
                   onChange={(e) => {

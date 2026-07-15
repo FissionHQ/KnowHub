@@ -15,6 +15,7 @@ export interface Organization {
   branding: OrgBranding;
   maxFileSizeBytes: number;
   trashRetentionDays: number;
+  auditRetentionDays: number;
   createdAt: Date;
 }
 
@@ -73,11 +74,28 @@ export interface Document {
   title: string;
   contentRef?: string;
   ownerId: string;
+  ownerName?: string;
+  lastEditedByName?: string;
   status: DocumentStatus;
   version: number;
   createdAt: Date;
   updatedAt: Date;
   tags: string[];
+  restrictDownload: boolean;
+  trashedAt?: Date;
+  /** Present on GET /documents/:id — effective access for the current user */
+  accessLevel?: AccessLevel;
+}
+
+export interface TrashedDocument {
+  id: string;
+  title: string;
+  type: DocumentType;
+  spaceId: string;
+  spaceName: string;
+  ownerId: string;
+  trashedAt: Date;
+  purgeAt: Date;
 }
 
 export interface DocumentPermission {
@@ -94,7 +112,25 @@ export interface DocumentVersion {
   versionNumber: number;
   contentSnapshot: string;
   editedBy: string;
+  editedByName?: string;
   editedAt: Date;
+}
+
+export interface Comment {
+  id: string;
+  documentId: string;
+  parentId?: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  resolved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  replies?: Comment[];
+}
+
+export interface DocumentVersionListItem extends DocumentVersion {
+  editorName: string | null;
 }
 
 export interface Attachment {

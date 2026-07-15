@@ -122,7 +122,7 @@ export function GroupsSection() {
                           {members.length} member{members.length === 1 ? "" : "s"}
                         </Chip>
                         {group.isDefault && (
-                          <span className="text-xs text-violet-600 dark:text-violet-400">Default</span>
+                          <span className="text-xs text-[#f25011]">Default</span>
                         )}
                       </div>
                       {group.description && (

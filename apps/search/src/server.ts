@@ -8,6 +8,7 @@ import express from "express";
 import "express-async-errors";
 import helmet from "helmet";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import { z } from "zod";
 import { Client } from "@opensearch-project/opensearch";
@@ -33,7 +34,8 @@ const searchService = new SearchService(os);
 
 const app = express();
 app.use(helmet());
-app.use(cors());
+app.use(cors({ credentials: true, origin: true }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(morgan("combined", { stream: { write: (m) => logger.info(m.trim()) } }));
 
@@ -52,10 +54,13 @@ const querySchema = z.object({
 });
 
 // Shared auth helper
-async function extractTenant(authHeader: string | undefined) {
-  if (!authHeader?.startsWith("Bearer ")) throw Object.assign(new Error("Unauthorized"), { status: 401 });
+async function extractTenant(req: express.Request) {
+  const authHeader = req.headers.authorization;
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+  const cookieToken = (req.cookies as Record<string, string>)?.["wiki_token"];
+  const token = bearerToken ?? cookieToken;
 
-  const token = authHeader.slice(7);
+  if (!token) throw Object.assign(new Error("Unauthorized"), { status: 401 });
   let payload: jose.JWTPayload;
 
   try {
@@ -82,7 +87,7 @@ async function extractTenant(authHeader: string | undefined) {
 }
 
 app.get("/search", async (req, res) => {
-  const tenant = await extractTenant(req.headers.authorization);
+  const tenant = await extractTenant(req);
   const q = querySchema.safeParse(req.query);
   if (!q.success) {
     res.status(400).json({ error: { code: "VALIDATION_ERROR", message: "Invalid query", details: q.error.flatten() } });
@@ -94,11 +99,11 @@ app.get("/search", async (req, res) => {
 });
 
 app.get("/search/suggest", async (req, res) => {
-  const tenant = await extractTenant(req.headers.authorization);
+  const tenant = await extractTenant(req);
   const q = z.string().min(1).max(200).safeParse(req.query["q"]);
   if (!q.success) { res.json({ data: [] }); return; }
 
-  const suggestions = await searchService.suggest(q.data, tenant.orgId, tenant.groupIds);
+  const suggestions = await searchService.suggest(q.data, tenant.orgId, tenant.groupIds, tenant.userId);
   res.json({ data: suggestions });
 });
 
