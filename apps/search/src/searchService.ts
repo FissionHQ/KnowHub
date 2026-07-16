@@ -119,11 +119,25 @@ export class SearchService {
         bool: {
           must: [
             {
-              multi_match: {
-                query: query.q,
-                fields: ["title^3", "body", "tags^2"],
-                type: "best_fields",
-                fuzziness: "AUTO",
+              bool: {
+                should: [
+                  {
+                    multi_match: {
+                      query: query.q,
+                      fields: ["title^3", "body", "tags^2"],
+                      type: "best_fields",
+                      fuzziness: "AUTO",
+                    },
+                  },
+                  {
+                    multi_match: {
+                      query: query.q,
+                      fields: ["title^3", "body"],
+                      type: "phrase_prefix",
+                    },
+                  },
+                ],
+                minimum_should_match: 1,
               },
             },
           ],
