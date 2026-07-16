@@ -61,18 +61,23 @@ export class Indexer {
     ];
     const aclUserIds = docPerm.filter((r) => r.userId).map((r) => r.userId!);
 
+    const body = doc.contentRef ?? "";
+    // Strip HTML tags for preview text
+    const plainText = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
     const indexDoc: SearchIndexDocument = {
       org_id: orgId,
       document_id: documentId,
       space_id: doc.spaceId,
       type: doc.type,
       title: doc.title,
-      body: doc.contentRef ?? "",
+      body,
       tags: doc.tags,
       owner_id: doc.ownerId,
       updated_at: doc.updatedAt.toISOString(),
       acl_group_ids: aclGroupIds,
       acl_user_ids: aclUserIds,
+      preview: plainText.slice(0, 300) || null,
       content_embedding: null,
     };
 

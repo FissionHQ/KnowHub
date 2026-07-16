@@ -33,7 +33,10 @@ const collabSchema = baseSchema.extend({
   COLLAB_PORT: z.coerce.number().default(3003),
 });
 
-const workerSchema = baseSchema;
+const workerSchema = baseSchema.extend({
+  CLAMAV_HOST: z.string().default("localhost"),
+  CLAMAV_PORT: z.coerce.number().default(3310),
+});
 
 export function parseApiEnv(env: NodeJS.ProcessEnv = process.env) {
   const result = apiSchema.safeParse(env);
