@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
 import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
-import { FileText, Plus, File, ChevronRight } from "lucide-react";
+import { FileText, Plus, File, ChevronRight, Upload } from "lucide-react";
+import { parseFileToHtml } from "@/lib/importers";
 
 interface Props { spaceId: string }
 
@@ -51,7 +53,24 @@ function flattenTree(docs: Document[]): FlatDoc[] {
 }
 
 export function SpaceView({ spaceId }: Props) {
+  const router = useRouter();
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImport(file: File) {
+    setImporting(true);
+    try {
+      const html = await parseFileToHtml(file);
+      const title = file.name.replace(/\.[^.]+$/, "");
+      const doc = await documentsApi.create({ spaceId, type: "page", title, content: html });
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceId}`,
@@ -94,6 +113,27 @@ export function SpaceView({ spaceId }: Props) {
             </div>
           </>
         )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.md"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImport(file);
+            e.target.value = "";
+          }}
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          className="shrink-0 flex items-center gap-1.5"
+          onPress={() => fileInputRef.current?.click()}
+          isDisabled={importing}
+        >
+          <Upload size={14} />
+          {importing ? "Importing…" : "Import"}
+        </Button>
         <Link href={`/spaces/${spaceId}/new` as never}>
           <Button
             variant="primary"

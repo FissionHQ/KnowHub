@@ -228,7 +228,7 @@ function AccessBadge({ level }: { level: AccessLevel }) {
     <span
       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
         isEdit
-          ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+          ? "bg-orange-100 text-[#f25011] dark:bg-orange-900/40 dark:text-orange-300"
           : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
       }`}
     >

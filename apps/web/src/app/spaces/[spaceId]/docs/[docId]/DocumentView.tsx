@@ -202,14 +202,14 @@ export function DocumentView({ spaceId, docId }: Props) {
         >
           <Link
             href="/spaces"
-            className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+            className="hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors"
           >
             Spaces
           </Link>
           <span aria-hidden="true">/</span>
           <Link
             href={`/spaces/${spaceId}`}
-            className="text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate max-w-[160px]"
+            className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors truncate max-w-[160px]"
           >
             {space?.name ?? "Space"}
           </Link>
@@ -218,7 +218,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             <>
               <Link
                 href={`/spaces/${spaceId}/docs/${parentDoc.id}`}
-                className="text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate max-w-[160px]"
+                className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors truncate max-w-[160px]"
               >
                 {parentDoc.title}
               </Link>
@@ -292,12 +292,12 @@ export function DocumentView({ spaceId, docId }: Props) {
           <button
             type="button"
             onClick={() => setCommentsOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-violet-50 dark:hover:bg-violet-950/30 px-2.5 py-1 rounded-full transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1 rounded-full transition-colors"
           >
             <MessageSquare size={12} />
             <span>Comments</span>
             {commentCount > 0 && (
-              <span className="bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                 {commentCount}
               </span>
             )}
@@ -306,7 +306,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             <button
               type="button"
               onClick={() => setPermissionsOpen(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-violet-50 dark:hover:bg-violet-950/30 px-2.5 py-1 rounded-full transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1 rounded-full transition-colors"
             >
               <Shield size={12} />
               <span>Permissions</span>
@@ -391,12 +391,12 @@ export function DocumentView({ spaceId, docId }: Props) {
             <ChevronRight size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <MessageSquare size={15} className="text-violet-600 dark:text-violet-400" />
+            <MessageSquare size={15} className="text-[#f25011]" />
             <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">
               Comments
             </span>
             {commentCount > 0 && (
-              <span className="bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                 {commentCount}
               </span>
             )}
@@ -428,7 +428,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             <ChevronRight size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <Shield size={15} className="text-violet-600 dark:text-violet-400" />
+            <Shield size={15} className="text-[#f25011]" />
             <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">
               Permissions
             </span>

@@ -73,7 +73,7 @@ export function TrashSection() {
                     className={
                       item.type === "pdf"
                         ? "p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
-                        : "p-1.5 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400 shrink-0"
+                        : "p-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-[#f25011] dark:text-orange-400 shrink-0"
                     }
                   >
                     {item.type === "pdf" ? <File size={16} /> : <FileText size={16} />}
