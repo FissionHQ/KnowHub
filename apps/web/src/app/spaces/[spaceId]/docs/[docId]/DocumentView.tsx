@@ -14,6 +14,7 @@ import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
 import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
 import {
@@ -77,11 +78,14 @@ export function DocumentView({ spaceId, docId }: Props) {
   );
   const commentCount = comments.filter((c) => !c.parentId).length;
 
+  const canEdit = Boolean(user && (user.role === "admin" || doc?.accessLevel === "edit"));
+
   const collab = useCollaboration({
     orgId: user?.orgId ?? doc?.orgId ?? "",
     documentId: docId,
     userId: user?.id ?? "",
     userName: user?.name ?? "You",
+    canEdit,
     enabled: Boolean(user && doc?.type === "page" && !useFallbackEditor),
   });
 
@@ -186,7 +190,6 @@ export function DocumentView({ spaceId, docId }: Props) {
     Boolean(collab.provider);
   const showConnecting = showPageEditor && authLoading;
   const showFallback = showPageEditor && !showCollab && !showConnecting;
-  const canEdit = user?.role === "admin" || currentDoc.accessLevel === "edit";
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const isConnected = showFallback ? true : collab.status === "connected";
 
@@ -325,7 +328,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             </button>
           )}
           {doc.type === "page" && user && (
-            <EditorCountInline count={collab.editorCount} status={collab.status} />
+            <EditorCountInline presence={collab.presence} status={collab.status} canEdit={canEdit} />
           )}
         </div>
 
@@ -586,20 +589,15 @@ function DocumentActionsMenu({
 }
 
 function EditorCountInline({
-  count,
+  presence,
   status,
+  canEdit,
 }: {
-  count: number;
+  presence: { editors: number; viewers: number };
   status: "connecting" | "connected" | "disconnected";
+  canEdit: boolean;
 }) {
-  const label =
-    status === "connecting"
-      ? "Connecting…"
-      : status === "disconnected"
-        ? "Offline"
-        : count === 1
-          ? "1 editing"
-          : `${count} editing`;
+  const label = formatPresenceLabel(presence, status, canEdit);
 
   return (
     <span
