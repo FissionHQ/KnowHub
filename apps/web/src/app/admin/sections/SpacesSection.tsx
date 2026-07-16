@@ -204,7 +204,7 @@ function SpaceRow({
           <div className="min-w-0">
             <Link
               href={`/spaces/${space.id}`}
-              className="font-medium text-zinc-900 dark:text-zinc-100 hover:text-violet-600 dark:hover:text-violet-400"
+              className="font-medium text-zinc-900 dark:text-zinc-100 hover:text-[#f25011] dark:hover:text-[#f25011]"
             >
               {space.name}
             </Link>

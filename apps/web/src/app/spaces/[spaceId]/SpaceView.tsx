@@ -1,74 +1,80 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
 import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
-import { FileText, Plus, File, ChevronRight } from "lucide-react";
+import { FileText, Plus, File, ChevronRight, Upload } from "lucide-react";
+import { parseFileToHtml } from "@/lib/importers";
 import { SearchPanel } from "@/components/search/SearchPanel";
 
 interface Props { spaceId: string }
 
-function DocRow({ doc, spaceId, depth = 0, allDocs }: { doc: Document; spaceId: string; depth?: number; allDocs: Document[] }) {
-  const children = allDocs.filter((d) => d.parentId === doc.id);
-  return (
-    <>
-      <Link href={`/spaces/${spaceId}/docs/${doc.id}`} className="group block" style={{ paddingLeft: depth * 20 }}>
-        <Card className="transition-all hover:shadow-sm hover:border-zinc-300 dark:hover:border-zinc-600 cursor-pointer">
-          <CardContent className="flex flex-row items-center gap-3 px-4 py-3">
-            {depth > 0 && <ChevronRight size={12} className="text-zinc-400 shrink-0" />}
-            <div
-              className={
-                doc.type === "pdf"
-                  ? "p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
-                  : "p-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-[#f25011] shrink-0"
-              }
-            >
-              {doc.type === "pdf" ? <File size={16} color="#f25011"/> : <FileText size={16} color="#f25011"/>}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate group-hover:text-[#f25011] dark:group-hover:text-[#f25011] transition-colors">
-                {doc.title}
-              </p>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
-                {new Date(doc.updatedAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {doc.tags.slice(0, 2).map((tag) => (
-                <Chip key={tag} size="sm" variant="secondary" className="text-xs">
-                  {tag}
-                </Chip>
-              ))}
-              {doc.status === "draft" && (
-                <Chip size="sm" color="warning" variant="soft" className="text-xs">
-                  Draft
-                </Chip>
-              )}
-              {doc.status === "published" && (
-                <Chip size="sm" color="success" variant="soft" className="text-xs">
-                  Published
-                </Chip>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </Link>
-      {children.map((child) => (
-        <DocRow key={child.id} doc={child} spaceId={spaceId} depth={depth + 1} allDocs={allDocs} />
-      ))}
-    </>
-  );
+const PAGE_SIZE = 20;
+
+function formatDateTime(date: Date) {
+  const d = new Date(date);
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }) + " · " + d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+interface FlatDoc {
+  doc: Document;
+  depth: number;
+}
+
+function flattenTree(docs: Document[]): FlatDoc[] {
+  const childrenMap = new Map<string | undefined, Document[]>();
+  for (const doc of docs) {
+    const key = doc.parentId ?? "__root__";
+    if (!childrenMap.has(key)) childrenMap.set(key, []);
+    childrenMap.get(key)!.push(doc);
+  }
+
+  const result: FlatDoc[] = [];
+  function walk(parentId: string | undefined, depth: number) {
+    const key = parentId ?? "__root__";
+    const children = childrenMap.get(key) ?? [];
+    for (const doc of children) {
+      result.push({ doc, depth });
+      walk(doc.id, depth + 1);
+    }
+  }
+  walk(undefined, 0);
+  return result;
 }
 
 export function SpaceView({ spaceId }: Props) {
+  const router = useRouter();
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImport(file: File) {
+    setImporting(true);
+    try {
+      const html = await parseFileToHtml(file);
+      const title = file.name.replace(/\.[^.]+$/, "");
+      const doc = await documentsApi.create({ spaceId, type: "page", title, content: html });
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const [searchActive, setSearchActive] = useState(false);
+
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceId}`,
     () => spacesApi.get(spaceId),
@@ -78,7 +84,10 @@ export function SpaceView({ spaceId }: Props) {
     () => documentsApi.listBySpace(spaceId),
   );
 
-  const rootDocs = docs.filter((d) => !d.parentId);
+  const flatDocs = useMemo(() => flattenTree(docs), [docs]);
+  const visible = flatDocs.slice(0, visibleCount);
+  const hasMore = visibleCount < flatDocs.length;
+  const remaining = flatDocs.length - visibleCount;
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -107,6 +116,27 @@ export function SpaceView({ spaceId }: Props) {
             </div>
           </>
         )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.md"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImport(file);
+            e.target.value = "";
+          }}
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          className="shrink-0 flex items-center gap-1.5"
+          onPress={() => fileInputRef.current?.click()}
+          isDisabled={importing}
+        >
+          <Upload size={14} />
+          {importing ? "Importing…" : "Import"}
+        </Button>
         <Link href={`/spaces/${spaceId}/new` as never}>
           <Button
             variant="primary"
@@ -120,6 +150,10 @@ export function SpaceView({ spaceId }: Props) {
       </div>
 
       <Separator className="mb-6" />
+      {/* Document count */}
+      {!docsLoading && docs.length > 0 && (
+        <p className="text-xs text-zinc-400 mb-3">{docs.length} document{docs.length !== 1 ? "s" : ""}</p>
+      )}
 
       <div className="mb-6">
         <SearchPanel
@@ -133,9 +167,9 @@ export function SpaceView({ spaceId }: Props) {
         <>
       {/* Document list */}
       {docsLoading ? (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="w-full h-14 rounded-xl" />
+        <div className="flex flex-col gap-1">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="w-full h-10 rounded-lg" />
           ))}
         </div>
       ) : docs.length === 0 ? (
@@ -152,11 +186,60 @@ export function SpaceView({ spaceId }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="flex flex-col gap-1.5">
-          {rootDocs.map((doc) => (
-            <DocRow key={doc.id} doc={doc} spaceId={spaceId} allDocs={docs} />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-col gap-0.5">
+            {visible.map(({ doc, depth }) => (
+              <Link key={doc.id} href={`/spaces/${spaceId}/docs/${doc.id}`} className="group block" style={{ paddingLeft: depth * 20 }}>
+                <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                  {depth > 0 && <ChevronRight size={12} className="text-zinc-400 shrink-0" />}
+                  <div
+                    className={
+                      doc.type === "pdf"
+                        ? "p-1 rounded-md bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
+                        : "p-1 rounded-md bg-orange-50 dark:bg-orange-950/40 text-[#f25011] shrink-0"
+                    }
+                  >
+                    {doc.type === "pdf" ? <File size={14} color="#f25011"/> : <FileText size={14} color="#f25011"/>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate group-hover:text-[#f25011] transition-colors">
+                      {doc.title}
+                    </p>
+                  </div>
+                  <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 hidden sm:inline">
+                    {doc.ownerName ?? "Unknown"}
+                  </span>
+                  <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 whitespace-nowrap">
+                    {formatDateTime(doc.updatedAt)}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {doc.tags.slice(0, 2).map((tag) => (
+                      <Chip key={tag} size="sm" variant="secondary" className="text-xs">
+                        {tag}
+                      </Chip>
+                    ))}
+                    {doc.status === "draft" && (
+                      <Chip size="sm" color="warning" variant="soft" className="text-xs">
+                        Draft
+                      </Chip>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+          {hasMore && (
+            <div className="flex justify-center mt-4 pb-4">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+              >
+                Show more ({remaining} remaining)
+              </button>
+            </div>
+          )}
+        </>
       )}
         </>
       )}

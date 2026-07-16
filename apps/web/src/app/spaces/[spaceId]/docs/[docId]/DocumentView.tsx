@@ -28,6 +28,7 @@ import {
   Trash2,
   MoreVertical,
   Users,
+  Shield,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -60,6 +61,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [useFallbackEditor, setUseFallbackEditor] = useState(false);
   const [title, setTitle] = useState("");
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
 
@@ -201,14 +203,14 @@ export function DocumentView({ spaceId, docId }: Props) {
         >
           <Link
             href="/spaces"
-            className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+            className="hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors"
           >
             Spaces
           </Link>
           <span aria-hidden="true">/</span>
           <Link
             href={`/spaces/${spaceId}`}
-            className="text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate max-w-[160px]"
+            className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors truncate max-w-[160px]"
           >
             {space?.name ?? "Space"}
           </Link>
@@ -217,7 +219,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             <>
               <Link
                 href={`/spaces/${spaceId}/docs/${parentDoc.id}`}
-                className="text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate max-w-[160px]"
+                className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors truncate max-w-[160px]"
               >
                 {parentDoc.title}
               </Link>
@@ -291,24 +293,30 @@ export function DocumentView({ spaceId, docId }: Props) {
           <button
             type="button"
             onClick={() => setCommentsOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-violet-50 dark:hover:bg-violet-950/30 px-2.5 py-1 rounded-full transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1 rounded-full transition-colors"
           >
             <MessageSquare size={12} />
             <span>Comments</span>
             {commentCount > 0 && (
-              <span className="bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                 {commentCount}
               </span>
             )}
           </button>
+          {(user?.role === "admin" || doc.ownerId === user?.id) && (
+            <button
+              type="button"
+              onClick={() => setPermissionsOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1 rounded-full transition-colors"
+            >
+              <Shield size={12} />
+              <span>Permissions</span>
+            </button>
+          )}
           {doc.type === "page" && user && (
             <EditorCountInline count={collab.editorCount} status={collab.status} />
           )}
         </div>
-
-        {(user?.role === "admin" || doc.ownerId === user?.id) && (
-          <DocumentPermissionsPanel documentId={docId} />
-        )}
 
         {doc.type === "pdf" ? (
           pdfUrl ? (
@@ -331,6 +339,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               ydoc={collab.ydoc}
               provider={collab.provider}
               readOnly={!canEdit}
+              documentId={docId}
             />
           </div>
         ) : showConnecting ? (
@@ -383,12 +392,12 @@ export function DocumentView({ spaceId, docId }: Props) {
             <ChevronRight size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <MessageSquare size={15} className="text-violet-600 dark:text-violet-400" />
+            <MessageSquare size={15} className="text-[#f25011]" />
             <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">
               Comments
             </span>
             {commentCount > 0 && (
-              <span className="bg-violet-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                 {commentCount}
               </span>
             )}
@@ -399,6 +408,38 @@ export function DocumentView({ spaceId, docId }: Props) {
         </div>
         <div className="flex-1 overflow-y-auto">
           <CommentsPanel documentId={docId} defaultOpen />
+        </div>
+      </div>
+
+      {permissionsOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setPermissionsOpen(false)} />
+      )}
+      <div
+        className={`fixed top-0 right-0 h-full w-[48%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+          permissionsOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
+          <button
+            type="button"
+            onClick={() => setPermissionsOpen(false)}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Close permissions"
+          >
+            <ChevronRight size={18} />
+          </button>
+          <div className="flex items-center gap-2">
+            <Shield size={15} className="text-[#f25011]" />
+            <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">
+              Permissions
+            </span>
+          </div>
+          <span className="ml-auto text-xs text-zinc-400 truncate max-w-[160px]">
+            {doc.title}
+          </span>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <DocumentPermissionsPanel documentId={docId} />
         </div>
       </div>
     </div>

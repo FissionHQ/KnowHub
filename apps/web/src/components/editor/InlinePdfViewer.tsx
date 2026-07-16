@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 interface Props {
   url: string;
@@ -9,6 +9,7 @@ interface Props {
 
 export default function InlinePdfViewer({ url }: Props) {
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   if (error) {
     return (
@@ -26,22 +27,19 @@ export default function InlinePdfViewer({ url }: Props) {
 
   return (
     <div className="p-2">
-      <object
-        data={url}
-        type="application/pdf"
-        className="w-full h-[500px] rounded"
-        onError={() => setError(true)}
-      >
-        <div className="flex items-center gap-2 px-3 py-3">
-          <AlertCircle size={12} className="text-amber-500" />
-          <p className="text-xs text-zinc-500">
-            Your browser cannot display this PDF.{" "}
-            <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#f25011] hover:underline">
-              Download instead
-            </a>
-          </p>
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-12 text-zinc-400">
+          <Loader2 size={18} className="animate-spin" />
+          <span className="text-sm">Loading preview…</span>
         </div>
-      </object>
+      )}
+      <iframe
+        src={url}
+        className={`w-full h-[500px] rounded border-0 ${loading ? "hidden" : ""}`}
+        title="PDF preview"
+        onLoad={() => setLoading(false)}
+        onError={() => { setLoading(false); setError(true); }}
+      />
     </div>
   );
 }

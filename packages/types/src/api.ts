@@ -224,6 +224,7 @@ export interface SearchHit {
     title?: string[];
     body?: string[];
   };
+  preview?: string;
   score: number;
   updatedAt: string;
 }

@@ -65,6 +65,7 @@ export class SearchService {
           title: (highlight["title"] as string[] | undefined) ?? [],
           body: (highlight["body"] as string[] | undefined) ?? [],
         },
+        preview: (src["preview"] as string | null) ?? undefined,
         score: h["_score"] as number,
         updatedAt: src["updated_at"] as string,
       };

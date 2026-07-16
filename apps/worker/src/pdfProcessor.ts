@@ -14,9 +14,12 @@ import type { Client as OpenSearchClient } from "@opensearch-project/opensearch"
 import { INDEX_NAME } from "./opensearch.js";
 import type { PdfProcessingMessage, SearchIndexDocument } from "@wiki/types";
 import { logger } from "./logger.js";
+import { VirusScanner } from "./virusScanner.js";
 import { resolveIndexAcl } from "./resolveIndexAcl.js";
 
 export class PdfProcessor {
+  private virusScanner: VirusScanner;
+
   constructor(
     private db: Db,
     private s3: S3Client,
@@ -26,8 +29,12 @@ export class PdfProcessor {
       quarantineBucket: string;
       servedBucket: string;
       sesFromAddress: string;
+      clamavHost: string;
+      clamavPort: number;
     },
-  ) {}
+  ) {
+    this.virusScanner = new VirusScanner(opts.clamavHost, opts.clamavPort);
+  }
 
   async process(msg: PdfProcessingMessage): Promise<void> {
     const { attachmentId, documentId, orgId, quarantineKey, originalName } = msg;
@@ -41,21 +48,46 @@ export class PdfProcessor {
       .where(eq(attachments.id, attachmentId));
 
     let pdfText = "";
+    let fileBuffer: Buffer;
     const isPdf = originalName.toLowerCase().endsWith(".pdf");
 
     try {
-      if (isPdf) {
-        // Fetch from quarantine for PDF text extraction
-        const obj = await this.s3.send(
-          new GetObjectCommand({ Bucket: this.opts.quarantineBucket, Key: quarantineKey }),
+      // Fetch file from quarantine
+      const obj = await this.s3.send(
+        new GetObjectCommand({ Bucket: this.opts.quarantineBucket, Key: quarantineKey }),
+      );
+
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
+        chunks.push(chunk);
+      }
+      fileBuffer = Buffer.concat(chunks);
+
+      // PDF-8: Virus/malware scanning
+      const scanResult = await this.virusScanner.scan(fileBuffer);
+      if (!scanResult.clean) {
+        logger.warn("File flagged as infected", { attachmentId, reason: scanResult.reason });
+        await this.db
+          .update(attachments)
+          .set({ scanStatus: "infected" })
+          .where(eq(attachments.id, attachmentId));
+
+        // Delete infected file from quarantine
+        await this.s3.send(
+          new DeleteObjectCommand({ Bucket: this.opts.quarantineBucket, Key: quarantineKey }),
         );
 
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
-          chunks.push(chunk);
-        }
-        const fileBuffer = Buffer.concat(chunks);
+        await recordAudit(this.db, {
+          orgId,
+          action: "attachment.scan_result",
+          target: { attachmentId, documentId, scanStatus: "infected", reason: scanResult.reason },
+        });
+        return;
+      }
 
+      logger.info("Virus scan passed", { attachmentId });
+
+      if (isPdf) {
         if (!this.isValidPdf(fileBuffer)) {
           throw new Error("File does not appear to be a valid PDF");
         }
@@ -168,6 +200,7 @@ export class PdfProcessor {
       updated_at: doc.updatedAt.toISOString(),
       acl_group_ids: aclGroupIds,
       acl_user_ids: aclUserIds,
+      preview: pdfText.slice(0, 300).replace(/\s+/g, " ").trim() || null,
       content_embedding: null,
     };
 

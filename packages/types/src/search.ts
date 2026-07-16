@@ -12,6 +12,8 @@ export interface SearchIndexDocument {
   updated_at: string;
   acl_group_ids: string[];
   acl_user_ids: string[];
+  // Short text preview for listings/search results (PDF-9)
+  preview: string | null;
   // Reserved for Phase 2 AI search — null until embeddings are generated
   content_embedding: number[] | null;
 }

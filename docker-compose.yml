@@ -75,10 +75,24 @@ services:
       - localstack_data:/var/lib/localstack
       - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init.sh
     healthcheck:
-      test: ["CMD-SHELL", "awslocal s3 ls || exit 1"]
+      test: ["CMD-SHELL", "awslocal sqs list-queues | grep wiki-pdf-processing || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
+
+  # ─── ClamAV (virus scanning) ──────────────────────────────────────────────
+  clamav:
+    image: clamav/clamav:stable
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   # ─── MailHog (email in dev) ───────────────────────────────────────────────
   mailhog:
@@ -94,3 +108,4 @@ volumes:
   redis_data:
   opensearch_data:
   localstack_data:
+  clamav_data:
