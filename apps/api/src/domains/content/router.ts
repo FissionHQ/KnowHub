@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc, ne, inArray } from "drizzle-orm";
+import { eq, and, desc, ne } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
 import {
@@ -16,10 +16,11 @@ import {
   setTenantContext,
   isWithinTrashRetention,
   trashPurgeAt,
+  recordRecentlyUpdated,
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64 } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
-import { assertDocumentAccess, assertSpaceAccess, resolveDocumentAccess, assertCanManageDocumentPermissions, assertCanMutateDocumentContent, resolveAccessibleSpaceIds } from "../access/permissionResolver.js";
+import { assertDocumentAccess, assertSpaceAccess, resolveDocumentAccess, assertCanManageDocumentPermissions, assertCanMutateDocumentContent } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
 import { notifyCollabDocumentReset } from "../../lib/collabReset.js";
 import { logger } from "../../lib/logger.js";
@@ -130,40 +131,7 @@ export function createContentRouter(
     res.json({ data: rows });
   });
 
-  // GET /documents/recent — recently updated documents (ACL-scoped)
-  router.get("/documents/recent", async (req, res) => {
-    const { orgId, userRole, userId, groupIds } = req.tenant;
-
-    const accessibleSpaceIds = await resolveAccessibleSpaceIds({
-      db,
-      userRole,
-      userId,
-      groupIds,
-    });
-
-    if (accessibleSpaceIds !== null && !accessibleSpaceIds.length) {
-      return res.json({ data: [] });
-    }
-
-    const conditions = [
-      eq(documents.orgId, orgId),
-      ne(documents.status, "trashed"),
-      ...(accessibleSpaceIds !== null
-        ? [inArray(documents.spaceId, accessibleSpaceIds)]
-        : []),
-    ];
-
-    const rows = await db
-      .select()
-      .from(documents)
-      .where(and(...conditions))
-      .orderBy(desc(documents.updatedAt))
-      .limit(20);
-
-    res.json({ data: rows });
-  });
-
-  // GET /trash — list trashed documents (admin only)
+  // POST /documents
   router.get("/trash", async (req, res) => {
     const { orgId, userRole } = req.tenant;
     if (userRole !== "admin") throw new ForbiddenError();
@@ -256,6 +224,7 @@ export function createContentRouter(
     });
 
     await enqueueIndex(docId, orgId, "upsert");
+    await recordRecentlyUpdated(db, userId, docId);
 
     res.status(201).json({ data: inserted[0] });
   });
@@ -368,6 +337,7 @@ export function createContentRouter(
     }
 
     await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await recordRecentlyUpdated(db, userId, documentId ?? "");
 
     res.json({ data: updated[0] });
   });
@@ -619,6 +589,7 @@ export function createContentRouter(
     }
 
     await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await recordRecentlyUpdated(db, userId, documentId ?? "");
 
     await recordAudit(db, {
       orgId,

@@ -1,6 +1,6 @@
 "use client";
 
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -95,7 +95,10 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc]);
 
   useEffect(() => {
-    if (doc) activityApi.recordView(docId).catch(() => {});
+    if (!doc) return;
+    activityApi.recordView(docId)
+      .then(() => globalMutate("recent"))
+      .catch(() => {});
   }, [doc?.id, docId]);
 
   useEffect(() => {
@@ -111,6 +114,12 @@ export function DocumentView({ spaceId, docId }: Props) {
 
     return () => clearTimeout(timer);
   }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
+
+  useEffect(() => {
+    if (!useFallbackEditor && collab.saveStatus === "saved") {
+      void globalMutate("recently-updated");
+    }
+  }, [collab.saveStatus, useFallbackEditor]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
@@ -133,6 +142,7 @@ export function DocumentView({ spaceId, docId }: Props) {
         await documentsApi.update(docId, { content: html });
         setSaveStatus("saved");
         mutate();
+        void globalMutate("recently-updated");
       } catch {
         setSaveStatus("unsaved");
       }
@@ -189,6 +199,7 @@ export function DocumentView({ spaceId, docId }: Props) {
       const updated = await documentsApi.update(docId, { title: trimmed });
       mutate(updated, false);
       setSaveStatus("saved");
+      void globalMutate("recently-updated");
     } catch {
       setSaveStatus("unsaved");
     }

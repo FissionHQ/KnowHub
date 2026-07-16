@@ -4,15 +4,22 @@ import { useRef, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { spacesApi, documentsApi } from "@/lib/api";
-import type { Space } from "@wiki/types";
+import { spacesApi, documentsApi, activityApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import type { Space, Document } from "@wiki/types";
 import { Card, CardContent, Skeleton } from "@heroui/react";
-import { ArrowRight, MoreVertical, Upload } from "lucide-react";
+import { ArrowRight, MoreVertical, Upload, Clock, RefreshCw } from "lucide-react";
 import { parseFileToHtml } from "@/lib/importers";
 
 export function SpacesList() {
   const router = useRouter();
+  const { user } = useAuth();
   const { data: spaces, isLoading, error } = useSWR<Space[]>("spaces", spacesApi.list);
+  const { data: recentDocs = [] } = useSWR<Document[]>(user ? "recent" : null, activityApi.getRecent);
+  const { data: recentlyUpdated = [] } = useSWR<Document[]>(
+    user ? "recently-updated" : null,
+    activityApi.getRecentlyUpdated,
+  );
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +102,54 @@ export function SpacesList() {
         className="hidden"
         onChange={handleFileChange}
       />
+
+      {(recentDocs.length > 0 || recentlyUpdated.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {recentDocs.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock size={14} className="text-zinc-400" />
+                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Recently viewed</h2>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {recentDocs.slice(0, 5).map((doc) => (
+                    <Link
+                      key={doc.id}
+                      href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                      className="text-sm text-zinc-600 dark:text-zinc-300 hover:text-[#f25011] truncate py-1"
+                    >
+                      {doc.title}
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {recentlyUpdated.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <RefreshCw size={14} className="text-zinc-400" />
+                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Recently updated</h2>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {recentlyUpdated.slice(0, 5).map((doc) => (
+                    <Link
+                      key={doc.id}
+                      href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                      className="text-sm text-zinc-600 dark:text-zinc-300 hover:text-[#f25011] truncate py-1"
+                    >
+                      {doc.title}
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {spaces.map((space) => (
           <div key={space.id} className="relative group">

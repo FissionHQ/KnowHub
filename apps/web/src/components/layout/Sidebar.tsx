@@ -25,7 +25,8 @@ export function Sidebar() {
   const { data: favDocs = [] } = useSWR<Document[]>(user ? "favorites" : null, activityApi.getFavorites);
 
   const [showBookmarks, setShowBookmarks] = useState(true);
-  const [showRecent, setShowRecent] = useState(false);
+  const [showRecentlyViewed, setShowRecentlyViewed] = useState(true);
+  const [showRecentlyUpdated, setShowRecentlyUpdated] = useState(true);
   const [spaceMenu, setSpaceMenu] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [importing, setImporting] = useState(false);
@@ -178,38 +179,62 @@ export function Sidebar() {
           )
         )}
 
-        {/* Recent — collapsible */}
-        {(recentDocs.length > 0 || recentlyUpdated.length > 0) && (
-          <>
-            <button
-              type="button"
-              onClick={() => setShowRecent((v) => !v)}
-              className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-3 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
-            >
-              {showRecent ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-              Recent
-            </button>
-            {showRecent && (
-              <div className="flex flex-col gap-0.5 mb-1">
-                {recentDocs.slice(0, 4).map((doc) => (
-                  <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
-                      <Clock size={11} className="text-zinc-500 shrink-0" />
-                      <span className="truncate">{doc.title}</span>
-                    </div>
-                  </Link>
-                ))}
-                {recentlyUpdated.slice(0, 3).map((doc) => (
-                  <Link key={`upd-${doc.id}`} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
-                      <RefreshCw size={11} className="text-zinc-500 shrink-0" />
-                      <span className="truncate">{doc.title}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </>
+        {/* Recently viewed — per user */}
+        <button
+          type="button"
+          onClick={() => setShowRecentlyViewed((v) => !v)}
+          className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-3 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
+        >
+          {showRecentlyViewed ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          Recently viewed
+          {recentDocs.length > 0 && (
+            <span className="ml-auto text-[9px] bg-white/10 text-zinc-500 px-1.5 py-0.5 rounded-full">{recentDocs.length}</span>
+          )}
+        </button>
+        {showRecentlyViewed && (
+          recentDocs.length > 0 ? (
+            <div className="flex flex-col gap-0.5 mb-1">
+              {recentDocs.slice(0, 5).map((doc) => (
+                <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                    <Clock size={11} className="text-zinc-500 shrink-0" />
+                    <span className="truncate">{doc.title}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-zinc-600 px-3 py-1 mb-1">Pages you open appear here</p>
+          )
+        )}
+
+        {/* Recently updated — per user */}
+        <button
+          type="button"
+          onClick={() => setShowRecentlyUpdated((v) => !v)}
+          className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-3 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
+        >
+          {showRecentlyUpdated ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          Recently updated
+          {recentlyUpdated.length > 0 && (
+            <span className="ml-auto text-[9px] bg-white/10 text-zinc-500 px-1.5 py-0.5 rounded-full">{recentlyUpdated.length}</span>
+          )}
+        </button>
+        {showRecentlyUpdated && (
+          recentlyUpdated.length > 0 ? (
+            <div className="flex flex-col gap-0.5 mb-1">
+              {recentlyUpdated.slice(0, 5).map((doc) => (
+                <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                    <RefreshCw size={11} className="text-zinc-500 shrink-0" />
+                    <span className="truncate">{doc.title}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-zinc-600 px-3 py-1 mb-1">Pages you edit appear here</p>
+          )
         )}
       </nav>
 

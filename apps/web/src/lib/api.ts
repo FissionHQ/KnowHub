@@ -296,7 +296,7 @@ export const activityApi = {
   recordView: (documentId: string) =>
     apiFetch<{ recorded: boolean }>(`${BASE}/documents/${documentId}/view`, { method: "POST", body: "{}" }),
   getRecent: () => apiFetch<Document[]>(`${BASE}/users/me/recent`),
-  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/documents/recent`),
+  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/users/me/recently-updated`),
   toggleFavorite: (documentId: string) =>
     apiFetch<{ favorited: boolean }>(`${BASE}/documents/${documentId}/favorite`, { method: "POST", body: "{}" }),
   isFavorited: (documentId: string) =>

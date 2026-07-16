@@ -6,24 +6,24 @@ import { documentsApi } from "@/lib/api";
 import type { TrashedDocument } from "@wiki/types";
 import { Button, Card, CardContent } from "@heroui/react";
 import { File, FileText, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export function TrashSection() {
+  const { toast } = useToast();
   const { data: items = [], error, isLoading, mutate } = useSWR(
     "admin:trash",
     documentsApi.listTrash,
   );
   const [restoringId, setRestoringId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   async function handleRestore(item: TrashedDocument) {
-    if (!confirm(`Restore "${item.title}" to ${item.spaceName}?`)) return;
     setRestoringId(item.id);
-    setActionError(null);
     try {
       await documentsApi.restore(item.id);
       await mutate();
+      toast(`"${item.title}" restored to ${item.spaceName}`, "success");
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to restore document");
+      toast(err instanceof Error ? err.message : "Failed to restore document", "error");
     } finally {
       setRestoringId(null);
     }
@@ -42,10 +42,6 @@ export function TrashSection() {
           </p>
         </CardContent>
       </Card>
-
-      {actionError && (
-        <p className="text-sm text-red-600 dark:text-red-400 px-1">{actionError}</p>
-      )}
 
       <Card>
         <CardContent className="p-0 divide-y divide-zinc-100 dark:divide-zinc-800">
