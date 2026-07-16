@@ -1,20 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
-import { spacesApi, activityApi } from "@/lib/api";
+import { createPortal } from "react-dom";
+import { spacesApi, activityApi, documentsApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Space, Document } from "@wiki/types";
 import { Separator } from "@heroui/react";
-import { LogOut, Search, Settings, User, Zap, ChevronRight, ChevronDown, Clock, Star, RefreshCw } from "lucide-react";
+import { LogOut, Search, Settings, User, Zap, ChevronRight, ChevronDown, Clock, Star, RefreshCw, MoreHorizontal, Upload } from "lucide-react";
 import clsx from "clsx";
+import { parseFileToHtml } from "@/lib/importers";
 import { ThemeToggle } from "./ThemeToggle";
 import { SpaceDocTree } from "./SpaceDocTree";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const { data: spaces = [] } = useSWR<Space[]>(user ? "spaces" : null, spacesApi.list);
   const { data: recentDocs = [] } = useSWR<Document[]>(user ? "recent" : null, activityApi.getRecent);
@@ -23,6 +26,26 @@ export function Sidebar() {
 
   const [showBookmarks, setShowBookmarks] = useState(true);
   const [showRecent, setShowRecent] = useState(false);
+  const [spaceMenu, setSpaceMenu] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadSpaceRef = useRef<string>("");
+
+  async function handleFileImport(spaceId: string, file: File) {
+    setImporting(true);
+    setSpaceMenu(null);
+    try {
+      const html = await parseFileToHtml(file);
+      const title = file.name.replace(/\.[^.]+$/, "");
+      const doc = await documentsApi.create({ spaceId, type: "page", title, content: html });
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   // Detect active space from URL: /spaces/:spaceId/...
   const spaceMatch = pathname.match(/^\/spaces\/([^/]+)/);
@@ -33,6 +56,19 @@ export function Sidebar() {
       className="fixed left-0 top-0 h-full flex flex-col border-r border-zinc-200 dark:border-zinc-800 z-20"
       style={{ width: "var(--sidebar-width)", backgroundColor: "rgb(28, 30, 46)" }}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.txt,.md"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && uploadSpaceRef.current) {
+            handleFileImport(uploadSpaceRef.current, file);
+          }
+          e.target.value = "";
+        }}
+      />
       <div className="px-4 py-4 flex items-center gap-2.5">
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#f25011] shadow-sm">
           <Zap size={15} color="white" strokeWidth={2.5} />
@@ -72,21 +108,36 @@ export function Sidebar() {
             const isActive = activeSpaceId === space.id;
             return (
               <div key={space.id}>
-                <Link href={`/spaces/${space.id}`}>
-                  <div
-                    className={clsx(
-                      "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer",
-                      isActive
-                        ? "font-semibold"
-                        : "text-zinc-300 hover:bg-white/10",
-                    )}
-                    style={isActive ? { color: "#f25011" } : {}}
+                <div className="group/space flex items-center gap-0.5 rounded-lg pr-1 hover:bg-white/10 transition-colors">
+                  <Link href={`/spaces/${space.id}`} className="flex-1 min-w-0">
+                    <div
+                      className={clsx(
+                        "flex items-center gap-2.5 px-3 py-2 text-sm transition-colors cursor-pointer",
+                        isActive
+                          ? "font-semibold"
+                          : "text-zinc-300",
+                      )}
+                      style={isActive ? { color: "#f25011" } : {}}
+                    >
+                      <span className="text-base leading-none">{space.iconEmoji ?? "📄"}</span>
+                      <span className="truncate">{space.name}</span>
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setMenuPos({ top: rect.bottom + 4, left: rect.left });
+                      setSpaceMenu(spaceMenu === space.id ? null : space.id);
+                    }}
+                    className="shrink-0 opacity-0 group-hover/space:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
+                    title="More options"
                   >
-                    <span className="text-base leading-none">{space.iconEmoji ?? "📄"}</span>
-                    <span className="truncate flex-1">{space.name}</span>
-                    {isActive && <ChevronRight size={12} className="opacity-40" />}
-                  </div>
-                </Link>
+                    <MoreHorizontal size={12} />
+                  </button>
+                </div>
 
                 {/* Doc tree — only for the active space */}
                 {isActive && <SpaceDocTree spaceId={space.id} />}
@@ -194,6 +245,30 @@ export function Sidebar() {
           <span>Sign out</span>
         </button>
       </div>
+
+      {spaceMenu && typeof window !== "undefined" && createPortal(
+        <>
+          <div className="fixed inset-0 z-[9999]" onClick={() => setSpaceMenu(null)} />
+          <div
+            style={{ top: menuPos.top, left: menuPos.left }}
+            className="fixed z-[9999] w-44 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 text-[13px]"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                uploadSpaceRef.current = spaceMenu;
+                setSpaceMenu(null);
+                fileInputRef.current?.click();
+              }}
+              className="w-full text-left px-3 py-2 text-zinc-200 hover:bg-white/10 transition-colors flex items-center gap-2"
+            >
+              <Upload size={14} />
+              Import document
+            </button>
+          </div>
+        </>,
+        document.body,
+      )}
     </aside>
   );
 }

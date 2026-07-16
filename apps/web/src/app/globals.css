@@ -7,7 +7,29 @@
 
 :root {
   --sidebar-width: 264px;
+  --accent: oklch(64.99% 0.2079 37.63);
+  --accent-hover: oklch(59% 0.2 37.63);
+  --accent-foreground: oklch(100% 0 0);
 }
+
+/* All interactive elements should show pointer cursor */
+button,
+[role="button"],
+a,
+select,
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+label[for],
+summary {
+  cursor: pointer;
+}
+
+/* Links and interactive hover color */
+a:hover {
+  color: #f25011;
+}
+
 
 /* Tiptap editor */
 .ProseMirror {
@@ -64,7 +86,7 @@
 }
 
 .ProseMirror blockquote {
-  border-left: 3px solid #8b5cf6;
+  border-left: 3px solid #f25011;
   margin-left: 0;
   padding-left: 1rem;
   color: #71717a;
@@ -106,7 +128,7 @@
 }
 
 .ProseMirror a {
-  color: #7c3aed;
+  color: #f25011;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
