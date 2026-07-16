@@ -57,6 +57,13 @@
       "when": 1783884000000,
       "tag": "0007_document_trashed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783885000000,
+      "tag": "0008_document_status_before_trash",
+      "breakpoints": true
     }
   ]
 }

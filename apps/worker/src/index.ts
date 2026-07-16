@@ -13,7 +13,7 @@ import {
 import { S3Client } from "@aws-sdk/client-s3";
 import { SESClient } from "@aws-sdk/client-ses";
 import { parseWorkerEnv } from "@wiki/config";
-import { getDb, setTenantContext, purgeExpiredAuditLogs, purgeExpiredTrash } from "@wiki/db";
+import { getDb, setTenantContext, purgeExpiredAuditLogs, purgeExpiredTrash, recordAudit } from "@wiki/db";
 import { createOpenSearchClient, ensureIndex, INDEX_NAME } from "./opensearch.js";
 import { PdfProcessor } from "./pdfProcessor.js";
 import { Indexer } from "./indexer.js";
@@ -137,6 +137,15 @@ async function main() {
           documentId: doc.documentId,
           orgId: doc.orgId,
           title: doc.title,
+        });
+        await recordAudit(db, {
+          orgId: doc.orgId,
+          action: "document.purge",
+          target: {
+            documentId: doc.documentId,
+            title: doc.title,
+            spaceId: doc.spaceId,
+          },
         });
       }
       if (purged.length) {

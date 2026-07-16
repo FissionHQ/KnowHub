@@ -163,6 +163,8 @@ export const documents = pgTable(
     tags: text("tags").array().notNull().default([]),
     restrictDownload: boolean("restrict_download").notNull().default(false),
     trashedAt: timestamp("trashed_at", { withTimezone: true }),
+    /** draft | published — preserved when moved to trash for restore */
+    statusBeforeTrash: documentStatusEnum("status_before_trash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

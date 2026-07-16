@@ -22,6 +22,7 @@ import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from ".
 import { assertDocumentAccess, assertSpaceAccess, resolveDocumentAccess, assertCanManageDocumentPermissions, assertCanMutateDocumentContent } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
 import { notifyCollabDocumentReset } from "../../lib/collabReset.js";
+import { logger } from "../../lib/logger.js";
 import type { SQSClient } from "@aws-sdk/client-sqs";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import type { SearchIndexMessage } from "@wiki/types";
@@ -57,6 +58,12 @@ const updatePermissionSchema = z.object({
   accessLevel: z.enum(["view", "edit"]),
 });
 
+type RestorableDocumentStatus = "draft" | "published";
+
+function restorableStatus(status: string): RestorableDocumentStatus {
+  return status === "published" ? "published" : "draft";
+}
+
 export function createContentRouter(
   db: Db,
   sqs: SQSClient,
@@ -67,12 +74,16 @@ export function createContentRouter(
 
   async function enqueueIndex(documentId: string, orgId: string, operation: "upsert" | "delete") {
     const msg: SearchIndexMessage = { type: "SEARCH_INDEX", documentId, orgId, operation };
-    await sqs.send(
-      new SendMessageCommand({
-        QueueUrl: indexQueueUrl,
-        MessageBody: JSON.stringify(msg),
-      }),
-    );
+    try {
+      await sqs.send(
+        new SendMessageCommand({
+          QueueUrl: indexQueueUrl,
+          MessageBody: JSON.stringify(msg),
+        }),
+      );
+    } catch (err) {
+      logger.warn("Failed to enqueue search index message", { err, documentId, orgId, operation });
+    }
   }
 
   // GET /spaces/:spaceId/documents
@@ -137,6 +148,7 @@ export function createContentRouter(
         spaceName: spaces.name,
         ownerId: documents.ownerId,
         trashedAt: documents.trashedAt,
+        statusBeforeTrash: documents.statusBeforeTrash,
         updatedAt: documents.updatedAt,
       })
       .from(documents)
@@ -157,6 +169,7 @@ export function createContentRouter(
             ownerId: row.ownerId,
             trashedAt,
             purgeAt: trashPurgeAt(trashedAt, retentionDays),
+            previousStatus: restorableStatus(row.statusBeforeTrash ?? "draft"),
           };
         })
         .filter((row) => isWithinTrashRetention(row.trashedAt, retentionDays)),
@@ -347,13 +360,32 @@ export function createContentRouter(
       ownerId: doc.ownerId,
     });
 
+    const previousStatus = restorableStatus(doc.status);
     const trashedAt = new Date();
     await db
       .update(documents)
-      .set({ status: "trashed", trashedAt, updatedAt: trashedAt })
+      .set({
+        status: "trashed",
+        statusBeforeTrash: previousStatus,
+        trashedAt,
+        updatedAt: trashedAt,
+      })
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
 
     await enqueueIndex(documentId ?? "", orgId, "delete");
+
+    await recordAudit(db, {
+      orgId,
+      actorId: userId,
+      action: "document.delete",
+      target: {
+        documentId,
+        title: doc.title,
+        spaceId: doc.spaceId,
+        previousStatus,
+      },
+      req,
+    });
 
     res.json({ data: { trashed: true } });
   });
@@ -388,9 +420,16 @@ export function createContentRouter(
       throw new ConflictError("Document has exceeded the trash retention period");
     }
 
+    const restoredStatus = restorableStatus(doc.statusBeforeTrash ?? "draft");
+
     const restored = await db
       .update(documents)
-      .set({ status: "published", trashedAt: null, updatedAt: new Date() })
+      .set({
+        status: restoredStatus,
+        statusBeforeTrash: null,
+        trashedAt: null,
+        updatedAt: new Date(),
+      })
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
       .returning();
 
@@ -400,7 +439,12 @@ export function createContentRouter(
       orgId,
       actorId: userId,
       action: "document.restore",
-      target: { documentId, title: doc.title, spaceId: doc.spaceId },
+      target: {
+        documentId,
+        title: doc.title,
+        spaceId: doc.spaceId,
+        restoredStatus,
+      },
       req,
     });
 
@@ -684,7 +728,7 @@ export function createContentRouter(
       });
     }
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert").catch(() => null);
+    await enqueueIndex(documentId ?? "", orgId, "upsert");
 
     await recordAudit(db, {
       orgId,
@@ -747,7 +791,7 @@ export function createContentRouter(
       .set({ accessLevel: body.data.accessLevel })
       .where(eq(documentPermissions.id, permissionId ?? ""));
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert").catch(() => null);
+    await enqueueIndex(documentId ?? "", orgId, "upsert");
 
     await recordAudit(db, {
       orgId,
@@ -802,7 +846,7 @@ export function createContentRouter(
 
     await db.delete(documentPermissions).where(eq(documentPermissions.id, permissionId ?? ""));
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert").catch(() => null);
+    await enqueueIndex(documentId ?? "", orgId, "upsert");
 
     await recordAudit(db, {
       orgId,
