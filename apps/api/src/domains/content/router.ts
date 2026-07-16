@@ -101,8 +101,25 @@ export function createContentRouter(
     });
 
     const rows = await db
-      .select()
+      .select({
+        id: documents.id,
+        orgId: documents.orgId,
+        spaceId: documents.spaceId,
+        parentId: documents.parentId,
+        type: documents.type,
+        title: documents.title,
+        contentRef: documents.contentRef,
+        ownerId: documents.ownerId,
+        ownerName: users.name,
+        status: documents.status,
+        version: documents.version,
+        tags: documents.tags,
+        restrictDownload: documents.restrictDownload,
+        createdAt: documents.createdAt,
+        updatedAt: documents.updatedAt,
+      })
       .from(documents)
+      .leftJoin(users, eq(documents.ownerId, users.id))
       .where(
         and(
           eq(documents.spaceId, spaceId ?? ""),
