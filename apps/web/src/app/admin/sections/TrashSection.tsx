@@ -83,7 +83,11 @@ export function TrashSection() {
                       {item.title}
                     </p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      {item.spaceName} · deleted{" "}
+                      {item.spaceName}
+                      {item.previousStatus === "draft" && (
+                        <span className="text-zinc-400"> · was draft</span>
+                      )}
+                      {" · deleted "}
                       {new Date(item.trashedAt).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",

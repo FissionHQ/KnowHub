@@ -96,6 +96,8 @@ export interface TrashedDocument {
   ownerId: string;
   trashedAt: Date;
   purgeAt: Date;
+  /** Status before trash (draft or published) */
+  previousStatus: "draft" | "published";
 }
 
 export interface DocumentPermission {
