@@ -10,12 +10,14 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Underline from "@tiptap/extension-underline";
 import Collaboration from "@tiptap/extension-collaboration";
 import { common, createLowlight } from "lowlight";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
 import { useEffect } from "react";
 import { EditorToolbar } from "./EditorToolbar";
+import { FileEmbedExtension } from "./FileEmbedExtension";
 
 const lowlight = createLowlight(common);
 
@@ -24,6 +26,7 @@ interface Props {
   provider: HocuspocusProvider;
   placeholder?: string;
   readOnly?: boolean;
+  documentId?: string;
 }
 
 export function CollaborativeEditor({
@@ -31,6 +34,7 @@ export function CollaborativeEditor({
   provider,
   placeholder = "Start writing...",
   readOnly = false,
+  documentId,
 }: Props) {
   const editor = useEditor(
     {
@@ -38,6 +42,7 @@ export function CollaborativeEditor({
       extensions: [
         StarterKit.configure({ codeBlock: false, history: false }),
         Placeholder.configure({ placeholder }),
+        Underline,
         Image,
         Link.configure({ openOnClick: false }),
         Table.configure({ resizable: true }),
@@ -45,6 +50,7 @@ export function CollaborativeEditor({
         TableCell,
         TableHeader,
         CodeBlockLowlight.configure({ lowlight }),
+        FileEmbedExtension,
         Collaboration.configure({
           document: ydoc,
           field: "default",
@@ -80,7 +86,7 @@ export function CollaborativeEditor({
 
   return (
     <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
-      {!readOnly && <EditorToolbar editor={editor} onInsertImage={handleInsertImage} />}
+      {!readOnly && <EditorToolbar editor={editor} onInsertImage={handleInsertImage} documentId={documentId} />}
       <EditorContent editor={editor} className="prose prose-sm max-w-none" />
     </div>
   );

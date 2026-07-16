@@ -42,6 +42,8 @@ const pdfProcessor = new PdfProcessor(db, s3, os, ses, {
   quarantineBucket: env.S3_QUARANTINE_BUCKET,
   servedBucket: env.S3_SERVED_BUCKET,
   sesFromAddress: env.SES_FROM_ADDRESS,
+  clamavHost: env.CLAMAV_HOST,
+  clamavPort: env.CLAMAV_PORT,
 });
 const indexer = new Indexer(db, os);
 

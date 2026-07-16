@@ -330,6 +330,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               ydoc={collab.ydoc}
               provider={collab.provider}
               readOnly={!canEdit}
+              documentId={docId}
             />
           </div>
         ) : showConnecting ? (

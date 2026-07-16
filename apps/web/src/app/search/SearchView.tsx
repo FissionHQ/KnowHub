@@ -243,12 +243,16 @@ export function SearchView() {
                             __html: hit.highlight.title?.[0] ?? hit.title,
                           }}
                         />
-                        {hit.highlight.body?.[0] && (
+                        {hit.highlight.body?.[0] ? (
                           <p
                             className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed [&>mark]:bg-yellow-200 [&>mark]:dark:bg-yellow-800/50 [&>mark]:px-0.5 [&>mark]:rounded"
                             dangerouslySetInnerHTML={{ __html: hit.highlight.body[0] }}
                           />
-                        )}
+                        ) : hit.preview ? (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
+                            {hit.preview}
+                          </p>
+                        ) : null}
                       </div>
                       <Chip
                         size="sm"
