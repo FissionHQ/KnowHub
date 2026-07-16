@@ -60,7 +60,18 @@ function canPreview(fileType: string, fileName: string): boolean {
   return false;
 }
 
+function PreviewLoader() {
+  return (
+    <div className="flex items-center justify-center gap-2 py-12 text-zinc-400">
+      <Loader2 size={18} className="animate-spin" />
+      <span className="text-sm">Loading preview…</span>
+    </div>
+  );
+}
+
 function FilePreview({ fileType, url, attachmentId, fileName }: { fileType: string; url: string; attachmentId: string; fileName: string }) {
+  const [loading, setLoading] = useState(true);
+
   if (fileType === "application/pdf") {
     return <InlinePdfViewer url={url} />;
   }
@@ -68,7 +79,14 @@ function FilePreview({ fileType, url, attachmentId, fileName }: { fileType: stri
   if (fileType.startsWith("image/")) {
     return (
       <div className="p-3 flex justify-center">
-        <img src={url} alt="Preview" className="max-w-full max-h-[400px] rounded" />
+        {loading && <PreviewLoader />}
+        <img
+          src={url}
+          alt="Preview"
+          className={`max-w-full max-h-[400px] rounded ${loading ? "hidden" : ""}`}
+          onLoad={() => setLoading(false)}
+          onError={() => setLoading(false)}
+        />
       </div>
     );
   }
@@ -76,7 +94,14 @@ function FilePreview({ fileType, url, attachmentId, fileName }: { fileType: stri
   if (fileType.startsWith("video/")) {
     return (
       <div className="p-3 flex justify-center">
-        <video src={url} controls className="max-w-full max-h-[400px] rounded" />
+        {loading && <PreviewLoader />}
+        <video
+          src={url}
+          controls
+          className={`max-w-full max-h-[400px] rounded ${loading ? "hidden" : ""}`}
+          onLoadedData={() => setLoading(false)}
+          onError={() => setLoading(false)}
+        />
       </div>
     );
   }
@@ -84,7 +109,14 @@ function FilePreview({ fileType, url, attachmentId, fileName }: { fileType: stri
   if (fileType.startsWith("audio/")) {
     return (
       <div className="p-3 flex justify-center">
-        <audio src={url} controls className="w-full" />
+        {loading && <PreviewLoader />}
+        <audio
+          src={url}
+          controls
+          className={`w-full ${loading ? "hidden" : ""}`}
+          onLoadedData={() => setLoading(false)}
+          onError={() => setLoading(false)}
+        />
       </div>
     );
   }
@@ -94,10 +126,12 @@ function FilePreview({ fileType, url, attachmentId, fileName }: { fileType: stri
 
   return (
     <div className="p-2">
+      {loading && <PreviewLoader />}
       <iframe
         src={previewUrl}
-        className="w-full h-[500px] rounded border border-zinc-200 dark:border-zinc-700 bg-white"
+        className={`w-full h-[500px] rounded border border-zinc-200 dark:border-zinc-700 bg-white ${loading ? "hidden" : ""}`}
         title="Document preview"
+        onLoad={() => setLoading(false)}
       />
     </div>
   );

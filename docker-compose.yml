@@ -75,7 +75,7 @@ services:
       - localstack_data:/var/lib/localstack
       - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init.sh
     healthcheck:
-      test: ["CMD-SHELL", "awslocal s3 ls || exit 1"]
+      test: ["CMD-SHELL", "awslocal sqs list-queues | grep wiki-pdf-processing || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
