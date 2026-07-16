@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
 import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
 import { FileText, Plus, File, ChevronRight } from "lucide-react";
+import { SearchPanel } from "@/components/search/SearchPanel";
 
 interface Props { spaceId: string }
 
@@ -66,6 +68,7 @@ function DocRow({ doc, spaceId, depth = 0, allDocs }: { doc: Document; spaceId: 
 }
 
 export function SpaceView({ spaceId }: Props) {
+  const [searchActive, setSearchActive] = useState(false);
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceId}`,
     () => spacesApi.get(spaceId),
@@ -118,6 +121,16 @@ export function SpaceView({ spaceId }: Props) {
 
       <Separator className="mb-6" />
 
+      <div className="mb-6">
+        <SearchPanel
+          lockedSpaceId={spaceId}
+          placeholder="Search in this space…"
+          onSearchedChange={setSearchActive}
+        />
+      </div>
+
+      {!searchActive && (
+        <>
       {/* Document list */}
       {docsLoading ? (
         <div className="flex flex-col gap-2">
@@ -144,6 +157,8 @@ export function SpaceView({ spaceId }: Props) {
             <DocRow key={doc.id} doc={doc} spaceId={spaceId} allDocs={docs} />
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );

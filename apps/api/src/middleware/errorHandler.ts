@@ -24,7 +24,13 @@ export function errorHandler(
     return;
   }
 
-  logger.error("Unhandled error", { err, requestId, path: req.path });
+  logger.error("Unhandled error", {
+    err,
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+    requestId,
+    path: req.path,
+  });
   res.status(500).json({
     error: {
       code: "INTERNAL_ERROR",

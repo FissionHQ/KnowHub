@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ne, inArray } from "drizzle-orm";
 import type { Db } from "@wiki/db";
 import { recentlyViewed, favorites, documents } from "@wiki/db";
+import { resolveAccessibleSpaceIds } from "../access/permissionResolver.js";
 
 export function createUserActivityRouter(db: Db): Router {
   const router = Router();
@@ -22,9 +23,29 @@ export function createUserActivityRouter(db: Db): Router {
     res.json({ data: { recorded: true } });
   });
 
-  // GET /users/me/recent — recently viewed documents
+  // GET /users/me/recent — recently viewed documents (ACL-scoped)
   router.get("/users/me/recent", async (req, res) => {
-    const { userId, orgId } = req.tenant;
+    const { userId, orgId, userRole, groupIds } = req.tenant;
+
+    const accessibleSpaceIds = await resolveAccessibleSpaceIds({
+      db,
+      userRole,
+      userId,
+      groupIds,
+    });
+
+    if (accessibleSpaceIds !== null && !accessibleSpaceIds.length) {
+      return res.json({ data: [] });
+    }
+
+    const conditions = [
+      eq(recentlyViewed.userId, userId),
+      eq(documents.orgId, orgId),
+      ne(documents.status, "trashed"),
+      ...(accessibleSpaceIds !== null
+        ? [inArray(documents.spaceId, accessibleSpaceIds)]
+        : []),
+    ];
 
     const rows = await db
       .select({
@@ -46,7 +67,7 @@ export function createUserActivityRouter(db: Db): Router {
       })
       .from(recentlyViewed)
       .innerJoin(documents, eq(recentlyViewed.documentId, documents.id))
-      .where(and(eq(recentlyViewed.userId, userId), eq(documents.orgId, orgId)))
+      .where(and(...conditions))
       .orderBy(desc(recentlyViewed.viewedAt))
       .limit(20);
 
@@ -89,9 +110,29 @@ export function createUserActivityRouter(db: Db): Router {
     res.json({ data: { favorited: rows.length > 0 } });
   });
 
-  // GET /users/me/favorites — list favorites
+  // GET /users/me/favorites — list favorites (ACL-scoped)
   router.get("/users/me/favorites", async (req, res) => {
-    const { userId, orgId } = req.tenant;
+    const { userId, orgId, userRole, groupIds } = req.tenant;
+
+    const accessibleSpaceIds = await resolveAccessibleSpaceIds({
+      db,
+      userRole,
+      userId,
+      groupIds,
+    });
+
+    if (accessibleSpaceIds !== null && !accessibleSpaceIds.length) {
+      return res.json({ data: [] });
+    }
+
+    const conditions = [
+      eq(favorites.userId, userId),
+      eq(documents.orgId, orgId),
+      ne(documents.status, "trashed"),
+      ...(accessibleSpaceIds !== null
+        ? [inArray(documents.spaceId, accessibleSpaceIds)]
+        : []),
+    ];
 
     const rows = await db
       .select({
@@ -112,7 +153,7 @@ export function createUserActivityRouter(db: Db): Router {
       })
       .from(favorites)
       .innerJoin(documents, eq(favorites.documentId, documents.id))
-      .where(and(eq(favorites.userId, userId), eq(documents.orgId, orgId)))
+      .where(and(...conditions))
       .orderBy(desc(favorites.createdAt))
       .limit(50);
 

@@ -5,11 +5,10 @@ export function getCollabWsUrl(): string {
 export function getCollaborationToken(): string | undefined {
   if (typeof window === "undefined") return undefined;
 
-  const devToken = process.env["NEXT_PUBLIC_DEV_JWT"];
-  if (devToken) return devToken;
-
   const match = document.cookie.match(/(?:^|; )wiki_token=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+  if (match?.[1]) return decodeURIComponent(match[1]);
+
+  return process.env["NEXT_PUBLIC_DEV_JWT"];
 }
 
 export function colorForUser(userId: string): string {

@@ -7,8 +7,9 @@ import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
-import { FileText, Plus, ChevronRight, MoreHorizontal } from "lucide-react";
+import { FileText, Plus, ChevronRight, MoreHorizontal, Trash2, PenIcon } from "lucide-react";
 import clsx from "clsx";
+import { TrashConfirmDialog } from "@/components/TrashConfirmDialog";
 
 interface NodeProps {
   doc: Document;
@@ -24,6 +25,8 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
   const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(doc.title);
@@ -44,14 +47,33 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  async function handleDelete(e: React.MouseEvent) {
+  useEffect(() => {
+    if (!trashConfirmOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !deleting) setTrashConfirmOpen(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [trashConfirmOpen, deleting]);
+
+  function handleTrashClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
-    await documentsApi.delete(doc.id);
-    mutate();
-    if (pathname === `/spaces/${spaceId}/docs/${doc.id}`) {
-      router.push(`/spaces/${spaceId}`);
+    setTrashConfirmOpen(true);
+  }
+
+  async function confirmTrash() {
+    setDeleting(true);
+    try {
+      await documentsApi.delete(doc.id);
+      mutate();
+      setTrashConfirmOpen(false);
+      if (pathname === `/spaces/${spaceId}/docs/${doc.id}`) {
+        router.push(`/spaces/${spaceId}`);
+      }
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -171,20 +193,35 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenameValue(doc.title); setRenaming(true); }}
-              className="w-full text-left px-3 py-1.5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+              className="w-full text-left px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
+              <PenIcon size={10} />
               Rename
             </button>
             <button
               type="button"
-              onClick={handleDelete}
-              className="w-full text-left px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+              disabled={deleting}
+              onClick={handleTrashClick}
+              className="w-full text-left px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
-              Delete
+              <Trash2 size={10} />
+              Move to trash
             </button>
           </div>,
           document.body,
         )}
+
+        {trashConfirmOpen &&
+          typeof window !== "undefined" &&
+          createPortal(
+            <TrashConfirmDialog
+              title={doc.title}
+              deleting={deleting}
+              onCancel={() => setTrashConfirmOpen(false)}
+              onConfirm={confirmTrash}
+            />,
+            document.body,
+          )}
       </div>
 
       {expanded && children.length > 0 && (

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc, ne } from "drizzle-orm";
+import { eq, and, desc, ne, inArray } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
 import {
@@ -19,7 +19,7 @@ import {
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64 } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
-import { assertDocumentAccess, assertSpaceAccess, resolveDocumentAccess, assertCanManageDocumentPermissions, assertCanMutateDocumentContent } from "../access/permissionResolver.js";
+import { assertDocumentAccess, assertSpaceAccess, resolveDocumentAccess, assertCanManageDocumentPermissions, assertCanMutateDocumentContent, resolveAccessibleSpaceIds } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
 import { notifyCollabDocumentReset } from "../../lib/collabReset.js";
 import { logger } from "../../lib/logger.js";
@@ -113,14 +113,33 @@ export function createContentRouter(
     res.json({ data: rows });
   });
 
-  // GET /documents/recent — recently updated documents
+  // GET /documents/recent — recently updated documents (ACL-scoped)
   router.get("/documents/recent", async (req, res) => {
-    const { orgId } = req.tenant;
+    const { orgId, userRole, userId, groupIds } = req.tenant;
+
+    const accessibleSpaceIds = await resolveAccessibleSpaceIds({
+      db,
+      userRole,
+      userId,
+      groupIds,
+    });
+
+    if (accessibleSpaceIds !== null && !accessibleSpaceIds.length) {
+      return res.json({ data: [] });
+    }
+
+    const conditions = [
+      eq(documents.orgId, orgId),
+      ne(documents.status, "trashed"),
+      ...(accessibleSpaceIds !== null
+        ? [inArray(documents.spaceId, accessibleSpaceIds)]
+        : []),
+    ];
 
     const rows = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.orgId, orgId), ne(documents.status, "trashed")))
+      .where(and(...conditions))
       .orderBy(desc(documents.updatedAt))
       .limit(20);
 

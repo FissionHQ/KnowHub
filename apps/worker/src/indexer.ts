@@ -1,10 +1,12 @@
 import { eq, and } from "drizzle-orm";
 import type { Db } from "@wiki/db";
-import { documents, spacePermissions, documentPermissions } from "@wiki/db";
+import { documents } from "@wiki/db";
 import type { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { INDEX_NAME } from "./opensearch.js";
 import type { SearchIndexDocument, SearchIndexMessage } from "@wiki/types";
 import { logger } from "./logger.js";
+import { htmlToPlainText } from "./htmlToPlainText.js";
+import { resolveIndexAcl } from "./resolveIndexAcl.js";
 
 export class Indexer {
   constructor(
@@ -43,23 +45,12 @@ export class Indexer {
       return;
     }
 
-    const spacePerm = await this.db
-      .select({ groupId: spacePermissions.groupId })
-      .from(spacePermissions)
-      .where(eq(spacePermissions.spaceId, doc.spaceId));
-
-    const docPerm = await this.db
-      .select({ groupId: documentPermissions.groupId, userId: documentPermissions.userId })
-      .from(documentPermissions)
-      .where(eq(documentPermissions.documentId, documentId));
-
-    const aclGroupIds = [
-      ...new Set([
-        ...spacePerm.map((r) => r.groupId),
-        ...docPerm.filter((r) => r.groupId).map((r) => r.groupId!),
-      ]),
-    ];
-    const aclUserIds = docPerm.filter((r) => r.userId).map((r) => r.userId!);
+    const { aclGroupIds, aclUserIds } = await resolveIndexAcl(
+      this.db,
+      documentId,
+      doc.spaceId,
+      doc.ownerId,
+    );
 
     const indexDoc: SearchIndexDocument = {
       org_id: orgId,
@@ -67,7 +58,7 @@ export class Indexer {
       space_id: doc.spaceId,
       type: doc.type,
       title: doc.title,
-      body: doc.contentRef ?? "",
+      body: htmlToPlainText(doc.contentRef ?? ""),
       tags: doc.tags,
       owner_id: doc.ownerId,
       updated_at: doc.updatedAt.toISOString(),
