@@ -14,10 +14,10 @@ import { z } from "zod";
 import { Client } from "@opensearch-project/opensearch";
 import { parseSearchEnv } from "@wiki/config";
 import { getDb } from "@wiki/db";
-import { SearchService } from "./searchService.js";
+import { SearchService, type AccessibleSpaces } from "./searchService.js";
 import winston from "winston";
-import { groupMemberships, groups } from "@wiki/db";
-import { eq, and } from "drizzle-orm";
+import { groupMemberships, groups, spacePermissions, spaces, users } from "@wiki/db";
+import { eq, and, inArray } from "drizzle-orm";
 import * as jose from "jose";
 import type { UserRole } from "@wiki/types";
 
@@ -41,24 +41,39 @@ app.use(morgan("combined", { stream: { write: (m) => logger.info(m.trim()) } }))
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-const querySchema = z.object({
-  q: z.string().min(1).max(500),
-  spaceId: z.string().uuid().optional(),
-  type: z.enum(["page", "pdf"]).optional(),
-  authorId: z.string().uuid().optional(),
-  tags: z.string().optional().transform((v) => (v ? v.split(",") : undefined)),
-  from: z.string().optional(),
-  to: z.string().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  size: z.coerce.number().int().min(1).max(100).default(20),
-});
+const querySchema = z
+  .object({
+    q: z.string().max(500).optional().default(""),
+    spaceId: z.string().uuid().optional(),
+    type: z.enum(["page", "pdf"]).optional(),
+    authorId: z.string().uuid().optional(),
+    tags: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v.split(",").map((t) => t.trim()).filter(Boolean) : undefined)),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    size: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .refine(
+    (data) =>
+      data.q.trim().length > 0 ||
+      data.spaceId ||
+      data.type ||
+      data.authorId ||
+      (data.tags && data.tags.length > 0) ||
+      data.from ||
+      data.to,
+    { message: "Provide a search query or at least one filter" },
+  );
 
 // Shared auth helper
 async function extractTenant(req: express.Request) {
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
   const cookieToken = (req.cookies as Record<string, string>)?.["wiki_token"];
-  const token = bearerToken ?? cookieToken;
+  const token = cookieToken ?? bearerToken;
 
   if (!token) throw Object.assign(new Error("Unauthorized"), { status: 401 });
   let payload: jose.JWTPayload;
@@ -86,6 +101,29 @@ async function extractTenant(req: express.Request) {
   return { orgId, userId, role, groupIds: rows.map((r) => r.groupId) };
 }
 
+/** Space IDs the user may access — same gate as API resolveSpaceAccess. */
+async function resolveAccessibleSpaceIds(
+  orgId: string,
+  groupIds: string[],
+  role: UserRole,
+): Promise<AccessibleSpaces> {
+  if (role === "admin") return null;
+  if (!groupIds.length) return [];
+
+  const rows = await db
+    .select({ spaceId: spacePermissions.spaceId })
+    .from(spacePermissions)
+    .innerJoin(spaces, eq(spacePermissions.spaceId, spaces.id))
+    .where(
+      and(
+        eq(spaces.orgId, orgId),
+        inArray(spacePermissions.groupId, groupIds),
+      ),
+    );
+
+  return [...new Set(rows.map((r) => r.spaceId))];
+}
+
 app.get("/search", async (req, res) => {
   const tenant = await extractTenant(req);
   const q = querySchema.safeParse(req.query);
@@ -94,7 +132,36 @@ app.get("/search", async (req, res) => {
     return;
   }
 
-  const results = await searchService.search(q.data as import("@wiki/types").SearchQuery, tenant.orgId, tenant.groupIds, tenant.userId);
+  const accessibleSpaceIds = await resolveAccessibleSpaceIds(
+    tenant.orgId,
+    tenant.groupIds,
+    tenant.role,
+  );
+
+  if (q.data.authorId) {
+    const authorRows = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, q.data.authorId), eq(users.orgId, tenant.orgId)));
+    if (!authorRows.length) {
+      res.json({
+        data: {
+          hits: [],
+          total: 0,
+          page: q.data.page,
+          size: q.data.size,
+        },
+      });
+      return;
+    }
+  }
+
+  const results = await searchService.search(
+    q.data as import("@wiki/types").SearchQuery,
+    tenant.orgId,
+    tenant.groupIds,
+    accessibleSpaceIds,
+  );
   res.json({ data: results });
 });
 
@@ -103,7 +170,22 @@ app.get("/search/suggest", async (req, res) => {
   const q = z.string().min(1).max(200).safeParse(req.query["q"]);
   if (!q.success) { res.json({ data: [] }); return; }
 
-  const suggestions = await searchService.suggest(q.data, tenant.orgId, tenant.groupIds, tenant.userId);
+  const spaceId = z.string().uuid().optional().safeParse(req.query["spaceId"]);
+  const filterSpaceId = spaceId.success ? spaceId.data : undefined;
+
+  const accessibleSpaceIds = await resolveAccessibleSpaceIds(
+    tenant.orgId,
+    tenant.groupIds,
+    tenant.role,
+  );
+
+  const suggestions = await searchService.suggest(
+    q.data,
+    tenant.orgId,
+    tenant.groupIds,
+    accessibleSpaceIds,
+    filterSpaceId,
+  );
   res.json({ data: suggestions });
 });
 

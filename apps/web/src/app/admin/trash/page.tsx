@@ -6,16 +6,21 @@ import { trashApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
 import { Card, CardContent, Button, Chip } from "@heroui/react";
 import { Trash2, RotateCcw, AlertTriangle, FileText, File } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function TrashPage() {
+  const { toast } = useToast();
   const { data: docs = [], mutate } = useSWR<Document[]>("trash", trashApi.list);
   const [loading, setLoading] = useState<string | null>(null);
 
-  async function handleRestore(id: string) {
+  async function handleRestore(id: string, title: string) {
     setLoading(id);
     try {
       await trashApi.restore(id);
-      mutate();
+      await mutate();
+      toast(`"${title}" restored`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to restore document", "error");
     } finally {
       setLoading(null);
     }
@@ -75,7 +80,7 @@ export default function TrashPage() {
                   size="sm"
                   variant="outline"
                   isDisabled={loading === doc.id}
-                  onPress={() => handleRestore(doc.id)}
+                  onPress={() => handleRestore(doc.id, doc.title)}
                   className="shrink-0 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                 >
                   <RotateCcw size={13} />

@@ -323,6 +323,25 @@ export const recentlyViewed = pgTable(
   ],
 );
 
+// ─── Recently Updated (per user) ─────────────────────────────────────────
+
+export const recentlyUpdated = pgTable(
+  "recently_updated",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.documentId] }),
+    index("recently_updated_user_id_idx").on(t.userId),
+  ],
+);
+
 // ─── Favorites ────────────────────────────────────────────────────────────
 
 export const favorites = pgTable(

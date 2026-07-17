@@ -1,25 +1,36 @@
-/**
- * Bulk re-index all documents into OpenSearch.
- * Run with: npx tsx scripts/reindex.ts
- */
+import { config } from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { Client } from "@opensearch-project/opensearch";
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
-import { eq } from "drizzle-orm";
-import { documents, spacePermissions, documentPermissions } from "@wiki/db";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { eq, ne } from "drizzle-orm";
+import { documents, spacePermissions, documentPermissions } from "./schema.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+config({ path: path.resolve(__dirname, "../../../.env") });
 
 const INDEX_NAME = "wiki-documents";
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL || "postgresql://wiki:wiki@localhost:5434/wiki" });
-const db = drizzle(pool);
-
-const os = new Client({
-  node: process.env.OPENSEARCH_URL || "http://localhost:9200",
-  ssl: undefined,
-});
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 async function main() {
-  // Ensure index exists
+  const databaseUrl = process.env["DATABASE_URL"];
+  if (!databaseUrl) throw new Error("DATABASE_URL is required");
+
+  const opensearchUrl = process.env["OPENSEARCH_URL"] ?? "http://localhost:9200";
+  const pg = postgres(databaseUrl, { max: 1 });
+  const db = drizzle(pg);
+  const os = new Client({ node: opensearchUrl });
+
   const exists = await os.indices.exists({ index: INDEX_NAME });
   if (!exists.body) {
     await os.indices.create({
@@ -31,13 +42,14 @@ async function main() {
             document_id: { type: "keyword" },
             space_id: { type: "keyword" },
             type: { type: "keyword" },
-            title: { type: "text", analyzer: "standard" },
-            body: { type: "text", analyzer: "standard" },
+            title: { type: "text", analyzer: "english" },
+            body: { type: "text", analyzer: "english" },
             tags: { type: "keyword" },
             owner_id: { type: "keyword" },
             updated_at: { type: "date" },
             acl_group_ids: { type: "keyword" },
             acl_user_ids: { type: "keyword" },
+            content_embedding: { type: "keyword", index: false },
           },
         },
       },
@@ -45,7 +57,11 @@ async function main() {
     console.log("Created index:", INDEX_NAME);
   }
 
-  const allDocs = await db.select().from(documents);
+  const allDocs = await db
+    .select()
+    .from(documents)
+    .where(ne(documents.status, "trashed"));
+
   console.log(`Found ${allDocs.length} documents to index`);
 
   for (const doc of allDocs) {
@@ -65,7 +81,12 @@ async function main() {
         ...docPerm.filter((r) => r.groupId).map((r) => r.groupId!),
       ]),
     ];
-    const aclUserIds = docPerm.filter((r) => r.userId).map((r) => r.userId!);
+    const aclUserIds = [
+      ...new Set([
+        doc.ownerId,
+        ...docPerm.filter((r) => r.userId).map((r) => r.userId!),
+      ]),
+    ];
 
     await os.index({
       index: INDEX_NAME,
@@ -76,7 +97,7 @@ async function main() {
         space_id: doc.spaceId,
         type: doc.type,
         title: doc.title,
-        body: doc.contentRef ?? "",
+        body: doc.type === "page" ? htmlToPlainText(doc.contentRef ?? "") : (doc.contentRef ?? ""),
         tags: doc.tags,
         owner_id: doc.ownerId,
         updated_at: doc.updatedAt.toISOString(),
@@ -91,7 +112,10 @@ async function main() {
 
   await os.indices.refresh({ index: INDEX_NAME });
   console.log("Done! All documents indexed.");
-  await pool.end();
+  await pg.end();
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

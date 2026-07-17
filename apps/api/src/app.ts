@@ -78,7 +78,7 @@ export function createApp(
 
   api.use(createIdentityRouter(db, redis, ses, env));
   api.use(createAccessRouter(db, redis));
-  api.use(createNavigationRouter(db));
+  api.use(createNavigationRouter(db, sqs, env.SQS_INDEX_QUEUE_URL));
   api.use(createUserActivityRouter(db));
   api.use(createContentRouter(db, sqs, env.SQS_INDEX_QUEUE_URL, redis));
   api.use(createCommentsRouter(db));

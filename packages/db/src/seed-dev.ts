@@ -1,7 +1,6 @@
 import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
-import { SignJWT } from "jose";
 import postgres from "postgres";
 import { randomBytes, scryptSync } from "node:crypto";
 import { writeFileSync } from "fs";
@@ -51,11 +50,7 @@ function hashPassword(password: string): string {
 
 async function main() {
   const url = process.env["DATABASE_URL"];
-  const jwtSecret = process.env["JWT_SECRET"];
   if (!url) throw new Error("DATABASE_URL is required");
-  if (!jwtSecret || jwtSecret.length < 32) {
-    throw new Error("JWT_SECRET must be at least 32 characters");
-  }
 
   const pg = postgres(url, { max: 1 });
   const db = drizzle(pg);
@@ -204,21 +199,10 @@ async function main() {
     });
   }
 
-  const token = await new SignJWT({
-    "custom:org_id": IDS.org,
-    "custom:org_slug": "acme",
-    "custom:role": "admin",
-  })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(IDS.admin)
-    .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(new TextEncoder().encode(jwtSecret));
-
   const envLocalPath = path.resolve(__dirname, "../../../apps/web/.env.local");
   writeFileSync(
     envLocalPath,
-    `NEXT_PUBLIC_DEV_JWT=${token}\nNEXT_PUBLIC_COLLAB_WS_URL=ws://localhost:3003\n`,
+    `NEXT_PUBLIC_COLLAB_WS_URL=ws://localhost:3003\n`,
   );
 
   console.log("\nSeed complete!\n");
@@ -228,7 +212,7 @@ async function main() {
   console.log(`Dev password: ${DEV_PASSWORD} (both users)`);
   console.log("Spaces:       Engineering, Product, People & HR");
   console.log("Documents:    5 sample pages");
-  console.log(`Dev JWT:        written to apps/web/.env.local (legacy fallback)`);
+  console.log(`Collab WS URL:  written to apps/web/.env.local`);
   console.log("\nSign in at http://localhost:3000/login");
 
   await pg.end();

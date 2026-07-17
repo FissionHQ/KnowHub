@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, ne } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
-import { spaces, spacePermissions, groups } from "@wiki/db";
+import { spaces, spacePermissions, groups, documents } from "@wiki/db";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../lib/errors.js";
 import { assertSpaceAccess } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
+import { logger } from "../../lib/logger.js";
+import type { SQSClient } from "@aws-sdk/client-sqs";
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
+import type { SearchIndexMessage } from "@wiki/types";
 
 const createSpaceSchema = z.object({
   name: z.string().min(1).max(200),
@@ -33,8 +37,37 @@ const updateSpacePermissionsSchema = z.object({
     .min(0),
 });
 
-export function createNavigationRouter(db: Db): Router {
+export function createNavigationRouter(db: Db, sqs: SQSClient, indexQueueUrl: string): Router {
   const router = Router();
+
+  async function enqueueIndex(documentId: string, orgId: string) {
+    const msg: SearchIndexMessage = { type: "SEARCH_INDEX", documentId, orgId, operation: "upsert" };
+    try {
+      await sqs.send(
+        new SendMessageCommand({
+          QueueUrl: indexQueueUrl,
+          MessageBody: JSON.stringify(msg),
+        }),
+      );
+    } catch (err) {
+      logger.warn("Failed to enqueue search index message", { err, documentId, orgId });
+    }
+  }
+
+  async function reindexSpaceDocuments(orgId: string, spaceId: string) {
+    const docs = await db
+      .select({ id: documents.id })
+      .from(documents)
+      .where(
+        and(
+          eq(documents.spaceId, spaceId),
+          eq(documents.orgId, orgId),
+          ne(documents.status, "trashed"),
+        ),
+      );
+
+    await Promise.all(docs.map((doc) => enqueueIndex(doc.id, orgId)));
+  }
 
   // GET /spaces — list spaces visible to current user
   router.get("/spaces", async (req, res) => {
@@ -217,6 +250,8 @@ export function createNavigationRouter(db: Db): Router {
       },
       req,
     });
+
+    await reindexSpaceDocuments(orgId, spaceId ?? "");
 
     res.json({ data: { spaceId, groupPermissions: body.data.groupPermissions } });
   });

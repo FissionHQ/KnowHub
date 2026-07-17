@@ -16,6 +16,7 @@ import {
   setTenantContext,
   isWithinTrashRetention,
   trashPurgeAt,
+  recordRecentlyUpdated,
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64 } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
@@ -130,21 +131,7 @@ export function createContentRouter(
     res.json({ data: rows });
   });
 
-  // GET /documents/recent — recently updated documents
-  router.get("/documents/recent", async (req, res) => {
-    const { orgId } = req.tenant;
-
-    const rows = await db
-      .select()
-      .from(documents)
-      .where(and(eq(documents.orgId, orgId), ne(documents.status, "trashed")))
-      .orderBy(desc(documents.updatedAt))
-      .limit(20);
-
-    res.json({ data: rows });
-  });
-
-  // GET /trash — list trashed documents (admin only)
+  // POST /documents
   router.get("/trash", async (req, res) => {
     const { orgId, userRole } = req.tenant;
     if (userRole !== "admin") throw new ForbiddenError();
@@ -237,6 +224,7 @@ export function createContentRouter(
     });
 
     await enqueueIndex(docId, orgId, "upsert");
+    await recordRecentlyUpdated(db, userId, docId);
 
     res.status(201).json({ data: inserted[0] });
   });
@@ -349,6 +337,7 @@ export function createContentRouter(
     }
 
     await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await recordRecentlyUpdated(db, userId, documentId ?? "");
 
     res.json({ data: updated[0] });
   });
@@ -600,6 +589,7 @@ export function createContentRouter(
     }
 
     await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await recordRecentlyUpdated(db, userId, documentId ?? "");
 
     await recordAudit(db, {
       orgId,

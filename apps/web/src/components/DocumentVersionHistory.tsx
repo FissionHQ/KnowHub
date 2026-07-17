@@ -6,6 +6,7 @@ import { documentsApi } from "@/lib/api";
 import type { DocumentVersionListItem } from "@wiki/types";
 import { Tooltip } from "@heroui/react";
 import { History, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
 
 interface Props {
   documentId: string;
@@ -40,33 +41,25 @@ function VersionDetailTooltip({
 }
 
 export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: Props) {
+  const { toast } = useToast();
   const { data: versions = [], mutate } = useSWR(
     `doc-versions:${documentId}`,
     () => documentsApi.getVersions(documentId),
   );
   const [restoring, setRestoring] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   async function handleRestore(version: DocumentVersionListItem) {
-    if (
-      !confirm(
-        `Restore version ${version.versionNumber}? This creates a new revision and reloads the document.`,
-      )
-    ) {
-      return;
-    }
-
     setRestoring(version.versionNumber);
-    setError(null);
     try {
       const result = await documentsApi.restoreVersion(documentId, version.versionNumber);
       await mutate();
+      toast(`Restored version ${version.versionNumber}`, "success");
       if (result.reloadRequired) {
-        window.location.reload();
+        window.setTimeout(() => window.location.reload(), 600);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to restore version");
+      toast(err instanceof Error ? err.message : "Failed to restore version", "error");
       setRestoring(null);
     }
   }
@@ -159,8 +152,6 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
               );
             })}
           </ul>
-
-          {error && <p className="text-sm text-red-600 px-4 py-2">{error}</p>}
         </div>
       )}
     </div>

@@ -132,6 +132,21 @@ export async function resolveSpaceAccess(
   return rows.some((r) => r.accessLevel === "edit") ? "edit" : "view";
 }
 
+/** Space IDs the user may access. null = admin (all spaces in org). */
+export async function resolveAccessibleSpaceIds(
+  opts: PermissionCheck,
+): Promise<string[] | null> {
+  if (opts.userRole === "admin") return null;
+  if (!opts.groupIds.length) return [];
+
+  const rows = await opts.db
+    .select({ spaceId: spacePermissions.spaceId })
+    .from(spacePermissions)
+    .where(inArray(spacePermissions.groupId, opts.groupIds));
+
+  return [...new Set(rows.map((r) => r.spaceId))];
+}
+
 /** Admin or document owner may change document-level permissions. */
 export function assertCanManageDocumentPermissions(opts: {
   userRole: UserRole;

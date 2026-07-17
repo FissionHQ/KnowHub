@@ -1,6 +1,6 @@
 "use client";
 
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -8,11 +8,13 @@ import { documentsApi, attachmentsApi, spacesApi, commentsApi, activityApi } fro
 import type { Document, Space, Comment } from "@wiki/types";
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
 import { DocumentVersionHistory } from "@/components/DocumentVersionHistory";
+import { TrashConfirmDialog } from "@/components/TrashConfirmDialog";
 import { CollaborativeEditor } from "@/components/editor/CollaborativeEditor";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
 import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
 import {
@@ -76,11 +78,14 @@ export function DocumentView({ spaceId, docId }: Props) {
   );
   const commentCount = comments.filter((c) => !c.parentId).length;
 
+  const canEdit = Boolean(user && (user.role === "admin" || doc?.accessLevel === "edit"));
+
   const collab = useCollaboration({
     orgId: user?.orgId ?? doc?.orgId ?? "",
     documentId: docId,
     userId: user?.id ?? "",
     userName: user?.name ?? "You",
+    canEdit,
     enabled: Boolean(user && doc?.type === "page" && !useFallbackEditor),
   });
 
@@ -94,7 +99,10 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc]);
 
   useEffect(() => {
-    if (doc) activityApi.recordView(docId).catch(() => {});
+    if (!doc) return;
+    activityApi.recordView(docId)
+      .then(() => globalMutate("recent"))
+      .catch(() => {});
   }, [doc?.id, docId]);
 
   useEffect(() => {
@@ -110,6 +118,12 @@ export function DocumentView({ spaceId, docId }: Props) {
 
     return () => clearTimeout(timer);
   }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
+
+  useEffect(() => {
+    if (!useFallbackEditor && collab.saveStatus === "saved") {
+      void globalMutate("recently-updated");
+    }
+  }, [collab.saveStatus, useFallbackEditor]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
@@ -132,6 +146,7 @@ export function DocumentView({ spaceId, docId }: Props) {
         await documentsApi.update(docId, { content: html });
         setSaveStatus("saved");
         mutate();
+        void globalMutate("recently-updated");
       } catch {
         setSaveStatus("unsaved");
       }
@@ -175,7 +190,6 @@ export function DocumentView({ spaceId, docId }: Props) {
     Boolean(collab.provider);
   const showConnecting = showPageEditor && authLoading;
   const showFallback = showPageEditor && !showCollab && !showConnecting;
-  const canEdit = user?.role === "admin" || currentDoc.accessLevel === "edit";
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const isConnected = showFallback ? true : collab.status === "connected";
 
@@ -188,6 +202,7 @@ export function DocumentView({ spaceId, docId }: Props) {
       const updated = await documentsApi.update(docId, { title: trimmed });
       mutate(updated, false);
       setSaveStatus("saved");
+      void globalMutate("recently-updated");
     } catch {
       setSaveStatus("unsaved");
     }
@@ -313,7 +328,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             </button>
           )}
           {doc.type === "page" && user && (
-            <EditorCountInline count={collab.editorCount} status={collab.status} />
+            <EditorCountInline presence={collab.presence} status={collab.status} canEdit={canEdit} />
           )}
         </div>
 
@@ -573,94 +588,16 @@ function DocumentActionsMenu({
   );
 }
 
-function TrashConfirmDialog({
-  title,
-  deleting,
-  onCancel,
-  onConfirm,
-}: {
-  title: string;
-  deleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-[10000] bg-black/40 backdrop-blur-[1px]"
-        onClick={deleting ? undefined : onCancel}
-        aria-hidden="true"
-      />
-      <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 pointer-events-none">
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="trash-confirm-title"
-          className="pointer-events-auto w-full max-w-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl"
-        >
-          <div className="px-5 pt-5 pb-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 shrink-0">
-                <Trash2 size={18} />
-              </div>
-              <div className="min-w-0">
-                <h2
-                  id="trash-confirm-title"
-                  className="text-base font-semibold text-zinc-900 dark:text-zinc-100"
-                >
-                  Move to trash?
-                </h2>
-                <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">{title}</span>{" "}
-                  will be moved to trash. An admin can restore it before the retention period
-                  expires.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-b-xl">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onPress={onCancel}
-              isDisabled={deleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              className="bg-red-600 hover:bg-red-700 text-white"
-              onPress={onConfirm}
-              isPending={deleting}
-              isDisabled={deleting}
-            >
-              Move to trash
-            </Button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 function EditorCountInline({
-  count,
+  presence,
   status,
+  canEdit,
 }: {
-  count: number;
+  presence: { editors: number; viewers: number };
   status: "connecting" | "connected" | "disconnected";
+  canEdit: boolean;
 }) {
-  const label =
-    status === "connecting"
-      ? "Connecting…"
-      : status === "disconnected"
-        ? "Offline"
-        : count === 1
-          ? "1 editing"
-          : `${count} editing`;
+  const label = formatPresenceLabel(presence, status, canEdit);
 
   return (
     <span

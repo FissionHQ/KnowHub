@@ -25,7 +25,7 @@ export function createAuthMiddleware(opts: {
     const authHeader = req.headers.authorization;
     const cookieToken = req.cookies?.["wiki_token"] as string | undefined;
     const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
-    const token = bearerToken ?? cookieToken;
+    const token = cookieToken ?? bearerToken;
 
     if (!token) {
       throw new UnauthorizedError("Missing Bearer token");

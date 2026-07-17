@@ -10,6 +10,7 @@ import {
   documentCollabState,
   documentVersions,
   setTenantContext,
+  recordRecentlyUpdated,
 } from "@wiki/db";
 import type { SearchIndexMessage } from "@wiki/types";
 import { COLLAB_FIELD, collabTiptapExtensions } from "@wiki/doc-collab";
@@ -205,6 +206,10 @@ async function persistHtmlAndIndex(
 
   if (nextVersion === null) {
     return;
+  }
+
+  if (editedBy) {
+    await recordRecentlyUpdated(db, editedBy, documentId);
   }
 
   const msg: SearchIndexMessage = {

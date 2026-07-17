@@ -6,6 +6,7 @@ import { documentsApi } from "@/lib/api";
 import type { DocumentVersionListItem } from "@wiki/types";
 import { History, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { Spinner } from "@heroui/react";
+import { useToast } from "@/components/ui/ToastProvider";
 
 interface Props {
   documentId: string;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function VersionHistoryPanel({ documentId, onRestore }: Props) {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
 
@@ -26,6 +28,9 @@ export function VersionHistoryPanel({ documentId, onRestore }: Props) {
     try {
       await documentsApi.restoreVersion(documentId, v.versionNumber);
       onRestore(v.contentSnapshot);
+      toast(`Restored version ${v.versionNumber}`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to restore version", "error");
     } finally {
       setRestoring(null);
     }

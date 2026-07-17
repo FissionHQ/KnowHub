@@ -85,6 +85,10 @@ export interface Document {
   trashedAt?: Date;
   /** Present on GET /documents/:id — effective access for the current user */
   accessLevel?: AccessLevel;
+  /** Present on recently-viewed lists */
+  viewedAt?: Date;
+  /** Present on recently-updated lists */
+  editedAt?: Date;
 }
 
 export interface TrashedDocument {

@@ -9,6 +9,7 @@ import type { Document, Space } from "@wiki/types";
 import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
 import { FileText, Plus, File, ChevronRight, Upload } from "lucide-react";
 import { parseFileToHtml } from "@/lib/importers";
+import { SearchPanel } from "@/components/search/SearchPanel";
 
 interface Props { spaceId: string }
 
@@ -72,6 +73,8 @@ export function SpaceView({ spaceId }: Props) {
       setImporting(false);
     }
   }
+
+  const [searchActive, setSearchActive] = useState(false);
 
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceId}`,
@@ -148,12 +151,21 @@ export function SpaceView({ spaceId }: Props) {
       </div>
 
       <Separator className="mb-6" />
-
       {/* Document count */}
       {!docsLoading && flatDocs.length > 0 && (
         <p className="text-xs text-zinc-400 mb-3">{flatDocs.length} document{flatDocs.length !== 1 ? "s" : ""}</p>
       )}
 
+      <div className="mb-6">
+        <SearchPanel
+          lockedSpaceId={spaceId}
+          placeholder="Search in this space…"
+          onSearchedChange={setSearchActive}
+        />
+      </div>
+
+      {!searchActive && (
+        <>
       {/* Document list */}
       {docsLoading ? (
         <div className="flex flex-col gap-1">
@@ -228,6 +240,8 @@ export function SpaceView({ spaceId }: Props) {
               </button>
             </div>
           )}
+        </>
+      )}
         </>
       )}
     </div>

@@ -35,11 +35,6 @@ import type {
 const BASE = "/api";
 const SEARCH_BASE = "/search";
 
-function devAuthHeaders(): Record<string, string> {
-  const token = process.env["NEXT_PUBLIC_DEV_JWT"];
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -48,7 +43,6 @@ async function apiFetch<T>(
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...devAuthHeaders(),
       ...init?.headers,
     },
     credentials: "include",
@@ -142,7 +136,6 @@ export const documentsApi = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...devAuthHeaders(),
         },
         credentials: "include",
       });
@@ -183,7 +176,6 @@ export const attachmentsApi = {
     const res = await fetch(`${BASE}/documents/${documentId}/attachments`, {
       method: "POST",
       body: form,
-      headers: devAuthHeaders(),
       credentials: "include",
     });
     if (!res.ok) throw new Error("Upload failed");
@@ -196,7 +188,6 @@ export const attachmentsApi = {
     const res = await fetch(`${BASE}/documents/${documentId}/attachments/replace`, {
       method: "POST",
       body: form,
-      headers: devAuthHeaders(),
       credentials: "include",
     });
     if (!res.ok) throw new Error("Replace failed");
@@ -305,7 +296,7 @@ export const activityApi = {
   recordView: (documentId: string) =>
     apiFetch<{ recorded: boolean }>(`${BASE}/documents/${documentId}/view`, { method: "POST", body: "{}" }),
   getRecent: () => apiFetch<Document[]>(`${BASE}/users/me/recent`),
-  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/documents/recent`),
+  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/users/me/recently-updated`),
   toggleFavorite: (documentId: string) =>
     apiFetch<{ favorited: boolean }>(`${BASE}/documents/${documentId}/favorite`, { method: "POST", body: "{}" }),
   isFavorited: (documentId: string) =>
@@ -333,6 +324,9 @@ export const searchApi = {
     }
     return apiFetch<SearchResponse>(`${SEARCH_BASE}/search?${qs}`);
   },
-  suggest: (q: string) =>
-    apiFetch<string[]>(`${SEARCH_BASE}/search/suggest?q=${encodeURIComponent(q)}`),
+  suggest: (q: string, spaceId?: string) => {
+    const qs = new URLSearchParams({ q });
+    if (spaceId) qs.set("spaceId", spaceId);
+    return apiFetch<string[]>(`${SEARCH_BASE}/search/suggest?${qs}`);
+  },
 };

@@ -9,12 +9,13 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { eq, and } from "drizzle-orm";
 import pdfParse from "pdf-parse";
 import type { Db } from "@wiki/db";
-import { attachments, documents, documentPermissions, spacePermissions, recordAudit } from "@wiki/db";
+import { attachments, documents, recordAudit } from "@wiki/db";
 import type { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { INDEX_NAME } from "./opensearch.js";
 import type { PdfProcessingMessage, SearchIndexDocument } from "@wiki/types";
 import { logger } from "./logger.js";
 import { VirusScanner } from "./virusScanner.js";
+import { resolveIndexAcl } from "./resolveIndexAcl.js";
 
 export class PdfProcessor {
   private virusScanner: VirusScanner;
@@ -179,24 +180,13 @@ export class PdfProcessor {
     if (!docRows.length) return;
     const doc = docRows[0]!;
 
-    // Resolve ACL group IDs from space permissions
-    const spacePerm = await this.db
-      .select({ groupId: spacePermissions.groupId })
-      .from(spacePermissions)
-      .where(eq(spacePermissions.spaceId, doc.spaceId));
-
-    const docPerm = await this.db
-      .select({ groupId: documentPermissions.groupId, userId: documentPermissions.userId })
-      .from(documentPermissions)
-      .where(eq(documentPermissions.documentId, documentId));
-
-    const aclGroupIds = [
-      ...new Set([
-        ...spacePerm.map((r) => r.groupId),
-        ...docPerm.filter((r) => r.groupId).map((r) => r.groupId!),
-      ]),
-    ];
-    const aclUserIds = docPerm.filter((r) => r.userId).map((r) => r.userId!);
+    // Resolve ACL and index
+    const { aclGroupIds, aclUserIds } = await resolveIndexAcl(
+      this.db,
+      documentId,
+      doc.spaceId,
+      doc.ownerId,
+    );
 
     const indexDoc: SearchIndexDocument = {
       org_id: orgId,

@@ -3,6 +3,9 @@ import type { SearchQuery, SearchResponse } from "@wiki/types";
 
 const INDEX = "wiki-documents";
 
+/** null = admin (all spaces in org); [] = no accessible spaces */
+export type AccessibleSpaces = string[] | null;
+
 export class SearchService {
   constructor(private os: Client) {}
 
@@ -10,13 +13,38 @@ export class SearchService {
     query: SearchQuery,
     orgId: string,
     userGroupIds: string[],
-    userId: string,
+    accessibleSpaceIds: AccessibleSpaces,
   ): Promise<SearchResponse> {
     const page = query.page ?? 1;
     const size = Math.min(query.size ?? 20, 100);
     const from = (page - 1) * size;
 
-    const body = this.buildQuery(query, orgId, userGroupIds, userId);
+    if (!this.hasSearchAccess(userGroupIds, accessibleSpaceIds)) {
+      return { hits: [], total: 0, page, size };
+    }
+
+    if (
+      query.spaceId &&
+      accessibleSpaceIds !== null &&
+      !accessibleSpaceIds.includes(query.spaceId)
+    ) {
+      return { hits: [], total: 0, page, size };
+    }
+
+    const hasQuery = Boolean(query.q?.trim());
+    const hasFilters = Boolean(
+      query.spaceId ||
+        query.type ||
+        query.authorId ||
+        query.tags?.length ||
+        query.from ||
+        query.to,
+    );
+    if (!hasQuery && !hasFilters) {
+      return { hits: [], total: 0, page, size };
+    }
+
+    const body = this.buildQuery(query, orgId, userGroupIds, accessibleSpaceIds);
 
     const result = await this.os.search({
       index: INDEX,
@@ -51,9 +79,26 @@ export class SearchService {
     };
   }
 
-  async suggest(q: string, orgId: string, userGroupIds: string[], userId?: string): Promise<string[]> {
+  async suggest(
+    q: string,
+    orgId: string,
+    userGroupIds: string[],
+    accessibleSpaceIds: AccessibleSpaces,
+    spaceId?: string,
+  ): Promise<string[]> {
     if (!q.trim()) return [];
+    if (!this.hasSearchAccess(userGroupIds, accessibleSpaceIds)) return [];
 
+    if (
+      spaceId &&
+      accessibleSpaceIds !== null &&
+      !accessibleSpaceIds.includes(spaceId)
+    ) {
+      return [];
+    }
+
+    const filters = this.buildAclFilters(orgId, userGroupIds, accessibleSpaceIds);
+    if (spaceId) filters.push({ term: { space_id: spaceId } });
     const result = await this.os.search({
       index: INDEX,
       body: {
@@ -72,18 +117,7 @@ export class SearchService {
                 },
               },
             ],
-            filter: [
-              { term: { org_id: orgId } },
-              {
-                bool: {
-                  should: [
-                    ...(userGroupIds.length ? [{ terms: { acl_group_ids: userGroupIds } }] : []),
-                    ...(userId ? [{ term: { acl_user_ids: userId } }] : []),
-                  ],
-                  minimum_should_match: 1,
-                },
-              },
-            ],
+            filter: filters,
           },
         },
       },
@@ -94,25 +128,37 @@ export class SearchService {
     );
   }
 
+  /** Mirrors API: space access via groups first; admin bypasses. */
+  private hasSearchAccess(
+    userGroupIds: string[],
+    accessibleSpaceIds: AccessibleSpaces,
+  ): boolean {
+    if (accessibleSpaceIds === null) return true;
+    return userGroupIds.length > 0 && accessibleSpaceIds.length > 0;
+  }
+
+  private buildAclFilters(
+    orgId: string,
+    userGroupIds: string[],
+    accessibleSpaceIds: AccessibleSpaces,
+  ): unknown[] {
+    const filters: unknown[] = [{ term: { org_id: orgId } }];
+
+    if (accessibleSpaceIds === null) return filters;
+
+    filters.push({ terms: { space_id: accessibleSpaceIds } });
+    filters.push({ terms: { acl_group_ids: userGroupIds } });
+
+    return filters;
+  }
+
   private buildQuery(
     query: SearchQuery,
     orgId: string,
     userGroupIds: string[],
-    userId: string,
+    accessibleSpaceIds: AccessibleSpaces,
   ) {
-    const filters: unknown[] = [
-      { term: { org_id: orgId } },
-      // ACL filter: document must grant access to at least one of the user's groups, or the user directly
-      {
-        bool: {
-          should: [
-            ...(userGroupIds.length ? [{ terms: { acl_group_ids: userGroupIds } }] : []),
-            { term: { acl_user_ids: userId } },
-          ],
-          minimum_should_match: 1,
-        },
-      },
-    ];
+    const filters = this.buildAclFilters(orgId, userGroupIds, accessibleSpaceIds);
 
     if (query.spaceId) filters.push({ term: { space_id: query.spaceId } });
     if (query.type) filters.push({ term: { type: query.type } });
@@ -122,46 +168,58 @@ export class SearchService {
       filters.push({
         range: {
           updated_at: {
-            ...(query.from ? { gte: query.from } : {}),
-            ...(query.to ? { lte: query.to } : {}),
+            ...(query.from
+              ? { gte: query.from.length === 10 ? `${query.from}T00:00:00.000Z` : query.from }
+              : {}),
+            ...(query.to
+              ? { lte: query.to.length === 10 ? `${query.to}T23:59:59.999Z` : query.to }
+              : {}),
           },
         },
       });
     }
 
+    const textQuery = query.q?.trim() ?? "";
+    const must = textQuery
+      ? [
+          {
+            multi_match: {
+              query: textQuery,
+              fields: ["title^3", "body", "tags^2"],
+              type: "best_fields",
+              fuzziness: "AUTO",
+            },
+          },
+        ]
+      : [{ match_all: {} }];
+
     return {
       query: {
         bool: {
-          must: [
-            {
-              multi_match: {
-                query: query.q,
-                fields: ["title^3", "body", "tags^2"],
-                type: "best_fields",
-                fuzziness: "AUTO",
-              },
-            },
-          ],
+          must,
           filter: filters,
-          should: [
-            // SR-4: recency boost
-            {
-              range: {
-                updated_at: {
-                  gte: "now-7d",
-                  boost: 2,
-                },
-              },
-            },
-            {
-              range: {
-                updated_at: {
-                  gte: "now-30d",
-                  boost: 1,
-                },
-              },
-            },
-          ],
+          ...(textQuery
+            ? {
+                should: [
+                  {
+                    range: {
+                      updated_at: {
+                        gte: "now-7d",
+                        boost: 2,
+                      },
+                    },
+                  },
+                  {
+                    range: {
+                      updated_at: {
+                        gte: "now-30d",
+                        boost: 1,
+                      },
+                    },
+                  },
+                ],
+              }
+            : {}),
         },
       },
       highlight: {
@@ -170,9 +228,12 @@ export class SearchService {
         fields: {
           title: { number_of_fragments: 1, fragment_size: 100 },
           body: { number_of_fragments: 3, fragment_size: 200 },
+          tags: { number_of_fragments: 1, fragment_size: 80 },
         },
       },
-      sort: [{ _score: "desc" }, { updated_at: "desc" }],
+      sort: textQuery
+        ? [{ _score: "desc" }, { updated_at: "desc" }]
+        : [{ updated_at: "desc" }],
     };
   }
 }
