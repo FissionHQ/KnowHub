@@ -108,6 +108,8 @@ export interface UpdateDocumentBody {
   tags?: string[];
   status?: DocumentStatus;
   restrictDownload?: boolean;
+  /** When true, snapshot current title/content as a new published version. */
+  publish?: boolean;
 }
 
 export interface CreateCommentBody {

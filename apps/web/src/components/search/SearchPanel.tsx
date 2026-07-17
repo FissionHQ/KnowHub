@@ -153,10 +153,11 @@ export function SearchPanel({
     dateTo,
     spaceId,
     lockedSpaceId ?? "",
-    canSearch,
   ].join("\0");
 
-  // Re-run when filters change (not on each keystroke)
+  const searchDebounceKey = `${filterKey}\0${query.trim()}`;
+
+  // Debounced search when query or filters change (keeps results in sync with suggestions).
   useEffect(() => {
     if (!canSearch) {
       setSearched(false);
@@ -170,7 +171,7 @@ export function SearchPanel({
     return () => {
       if (filterSearchTimeout.current) clearTimeout(filterSearchTimeout.current);
     };
-  }, [filterKey]);
+  }, [searchDebounceKey, canSearch]);
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
@@ -307,7 +308,7 @@ export function SearchPanel({
                 className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
               />
             </div>
-            {/* <div>
+            <div>
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
                 File type
               </label>
@@ -320,7 +321,7 @@ export function SearchPanel({
                 <option value="page">Page</option>
                 <option value="pdf">PDF</option>
               </select>
-            </div> */}
+            </div>
             <div>
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
                 From date
@@ -414,14 +415,18 @@ export function SearchPanel({
                             __html: hit.highlight.title?.[0] ?? hit.title,
                           }}
                         />
-                        {hit.highlight.body?.[0] && (
+                        {hit.highlight.body?.[0] ? (
                           <p
                             className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed [&>mark]:bg-yellow-200 [&>mark]:dark:bg-yellow-800/50 [&>mark]:px-0.5 [&>mark]:rounded"
                             dangerouslySetInnerHTML={{
                               __html: hit.highlight.body[0],
                             }}
                           />
-                        )}
+                        ) : hit.preview ? (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
+                            {hit.preview}
+                          </p>
+                        ) : null}
                       </div>
                       <Chip size="sm" variant="soft" className="text-xs shrink-0">
                         {hit.type.toUpperCase()}

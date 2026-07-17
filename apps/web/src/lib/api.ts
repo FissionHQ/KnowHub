@@ -170,6 +170,14 @@ export const documentsApi = {
 // ─── Attachments ──────────────────────────────────────────────────────────
 
 export const attachmentsApi = {
+  listByDocument: (documentId: string) =>
+    apiFetch<Array<{
+      attachmentId: string;
+      scanStatus: string;
+      ready: boolean;
+      originalName: string;
+      createdAt: string;
+    }>>(`${BASE}/documents/${documentId}/attachments`),
   upload: async (documentId: string, file: File): Promise<{ attachmentId: string }> => {
     const form = new FormData();
     form.append("file", file);
@@ -182,7 +190,7 @@ export const attachmentsApi = {
     const json = await res.json() as { data: { attachmentId: string } };
     return json.data;
   },
-  replacePdf: async (documentId: string, file: File): Promise<{ attachmentId: string; version: number }> => {
+  replacePdf: async (documentId: string, file: File): Promise<{ attachmentId: string }> => {
     const form = new FormData();
     form.append("file", file);
     const res = await fetch(`${BASE}/documents/${documentId}/attachments/replace`, {
@@ -191,7 +199,7 @@ export const attachmentsApi = {
       credentials: "include",
     });
     if (!res.ok) throw new Error("Replace failed");
-    const json = await res.json() as { data: { attachmentId: string; version: number } };
+    const json = await res.json() as { data: { attachmentId: string } };
     return json.data;
   },
   getStatus: (attachmentId: string) =>
@@ -202,6 +210,8 @@ export const attachmentsApi = {
     apiFetch<{ url: string; expiresIn: number }>(
       `${BASE}/attachments/${attachmentId}/view`,
     ),
+  /** Same-origin proxy — avoids S3 CORS when viewing in the browser (e.g. LocalStack). */
+  viewProxyUrl: (attachmentId: string) => `/proxy/attachments/${attachmentId}`,
 };
 
 // ─── Groups ───────────────────────────────────────────────────────────────

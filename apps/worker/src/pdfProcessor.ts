@@ -9,7 +9,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { eq, and } from "drizzle-orm";
 import pdfParse from "pdf-parse";
 import type { Db } from "@wiki/db";
-import { attachments, documents, recordAudit } from "@wiki/db";
+import { attachments, documents, recordAudit, resolveDocumentViewCount } from "@wiki/db";
 import type { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { INDEX_NAME } from "./opensearch.js";
 import type { PdfProcessingMessage, SearchIndexDocument } from "@wiki/types";
@@ -188,16 +188,20 @@ export class PdfProcessor {
       doc.ownerId,
     );
 
+    const viewCount = await resolveDocumentViewCount(this.db, documentId);
+
     const indexDoc: SearchIndexDocument = {
       org_id: orgId,
       document_id: documentId,
       space_id: doc.spaceId,
       type: "pdf",
+      is_editable: false,
       title: doc.title,
       body: pdfText,
       tags: doc.tags,
       owner_id: doc.ownerId,
       updated_at: doc.updatedAt.toISOString(),
+      view_count: viewCount,
       acl_group_ids: aclGroupIds,
       acl_user_ids: aclUserIds,
       preview: pdfText.slice(0, 300).replace(/\s+/g, " ").trim() || null,

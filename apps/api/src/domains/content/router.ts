@@ -17,6 +17,11 @@ import {
   isWithinTrashRetention,
   trashPurgeAt,
   recordRecentlyUpdated,
+  saveDocumentContent,
+  publishDocumentVersion,
+  appendRestoredDocumentVersion,
+  isTitleChanged,
+  isContentChanged,
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64 } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
@@ -32,6 +37,7 @@ import type { Redis } from "ioredis";
 const createDocSchema = z.object({
   spaceId: z.string().uuid(),
   parentId: z.string().uuid().optional(),
+  type: z.enum(["page", "pdf"]).default("page"),
   title: z.string().min(1).max(500),
   content: z.string().default(""),
   tags: z.array(z.string()).default([]),
@@ -43,6 +49,7 @@ const updateDocSchema = z.object({
   tags: z.array(z.string()).optional(),
   status: z.enum(["draft", "published"]).optional(),
   restrictDownload: z.boolean().optional(),
+  publish: z.boolean().optional(),
 });
 
 const setPermissionSchema = z
@@ -131,7 +138,7 @@ export function createContentRouter(
     res.json({ data: rows });
   });
 
-  // POST /documents
+  // GET /trash — list trashed documents (admin only)
   router.get("/trash", async (req, res) => {
     const { orgId, userRole } = req.tenant;
     if (userRole !== "admin") throw new ForbiddenError();
@@ -197,6 +204,13 @@ export function createContentRouter(
     });
 
     const docId = uuidv4();
+    const docType = body.data.type;
+    // PDF attachment docs omit content; imported PDFs send converted HTML with type pdf.
+    const contentRef =
+      docType === "pdf"
+        ? body.data.content || null
+        : body.data.content || "";
+
     const inserted = await db
       .insert(documents)
       .values({
@@ -204,24 +218,15 @@ export function createContentRouter(
         orgId,
         spaceId: body.data.spaceId,
         parentId: body.data.parentId ?? null,
-        type: "page",
+        type: docType,
         title: body.data.title,
-        contentRef: body.data.content,
+        contentRef,
         ownerId: userId,
         status: "draft",
         version: 1,
         tags: body.data.tags,
       })
       .returning();
-
-    // Save initial version
-    await db.insert(documentVersions).values({
-      id: uuidv4(),
-      documentId: docId,
-      versionNumber: 1,
-      contentSnapshot: body.data.content,
-      editedBy: userId,
-    });
 
     await enqueueIndex(docId, orgId, "upsert");
     await recordRecentlyUpdated(db, userId, docId);
@@ -309,37 +314,94 @@ export function createContentRouter(
       ownerId: doc.ownerId,
     });
 
-    const newVersion = doc.version + 1;
+    const hasTitle = body.data.title !== undefined;
+    const hasContent = body.data.content !== undefined;
+    const hasMetadata =
+      body.data.tags !== undefined ||
+      body.data.status !== undefined ||
+      body.data.restrictDownload !== undefined;
 
-    const updated = await db
-      .update(documents)
-      .set({
-        ...(body.data.title !== undefined ? { title: body.data.title } : {}),
-        ...(body.data.content !== undefined ? { contentRef: body.data.content } : {}),
-        ...(body.data.tags !== undefined ? { tags: body.data.tags } : {}),
-        ...(body.data.status !== undefined ? { status: body.data.status } : {}),
-        ...(body.data.restrictDownload !== undefined ? { restrictDownload: body.data.restrictDownload } : {}),
-        version: newVersion,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
-      .returning();
+    const titleWillChange =
+      hasTitle && isTitleChanged(doc.title, body.data.title!);
+    const contentWillChange =
+      hasContent && isContentChanged(doc.contentRef, body.data.content!);
+    const publishing = body.data.publish === true;
 
-    // Save version snapshot when content changes
-    if (body.data.content !== undefined) {
-      await db.insert(documentVersions).values({
-        id: uuidv4(),
-        documentId: documentId ?? "",
-        versionNumber: newVersion,
-        contentSnapshot: body.data.content,
-        editedBy: userId,
-      });
+    if (!publishing && !titleWillChange && !contentWillChange && !hasMetadata) {
+      res.json({ data: doc });
+      return;
     }
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
-    await recordRecentlyUpdated(db, userId, documentId ?? "");
+    const metadataUpdates: {
+      tags?: string[];
+      status?: "draft" | "published";
+      restrictDownload?: boolean;
+      updatedAt?: Date;
+    } = {};
+    if (body.data.tags !== undefined) metadataUpdates.tags = body.data.tags;
+    if (body.data.restrictDownload !== undefined) {
+      metadataUpdates.restrictDownload = body.data.restrictDownload;
+    }
+    if (body.data.status !== undefined && !publishing) {
+      metadataUpdates.status = body.data.status;
+    }
 
-    res.json({ data: updated[0] });
+    const updated = await db.transaction(async (tx) => {
+      await setTenantContext(tx, orgId);
+
+      const docRow = {
+        id: doc.id,
+        orgId: doc.orgId,
+        version: doc.version,
+        title: doc.title,
+        contentRef: doc.contentRef,
+      };
+
+      if (publishing) {
+        await publishDocumentVersion(tx, {
+          doc: docRow,
+          editedBy: userId,
+          ...(hasContent ? { contentRef: body.data.content } : {}),
+          ...(hasTitle ? { title: body.data.title } : {}),
+        });
+      } else {
+        if (titleWillChange || contentWillChange) {
+          await saveDocumentContent(tx, {
+            doc: docRow,
+            ...(hasTitle ? { nextTitle: body.data.title } : {}),
+            ...(hasContent ? { nextContent: body.data.content } : {}),
+          });
+        }
+
+        if (Object.keys(metadataUpdates).length > 0) {
+          metadataUpdates.updatedAt = new Date();
+          await tx
+            .update(documents)
+            .set(metadataUpdates)
+            .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+        }
+      }
+
+      const result = await tx
+        .select()
+        .from(documents)
+        .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+      return result[0]!;
+    });
+
+    const contentOrMetadataChanged =
+      publishing || titleWillChange || contentWillChange || hasMetadata;
+    const draftEditOnPublished =
+      doc.status === "published" &&
+      !publishing &&
+      (titleWillChange || contentWillChange);
+
+    if (contentOrMetadataChanged && !draftEditOnPublished) {
+      await enqueueIndex(documentId ?? "", orgId, "upsert");
+      await recordRecentlyUpdated(db, userId, documentId ?? "");
+    }
+
+    res.json({ data: updated });
   });
 
   // DELETE /documents/:documentId — soft delete (trash)
@@ -483,6 +545,7 @@ export function createContentRouter(
         documentId: documentVersions.documentId,
         versionNumber: documentVersions.versionNumber,
         contentSnapshot: documentVersions.contentSnapshot,
+        titleSnapshot: documentVersions.titleSnapshot,
         editedBy: documentVersions.editedBy,
         editedAt: documentVersions.editedAt,
         editorName: users.name,
@@ -563,28 +626,34 @@ export function createContentRouter(
 
     if (!versionRows.length) throw new NotFoundError("Version");
 
-    const restoredContent = versionRows[0]!.contentSnapshot;
-    const newVersion = doc.version + 1;
+    const versionRow = versionRows[0]!;
+    const restoredContent = versionRow.contentSnapshot;
+    const restoredTitle = versionRow.titleSnapshot;
 
-    const updated = await db
-      .update(documents)
-      .set({
-        contentRef: restoredContent,
-        version: newVersion,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
-      .returning();
-
-    await db.insert(documentVersions).values({
-      id: uuidv4(),
-      documentId: documentId ?? "",
-      versionNumber: newVersion,
-      contentSnapshot: restoredContent,
-      editedBy: userId,
+    const updated = await db.transaction(async (tx) => {
+      await setTenantContext(tx, orgId);
+      await appendRestoredDocumentVersion(tx, {
+        doc: {
+          id: doc.id,
+          orgId: doc.orgId,
+          version: doc.version,
+          title: doc.title,
+          contentRef: doc.contentRef,
+        },
+        contentSnapshot: restoredContent,
+        titleSnapshot: restoredTitle,
+        editedBy: userId,
+      });
+      const rows = await tx
+        .select()
+        .from(documents)
+        .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+      return rows[0]!;
     });
 
-    if (doc.type === "page") {
+    const newVersion = updated.version;
+
+    if (doc.type === "page" || doc.contentRef) {
       await resetCollabStateAfterContentChange(orgId, documentId ?? "", restoredContent);
     }
 
@@ -599,13 +668,13 @@ export function createContentRouter(
         documentId,
         fromVersion: versionNumber,
         toVersion: newVersion,
-        title: doc.title,
+        title: restoredTitle,
         spaceId: doc.spaceId,
       },
       req,
     });
 
-    res.json({ data: updated[0], reloadRequired: true });
+    res.json({ data: updated, reloadRequired: true });
   });
 
   // GET /documents/:documentId/permissions

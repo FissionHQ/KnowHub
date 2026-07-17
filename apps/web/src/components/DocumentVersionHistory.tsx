@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { documentsApi } from "@/lib/api";
 import type { DocumentVersionListItem } from "@wiki/types";
@@ -32,6 +32,7 @@ function VersionDetailTooltip({
             Version {version.versionNumber}
             {isCurrent && <span className="text-emerald-600 ml-1">current</span>}
           </p>
+          <p className="text-zinc-600 dark:text-zinc-300 truncate">{version.titleSnapshot}</p>
           <p className="text-zinc-500">{version.editorName ?? "Unknown"}</p>
           <p className="text-zinc-400">{new Date(version.editedAt).toLocaleString()}</p>
         </div>
@@ -48,6 +49,15 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
   );
   const [restoring, setRestoring] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (open) void mutate();
+  }, [open, mutate]);
+
+  const effectiveCurrentVersion =
+    versions.length > 0
+      ? Math.max(currentVersion, versions[0]!.versionNumber)
+      : currentVersion;
 
   async function handleRestore(version: DocumentVersionListItem) {
     setRestoring(version.versionNumber);
@@ -83,7 +93,7 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
             </span>
             <span className="block text-xs mt-0.5">
               <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                v{currentVersion}
+                v{effectiveCurrentVersion}
               </span>
               <span className="text-zinc-400"> · {versionCountLabel}</span>
             </span>
@@ -100,7 +110,7 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
         <div className="bg-white dark:bg-zinc-900">
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-56 overflow-y-auto">
             {versions.map((version) => {
-              const isCurrent = version.versionNumber === currentVersion;
+              const isCurrent = version.versionNumber === effectiveCurrentVersion;
               return (
                 <li
                   key={version.id ?? `v${version.versionNumber}`}

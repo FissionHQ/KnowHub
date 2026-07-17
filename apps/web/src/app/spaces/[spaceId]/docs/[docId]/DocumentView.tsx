@@ -14,6 +14,7 @@ import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
 import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
@@ -41,6 +42,15 @@ const PdfViewer = dynamic(
 
 type SaveStatus = "saved" | "saving" | "unsaved";
 
+/** Attachment-backed PDFs have no HTML body; imported PDFs store converted HTML. */
+function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef">): boolean {
+  return doc.type === "pdf" && !doc.contentRef;
+}
+
+function isEditableDoc(doc: Pick<Document, "type" | "contentRef">): boolean {
+  return doc.type === "page" || (doc.type === "pdf" && Boolean(doc.contentRef));
+}
+
 interface Props {
   spaceId: string;
   docId: string;
@@ -65,6 +75,13 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
+  const prevCollabSaveStatus = useRef<SaveStatus>("saved");
+
+  function refreshDocAndVersions() {
+    void mutate();
+    void globalMutate(`doc-versions:${docId}`);
+    void globalMutate("recently-updated");
+  }
 
   const { data: favData, mutate: mutateFav } = useSWR(
     doc && user ? `fav:${docId}` : null,
@@ -86,7 +103,7 @@ export function DocumentView({ spaceId, docId }: Props) {
     userId: user?.id ?? "",
     userName: user?.name ?? "You",
     canEdit,
-    enabled: Boolean(user && doc?.type === "page" && !useFallbackEditor),
+    enabled: Boolean(user && doc && isEditableDoc(doc) && !useFallbackEditor),
   });
 
   useEffect(() => {
@@ -106,7 +123,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc?.id, docId]);
 
   useEffect(() => {
-    if (doc?.type !== "page" || useFallbackEditor) return;
+    if (!doc || !isEditableDoc(doc) || useFallbackEditor) return;
 
     const timer = setTimeout(() => {
       setUseFallbackEditor((prev) => {
@@ -120,23 +137,42 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
 
   useEffect(() => {
-    if (!useFallbackEditor && collab.saveStatus === "saved") {
-      void globalMutate("recently-updated");
+    if (useFallbackEditor) return;
+
+    const prev = prevCollabSaveStatus.current;
+    prevCollabSaveStatus.current = collab.saveStatus;
+
+    if (prev === "saving" && collab.saveStatus === "saved") {
+      void mutate();
     }
-  }, [collab.saveStatus, useFallbackEditor]);
+  }, [collab.saveStatus, useFallbackEditor, docId, mutate]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
-    const att = await attachmentsApi.getStatus(doc.id).catch(() => null);
-    if (att?.ready) {
-      const { url } = await attachmentsApi.getViewUrl(doc.id);
-      setPdfUrl(url);
+    const items = await attachmentsApi.listByDocument(doc.id).catch(() => []);
+    const att = items[0];
+    if (!att) return;
+    if (att.ready) {
+      setPdfUrl(attachmentsApi.viewProxyUrl(att.attachmentId));
     }
   }, [doc?.id]);
 
-  if (doc?.type === "pdf" && !pdfUrl) {
-    loadPdfUrl();
-  }
+  useEffect(() => {
+    if (!doc || !isPdfViewerDoc(doc) || pdfUrl) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      await loadPdfUrl();
+    };
+
+    void poll();
+    const interval = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [doc?.type, doc?.id, pdfUrl, loadPdfUrl]);
 
   const handleAutoSave = useCallback(
     async (html: string) => {
@@ -145,13 +181,12 @@ export function DocumentView({ spaceId, docId }: Props) {
       try {
         await documentsApi.update(docId, { content: html });
         setSaveStatus("saved");
-        mutate();
-        void globalMutate("recently-updated");
+        void mutate();
       } catch {
         setSaveStatus("unsaved");
       }
     },
-    [doc, docId, mutate],
+    [doc, docId],
   );
 
   async function handleMoveToTrash() {
@@ -182,7 +217,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   }
 
   const currentDoc = doc;
-  const showPageEditor = currentDoc.type === "page" && Boolean(user);
+  const showPageEditor = isEditableDoc(currentDoc) && Boolean(user);
   const showCollab =
     showPageEditor &&
     !useFallbackEditor &&
@@ -193,6 +228,21 @@ export function DocumentView({ spaceId, docId }: Props) {
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const isConnected = showFallback ? true : collab.status === "connected";
 
+  function getPublishPayload(): { title: string; content?: string } {
+    const trimmedTitle = title.trim() || currentDoc.title;
+    if (showFallback) {
+      return { title: trimmedTitle, content };
+    }
+    if (showCollab) {
+      try {
+        return { title: trimmedTitle, content: ydocToHtml(collab.ydoc) };
+      } catch {
+        return { title: trimmedTitle };
+      }
+    }
+    return { title: trimmedTitle };
+  }
+
   async function handleTitleBlur() {
     if (!canEdit) return;
     const trimmed = title.trim();
@@ -201,8 +251,8 @@ export function DocumentView({ spaceId, docId }: Props) {
     try {
       const updated = await documentsApi.update(docId, { title: trimmed });
       mutate(updated, false);
-      setSaveStatus("saved");
       void globalMutate("recently-updated");
+      setSaveStatus("saved");
     } catch {
       setSaveStatus("unsaved");
     }
@@ -283,14 +333,20 @@ export function DocumentView({ spaceId, docId }: Props) {
                 {isFavorited ? "Bookmarked" : "Bookmark"}
               </button>
             )}
-            {doc.type === "page" && user && (
+            {isEditableDoc(doc) && user && (
               <SaveIndicator status={activeSaveStatus} connected={isConnected} />
             )}
             {canEdit && (
               <DocumentActionsMenu
                 doc={doc}
                 deleting={deleting}
-                onUpdate={(updated) => mutate(updated, false)}
+                getPublishPayload={getPublishPayload}
+                onUpdate={(updated, opts) => {
+                  mutate(updated, false);
+                  if (opts?.published) {
+                    void globalMutate(`doc-versions:${docId}`);
+                  }
+                }}
                 onMoveToTrash={handleMoveToTrash}
               />
             )}
@@ -327,12 +383,12 @@ export function DocumentView({ spaceId, docId }: Props) {
               <span>Permissions</span>
             </button>
           )}
-          {doc.type === "page" && user && (
+          {isEditableDoc(doc) && user && (
             <EditorCountInline presence={collab.presence} status={collab.status} canEdit={canEdit} />
           )}
         </div>
 
-        {doc.type === "pdf" ? (
+        {isPdfViewerDoc(doc) ? (
           pdfUrl ? (
             <PdfViewer
               url={pdfUrl}
@@ -379,7 +435,7 @@ export function DocumentView({ spaceId, docId }: Props) {
 
       <div className="w-64 shrink-0 flex flex-col sticky top-18">
         <PageMetadataPanel doc={doc} onUpdate={(updated) => mutate(updated, false)} />
-        {doc.type === "page" && user && canEdit && (
+        {isEditableDoc(doc) && user && canEdit && (
           <DocumentVersionHistory
             documentId={docId}
             currentVersion={doc.version}
@@ -463,12 +519,14 @@ export function DocumentView({ spaceId, docId }: Props) {
 function DocumentActionsMenu({
   doc,
   deleting,
+  getPublishPayload,
   onUpdate,
   onMoveToTrash,
 }: {
   doc: Document;
   deleting: boolean;
-  onUpdate: (updated: Document) => void;
+  getPublishPayload?: () => { title: string; content?: string };
+  onUpdate: (updated: Document, opts?: { published?: boolean }) => void;
   onMoveToTrash: () => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -503,14 +561,33 @@ function DocumentActionsMenu({
     return () => document.removeEventListener("keydown", handleKey);
   }, [trashConfirmOpen, deleting]);
 
-  async function togglePublish() {
+  async function handlePublish() {
     setPublishing(true);
     setOpen(false);
     try {
+      const payload = getPublishPayload?.();
       const updated = await documentsApi.update(doc.id, {
-        status: isPublished ? "draft" : "published",
+        publish: true,
+        status: "published",
+        ...(payload
+          ? {
+              title: payload.title,
+              ...(payload.content !== undefined ? { content: payload.content } : {}),
+            }
+          : {}),
       });
-      onUpdate(updated);
+      onUpdate(updated, { published: true });
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function handleUnpublish() {
+    setPublishing(true);
+    setOpen(false);
+    try {
+      const updated = await documentsApi.update(doc.id, { status: "draft" });
+      onUpdate(updated, { published: false });
     } finally {
       setPublishing(false);
     }
@@ -534,7 +611,7 @@ function DocumentActionsMenu({
         onClick={(e) => {
           e.stopPropagation();
           const rect = btnRef.current!.getBoundingClientRect();
-          setMenuPos({ top: rect.bottom + 4, left: rect.right - 160 });
+          setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 });
           setOpen((v) => !v);
         }}
         title="More options"
@@ -549,17 +626,28 @@ function DocumentActionsMenu({
           <div
             ref={menuRef}
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-[9999] w-40 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
+            className="fixed z-[9999] w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
           >
             <button
               type="button"
               disabled={publishing}
-              onClick={togglePublish}
+              onClick={handlePublish}
               className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
-              {isPublished ? <PenLine size={14} /> : <Globe size={14} />}
-              {publishing ? "…" : isPublished ? "Unpublish" : "Publish"}
+              <Globe size={14} />
+              {publishing ? "…" : isPublished ? "Publish new version" : "Publish"}
             </button>
+            {isPublished && (
+              <button
+                type="button"
+                disabled={publishing}
+                onClick={handleUnpublish}
+                className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <PenLine size={14} />
+                Unpublish
+              </button>
+            )}
             <button
               type="button"
               disabled={deleting}

@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import type { Db } from "@wiki/db";
-import { documents } from "@wiki/db";
+import { documents, resolveSearchIndexContent, resolveDocumentViewCount } from "@wiki/db";
 import type { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { INDEX_NAME } from "./opensearch.js";
 import type { SearchIndexDocument, SearchIndexMessage } from "@wiki/types";
@@ -52,20 +52,40 @@ export class Indexer {
       doc.ownerId,
     );
 
-    const body = doc.contentRef ?? "";
-    // Strip HTML tags for preview text
-    const plainText = body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const searchable = await resolveSearchIndexContent(this.db, doc);
+    let body = searchable.body;
+
+    // Attachment-backed PDFs are indexed by pdfProcessor; avoid wiping extracted text.
+    if (doc.type === "pdf" && !doc.contentRef && !body.trim()) {
+      try {
+        const existing = await this.os.get({ index: INDEX_NAME, id: documentId });
+        const existingBody = (existing.body._source as SearchIndexDocument | undefined)?.body;
+        if (typeof existingBody === "string" && existingBody.trim()) {
+          body = existingBody;
+        }
+      } catch (err: unknown) {
+        const status = (err as { meta?: { statusCode?: number } })?.meta?.statusCode;
+        if (status !== 404) throw err;
+      }
+    }
+
+    const plainText = htmlToPlainText(body);
+    const searchableBody = plainText || body;
+    const isEditable = doc.type === "page" || Boolean(doc.contentRef);
+    const viewCount = await resolveDocumentViewCount(this.db, documentId);
 
     const indexDoc: SearchIndexDocument = {
       org_id: orgId,
       document_id: documentId,
       space_id: doc.spaceId,
       type: doc.type,
-      title: doc.title,
-      body: body,
+      is_editable: isEditable,
+      title: searchable.title,
+      body: searchableBody,
       tags: doc.tags,
       owner_id: doc.ownerId,
-      updated_at: doc.updatedAt.toISOString(),
+      updated_at: searchable.updatedAt.toISOString(),
+      view_count: viewCount,
       acl_group_ids: aclGroupIds,
       acl_user_ids: aclUserIds,
       preview: plainText.slice(0, 300) || null,

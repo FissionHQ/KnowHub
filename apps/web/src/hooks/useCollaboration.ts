@@ -149,7 +149,7 @@ export function useCollaboration({
         if (origin === collabProvider) return;
         setSaveStatus("saving");
         if (saveTimer.current) clearTimeout(saveTimer.current);
-        saveTimer.current = setTimeout(() => setSaveStatus("saved"), 2000);
+        saveTimer.current = setTimeout(() => setSaveStatus("saved"), 4000);
       };
 
       ydoc.on("update", onDocUpdate);
