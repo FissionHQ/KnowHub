@@ -65,7 +65,8 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
     setRenaming(false);
   }
 
-  const children = allDocs.filter((d) => d.parentId === doc.id);
+  const idSet = new Set(allDocs.map((d) => d.id));
+  const children = allDocs.filter((d) => d.parentId === doc.id && idSet.has(d.id));
   const isActive = pathname === `/spaces/${spaceId}/docs/${doc.id}`;
 
   async function handleCreate(e: React.MouseEvent) {
@@ -216,7 +217,8 @@ export function SpaceDocTree({ spaceId }: Props) {
     () => documentsApi.listBySpace(spaceId),
   );
 
-  const rootDocs = docs.filter((d) => !d.parentId);
+  const idSet = new Set(docs.map((d) => d.id));
+  const rootDocs = docs.filter((d) => !d.parentId || !idSet.has(d.parentId));
 
   async function handleNewRootPage() {
     const created = await documentsApi.create({
