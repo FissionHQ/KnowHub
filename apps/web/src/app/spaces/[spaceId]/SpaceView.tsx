@@ -33,23 +33,24 @@ interface FlatDoc {
 }
 
 function flattenTree(docs: Document[]): FlatDoc[] {
-  const childrenMap = new Map<string | undefined, Document[]>();
+  const idSet = new Set(docs.map((d) => d.id));
+  const childrenMap = new Map<string, Document[]>();
+  childrenMap.set("__root__", []);
   for (const doc of docs) {
-    const key = doc.parentId ?? "__root__";
+    // treat as root if parentId is missing or points to a doc not in this list
+    const key = doc.parentId && idSet.has(doc.parentId) ? doc.parentId : "__root__";
     if (!childrenMap.has(key)) childrenMap.set(key, []);
     childrenMap.get(key)!.push(doc);
   }
 
   const result: FlatDoc[] = [];
-  function walk(parentId: string | undefined, depth: number) {
-    const key = parentId ?? "__root__";
-    const children = childrenMap.get(key) ?? [];
-    for (const doc of children) {
+  function walk(parentId: string, depth: number) {
+    for (const doc of childrenMap.get(parentId) ?? []) {
       result.push({ doc, depth });
       walk(doc.id, depth + 1);
     }
   }
-  walk(undefined, 0);
+  walk("__root__", 0);
   return result;
 }
 
@@ -151,8 +152,8 @@ export function SpaceView({ spaceId }: Props) {
 
       <Separator className="mb-6" />
       {/* Document count */}
-      {!docsLoading && docs.length > 0 && (
-        <p className="text-xs text-zinc-400 mb-3">{docs.length} document{docs.length !== 1 ? "s" : ""}</p>
+      {!docsLoading && flatDocs.length > 0 && (
+        <p className="text-xs text-zinc-400 mb-3">{flatDocs.length} document{flatDocs.length !== 1 ? "s" : ""}</p>
       )}
 
       <div className="mb-6">
