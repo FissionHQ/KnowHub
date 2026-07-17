@@ -4,7 +4,7 @@
  */
 import { Client } from "@opensearch-project/opensearch";
 import { eq, ne } from "drizzle-orm";
-import { createDb, documents, spacePermissions, documentPermissions, resolveSearchIndexContent } from "@wiki/db";
+import { createDb, documents, spacePermissions, documentPermissions, resolveSearchIndexContent, resolveViewCountsByDocument } from "@wiki/db";
 import { htmlToPlainText } from "./htmlToPlainText.js";
 
 const INDEX_NAME = "wiki-documents";
@@ -20,6 +20,11 @@ async function main() {
     .from(documents)
     .where(ne(documents.status, "trashed"));
   console.log(`Found ${allDocs.length} documents to index`);
+
+  const viewCounts = await resolveViewCountsByDocument(
+    db,
+    allDocs.map((d) => d.id),
+  );
 
   for (const doc of allDocs) {
     const spacePerm = await db
@@ -38,10 +43,17 @@ async function main() {
         ...docPerm.filter((r) => r.groupId).map((r) => r.groupId!),
       ]),
     ];
-    const aclUserIds = docPerm.filter((r) => r.userId).map((r) => r.userId!);
+    const aclUserIds = [
+      ...new Set([
+        doc.ownerId,
+        ...docPerm.filter((r) => r.userId).map((r) => r.userId!),
+      ]),
+    ];
 
     const searchable = await resolveSearchIndexContent(db, doc);
     const plainText = htmlToPlainText(searchable.body);
+    const searchableBody = plainText || searchable.body;
+    const isEditable = doc.type === "page" || Boolean(doc.contentRef);
 
     await os.index({
       index: INDEX_NAME,
@@ -51,11 +63,13 @@ async function main() {
         document_id: doc.id,
         space_id: doc.spaceId,
         type: doc.type,
+        is_editable: isEditable,
         title: searchable.title,
-        body: searchable.body,
+        body: searchableBody,
         tags: doc.tags,
         owner_id: doc.ownerId,
         updated_at: searchable.updatedAt.toISOString(),
+        view_count: viewCounts.get(doc.id) ?? 0,
         acl_group_ids: aclGroupIds,
         acl_user_ids: aclUserIds,
         content_embedding: null,

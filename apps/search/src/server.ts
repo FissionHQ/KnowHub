@@ -159,6 +159,7 @@ app.get("/search", async (req, res) => {
   const results = await searchService.search(
     q.data as import("@wiki/types").SearchQuery,
     tenant.orgId,
+    tenant.userId,
     tenant.groupIds,
     accessibleSpaceIds,
   );
@@ -182,6 +183,7 @@ app.get("/search/suggest", async (req, res) => {
   const suggestions = await searchService.suggest(
     q.data,
     tenant.orgId,
+    tenant.userId,
     tenant.groupIds,
     accessibleSpaceIds,
     filterSpaceId,

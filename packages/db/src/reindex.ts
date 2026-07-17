@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Client } from "@opensearch-project/opensearch";
 import { eq, ne } from "drizzle-orm";
-import { createDb, documents, spacePermissions, documentPermissions } from "./index.js";
+import { createDb, documents, spacePermissions, documentPermissions, resolveViewCountsByDocument } from "./index.js";
 import { resolveSearchIndexContent } from "./searchIndexContent.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,11 +40,13 @@ async function main() {
             document_id: { type: "keyword" },
             space_id: { type: "keyword" },
             type: { type: "keyword" },
+            is_editable: { type: "boolean" },
             title: { type: "text", analyzer: "english" },
             body: { type: "text", analyzer: "english" },
             tags: { type: "keyword" },
             owner_id: { type: "keyword" },
             updated_at: { type: "date" },
+            view_count: { type: "integer" },
             acl_group_ids: { type: "keyword" },
             acl_user_ids: { type: "keyword" },
             content_embedding: { type: "keyword", index: false },
@@ -61,6 +63,11 @@ async function main() {
     .where(ne(documents.status, "trashed"));
 
   console.log(`Found ${allDocs.length} documents to index`);
+
+  const viewCounts = await resolveViewCountsByDocument(
+    db,
+    allDocs.map((d) => d.id),
+  );
 
   for (const doc of allDocs) {
     const spacePerm = await db
@@ -88,6 +95,8 @@ async function main() {
 
     const searchable = await resolveSearchIndexContent(db, doc);
     const plainText = htmlToPlainText(searchable.body);
+    const searchableBody = plainText || searchable.body;
+    const isEditable = doc.type === "page" || Boolean(doc.contentRef);
 
     await os.index({
       index: INDEX_NAME,
@@ -97,11 +106,13 @@ async function main() {
         document_id: doc.id,
         space_id: doc.spaceId,
         type: doc.type,
+        is_editable: isEditable,
         title: searchable.title,
-        body: searchable.body,
+        body: searchableBody,
         tags: doc.tags,
         owner_id: doc.ownerId,
         updated_at: searchable.updatedAt.toISOString(),
+        view_count: viewCounts.get(doc.id) ?? 0,
         acl_group_ids: aclGroupIds,
         acl_user_ids: aclUserIds,
         content_embedding: null,

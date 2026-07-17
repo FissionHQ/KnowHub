@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import type { Db } from "@wiki/db";
-import { documents, resolveSearchIndexContent } from "@wiki/db";
+import { documents, resolveSearchIndexContent, resolveDocumentViewCount } from "@wiki/db";
 import type { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { INDEX_NAME } from "./opensearch.js";
 import type { SearchIndexDocument, SearchIndexMessage } from "@wiki/types";
@@ -70,17 +70,22 @@ export class Indexer {
     }
 
     const plainText = htmlToPlainText(body);
+    const searchableBody = plainText || body;
+    const isEditable = doc.type === "page" || Boolean(doc.contentRef);
+    const viewCount = await resolveDocumentViewCount(this.db, documentId);
 
     const indexDoc: SearchIndexDocument = {
       org_id: orgId,
       document_id: documentId,
       space_id: doc.spaceId,
       type: doc.type,
+      is_editable: isEditable,
       title: searchable.title,
-      body,
+      body: searchableBody,
       tags: doc.tags,
       owner_id: doc.ownerId,
       updated_at: searchable.updatedAt.toISOString(),
+      view_count: viewCount,
       acl_group_ids: aclGroupIds,
       acl_user_ids: aclUserIds,
       preview: plainText.slice(0, 300) || null,

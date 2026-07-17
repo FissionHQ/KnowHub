@@ -13,6 +13,7 @@ export const INDEX_MAPPING = {
       document_id: { type: "keyword" },
       space_id: { type: "keyword" },
       type: { type: "keyword" },
+      is_editable: { type: "boolean" },
       title: {
         type: "text",
         analyzer: "english",
@@ -22,6 +23,7 @@ export const INDEX_MAPPING = {
       tags: { type: "keyword" },
       owner_id: { type: "keyword" },
       updated_at: { type: "date" },
+      view_count: { type: "integer" },
       acl_group_ids: { type: "keyword" },
       acl_user_ids: { type: "keyword" },
       // Phase 2 AI search — null until embeddings are generated
