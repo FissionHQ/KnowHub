@@ -1,12 +1,17 @@
 import * as Y from "yjs";
 import { TiptapTransformer } from "@hocuspocus/transformer";
-import { generateJSON } from "@tiptap/html";
+import { generateJSON, generateHTML } from "@tiptap/html";
 import { COLLAB_FIELD } from "./constants.js";
 import { collabTiptapExtensions } from "./extensions.js";
 
 export function htmlToYdoc(html: string): Y.Doc {
   const json = generateJSON(html, collabTiptapExtensions);
   return TiptapTransformer.toYdoc(json, COLLAB_FIELD, collabTiptapExtensions);
+}
+
+export function ydocToHtml(ydoc: Y.Doc): string {
+  const json = TiptapTransformer.fromYdoc(ydoc, COLLAB_FIELD);
+  return generateHTML(json, collabTiptapExtensions);
 }
 
 /** Encodes TipTap HTML as a base64 Yjs update for `document_collab_state`. */

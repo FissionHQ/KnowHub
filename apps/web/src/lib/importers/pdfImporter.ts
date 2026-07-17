@@ -1,4 +1,8 @@
-import type { TextItem } from "pdfjs-dist/types/src/display/api";
+interface PdfTextItem {
+  str: string;
+  transform: number[];
+  fontName: string;
+}
 
 interface TextBlock {
   text: string;
@@ -23,13 +27,13 @@ export async function extractPdfAsHtml(file: File): Promise<string> {
     const pageBlocks: TextBlock[] = [];
 
     for (const item of content.items) {
-      if (!("str" in item) || !(item as TextItem).str.trim()) continue;
-      const ti = item as TextItem;
+      if (!("str" in item) || !(item as PdfTextItem).str.trim()) continue;
+      const ti = item as PdfTextItem;
       pageBlocks.push({
         text: ti.str,
-        fontSize: Math.abs(ti.transform[0]),
+        fontSize: Math.abs(ti.transform[0] ?? 12),
         fontName: ti.fontName,
-        y: ti.transform[5],
+        y: ti.transform[5] ?? 0,
       });
     }
     allBlocks.push(pageBlocks);

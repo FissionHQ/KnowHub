@@ -120,6 +120,7 @@ export class SearchService {
             filter: filters,
           },
         },
+        collapse: { field: "document_id" },
       },
     });
 
@@ -221,6 +222,9 @@ export class SearchService {
               }
             : {}),
         },
+      },
+      collapse: {
+        field: "document_id",
       },
       highlight: {
         pre_tags: ["<mark>"],

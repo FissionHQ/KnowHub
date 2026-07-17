@@ -2,10 +2,9 @@ import { config } from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Client } from "@opensearch-project/opensearch";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { eq, ne } from "drizzle-orm";
-import { documents, spacePermissions, documentPermissions } from "./schema.js";
+import { createDb, documents, spacePermissions, documentPermissions } from "./index.js";
+import { resolveSearchIndexContent } from "./searchIndexContent.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, "../../../.env") });
@@ -27,8 +26,7 @@ async function main() {
   if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
   const opensearchUrl = process.env["OPENSEARCH_URL"] ?? "http://localhost:9200";
-  const pg = postgres(databaseUrl, { max: 1 });
-  const db = drizzle(pg);
+  const { db, pg } = createDb(databaseUrl);
   const os = new Client({ node: opensearchUrl });
 
   const exists = await os.indices.exists({ index: INDEX_NAME });
@@ -88,6 +86,9 @@ async function main() {
       ]),
     ];
 
+    const searchable = await resolveSearchIndexContent(db, doc);
+    const plainText = htmlToPlainText(searchable.body);
+
     await os.index({
       index: INDEX_NAME,
       id: doc.id,
@@ -96,22 +97,37 @@ async function main() {
         document_id: doc.id,
         space_id: doc.spaceId,
         type: doc.type,
-        title: doc.title,
-        body: doc.type === "page" ? htmlToPlainText(doc.contentRef ?? "") : (doc.contentRef ?? ""),
+        title: searchable.title,
+        body: searchable.body,
         tags: doc.tags,
         owner_id: doc.ownerId,
-        updated_at: doc.updatedAt.toISOString(),
+        updated_at: searchable.updatedAt.toISOString(),
         acl_group_ids: aclGroupIds,
         acl_user_ids: aclUserIds,
         content_embedding: null,
+        preview: plainText.slice(0, 300) || null,
       },
       refresh: false,
     });
     console.log(`Indexed: ${doc.title} (${doc.id})`);
   }
 
+  const activeIds = new Set(allDocs.map((d) => d.id));
+  const existing = await os.search({
+    index: INDEX_NAME,
+    body: { query: { match_all: {} }, size: 10000, _source: false },
+  });
+  let removed = 0;
+  for (const hit of existing.body.hits.hits as { _id: string }[]) {
+    if (!activeIds.has(hit._id)) {
+      await os.delete({ index: INDEX_NAME, id: hit._id, refresh: false });
+      console.log(`Removed stale index entry: ${hit._id}`);
+      removed++;
+    }
+  }
+
   await os.indices.refresh({ index: INDEX_NAME });
-  console.log("Done! All documents indexed.");
+  console.log(`Done! Indexed ${allDocs.length} documents, removed ${removed} stale entries.`);
   await pg.end();
 }
 

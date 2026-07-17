@@ -4,12 +4,12 @@ import { useRef, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { spacesApi, documentsApi, activityApi } from "@/lib/api";
+import { spacesApi, activityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Space, Document } from "@wiki/types";
 import { Card, CardContent, Skeleton } from "@heroui/react";
 import { ArrowRight, MoreVertical, Upload, Clock, RefreshCw } from "lucide-react";
-import { parseFileToHtml } from "@/lib/importers";
+import { importDocumentFile } from "@/lib/importDocument";
 
 export function SpacesList() {
   const router = useRouter();
@@ -29,14 +29,7 @@ export function SpacesList() {
     setUploading(spaceId);
     setMenuOpen(null);
     try {
-      const html = await parseFileToHtml(file);
-      const title = file.name.replace(/\.[^.]+$/, "");
-      const doc = await documentsApi.create({
-        spaceId,
-        type: "page",
-        title,
-        content: html,
-      });
+      const doc = await importDocumentFile(spaceId, file);
       router.push(`/spaces/${spaceId}/docs/${doc.id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");

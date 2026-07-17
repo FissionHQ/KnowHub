@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ attachmentId: string }> },
 ) {
   const { attachmentId } = await params;
@@ -26,19 +26,29 @@ export async function GET(
 
   const { data } = (await metaRes.json()) as { data: { url: string } };
 
-  // Fetch the actual file bytes from S3 presigned URL (server-side, no CORS)
-  const fileRes = await fetch(data.url);
-  if (!fileRes.ok) {
+  const range = request.headers.get("range");
+
+  // Fetch from S3 server-side (no browser CORS); forward Range for PDF streaming
+  const fileRes = range
+    ? await fetch(data.url, { headers: { Range: range } })
+    : await fetch(data.url);
+  if (!fileRes.ok && fileRes.status !== 206) {
     return new NextResponse("Failed to fetch file from storage", { status: 502 });
   }
 
   const contentType = fileRes.headers.get("content-type") || "application/octet-stream";
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    "Cache-Control": "private, max-age=240",
+    "Accept-Ranges": "bytes",
+  };
+  const contentLength = fileRes.headers.get("content-length");
+  const contentRange = fileRes.headers.get("content-range");
+  if (contentLength) headers["Content-Length"] = contentLength;
+  if (contentRange) headers["Content-Range"] = contentRange;
 
   return new NextResponse(fileRes.body, {
-    status: 200,
-    headers: {
-      "Content-Type": contentType,
-      "Cache-Control": "private, max-age=240",
-    },
+    status: fileRes.status,
+    headers,
   });
 }

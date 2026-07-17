@@ -201,6 +201,7 @@ export const documentVersions = pgTable(
       .references(() => documents.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
     contentSnapshot: text("content_snapshot").notNull(),
+    titleSnapshot: text("title_snapshot").notNull(),
     editedBy: uuid("edited_by")
       .notNull()
       .references(() => users.id),

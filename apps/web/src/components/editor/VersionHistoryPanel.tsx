@@ -66,6 +66,9 @@ export function VersionHistoryPanel({ documentId, onRestore }: Props) {
                 <span className="font-medium text-zinc-800 dark:text-zinc-200">
                   v{v.versionNumber}
                 </span>
+                <span className="text-zinc-500 ml-2 truncate max-w-[120px] inline-block align-bottom">
+                  {v.titleSnapshot}
+                </span>
                 <span className="text-zinc-400 ml-2">
                   {new Date(v.editedAt).toLocaleString()}
                 </span>

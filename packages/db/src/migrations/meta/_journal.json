@@ -71,6 +71,13 @@
       "when": 1783886000000,
       "tag": "0009_recently_updated",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783887000000,
+      "tag": "0010_document_version_title_snapshot",
+      "breakpoints": true
     }
   ]
 }

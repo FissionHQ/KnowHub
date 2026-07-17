@@ -5,13 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
 import { createPortal } from "react-dom";
-import { spacesApi, activityApi, documentsApi } from "@/lib/api";
+import { spacesApi, activityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Space, Document } from "@wiki/types";
 import { Separator } from "@heroui/react";
 import { LogOut, Search, Settings, User, Zap, ChevronRight, ChevronDown, Clock, Star, RefreshCw, MoreHorizontal, Upload } from "lucide-react";
 import clsx from "clsx";
-import { parseFileToHtml } from "@/lib/importers";
+import { importDocumentFile } from "@/lib/importDocument";
 import { ThemeToggle } from "./ThemeToggle";
 import { SpaceDocTree } from "./SpaceDocTree";
 
@@ -37,9 +37,7 @@ export function Sidebar() {
     setImporting(true);
     setSpaceMenu(null);
     try {
-      const html = await parseFileToHtml(file);
-      const title = file.name.replace(/\.[^.]+$/, "");
-      const doc = await documentsApi.create({ spaceId, type: "page", title, content: html });
+      const doc = await importDocumentFile(spaceId, file);
       router.push(`/spaces/${spaceId}/docs/${doc.id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");

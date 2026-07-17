@@ -8,7 +8,7 @@ import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
 import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
 import { FileText, Plus, File, ChevronRight, Upload } from "lucide-react";
-import { parseFileToHtml } from "@/lib/importers";
+import { importDocumentFile } from "@/lib/importDocument";
 import { SearchPanel } from "@/components/search/SearchPanel";
 
 interface Props { spaceId: string }
@@ -63,9 +63,7 @@ export function SpaceView({ spaceId }: Props) {
   async function handleImport(file: File) {
     setImporting(true);
     try {
-      const html = await parseFileToHtml(file);
-      const title = file.name.replace(/\.[^.]+$/, "");
-      const doc = await documentsApi.create({ spaceId, type: "page", title, content: html });
+      const doc = await importDocumentFile(spaceId, file);
       router.push(`/spaces/${spaceId}/docs/${doc.id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");

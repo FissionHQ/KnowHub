@@ -195,6 +195,7 @@ async function main() {
       documentId: doc.id,
       versionNumber: 1,
       contentSnapshot: doc.content,
+      titleSnapshot: doc.title,
       editedBy: IDS.admin,
     });
   }

@@ -1,4 +1,3 @@
-import { createHash, randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { eq, and } from "drizzle-orm";
 import { TiptapTransformer } from "@hocuspocus/transformer";
@@ -8,9 +7,9 @@ import type { Db } from "@wiki/db";
 import {
   documents,
   documentCollabState,
-  documentVersions,
   setTenantContext,
   recordRecentlyUpdated,
+  saveDocumentContent,
 } from "@wiki/db";
 import type { SearchIndexMessage } from "@wiki/types";
 import { COLLAB_FIELD, collabTiptapExtensions } from "@wiki/doc-collab";
@@ -40,10 +39,6 @@ function isYdocEmpty(ydoc: Y.Doc): boolean {
   } catch {
     return true;
   }
-}
-
-function contentHash(html: string): string {
-  return createHash("sha256").update(html).digest("hex");
 }
 
 async function seedFromHtml(
@@ -157,17 +152,18 @@ async function persistHtmlAndIndex(
     return;
   }
 
-  const htmlDigest = contentHash(html);
   const editedBy = getLastEditor(orgId, documentId);
 
-  const nextVersion = await db.transaction(async (tx) => {
+  const saved = await db.transaction(async (tx) => {
     await setTenantContext(tx, orgId);
 
     const docRows = await tx
       .select({
         version: documents.version,
         contentRef: documents.contentRef,
+        title: documents.title,
         ownerId: documents.ownerId,
+        status: documents.status,
       })
       .from(documents)
       .where(and(eq(documents.id, documentId), eq(documents.orgId, orgId)))
@@ -176,40 +172,35 @@ async function persistHtmlAndIndex(
     const doc = docRows[0];
     if (!doc) return null;
 
-    const previousDigest = doc.contentRef ? contentHash(doc.contentRef) : null;
-    if (previousDigest === htmlDigest) {
-      return null;
-    }
-
-    const version = doc.version + 1;
-    const attributedEditor = editedBy ?? doc.ownerId;
-
-    await tx
-      .update(documents)
-      .set({
-        contentRef: html,
-        version,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(documents.id, documentId), eq(documents.orgId, orgId)));
-
-    await tx.insert(documentVersions).values({
-      id: randomUUID(),
-      documentId,
-      versionNumber: version,
-      contentSnapshot: html,
-      editedBy: attributedEditor,
+    const result = await saveDocumentContent(tx, {
+      doc: {
+        id: documentId,
+        orgId,
+        version: doc.version,
+        title: doc.title,
+        contentRef: doc.contentRef,
+      },
+      nextContent: html,
     });
 
-    return version;
+    return result.saved ? doc.status : null;
   });
 
-  if (nextVersion === null) {
+  if (!saved) {
     return;
   }
 
   if (editedBy) {
     await recordRecentlyUpdated(db, editedBy, documentId);
+  }
+
+  // Published docs are indexed from the latest published snapshot only (on publish).
+  if (saved === "published") {
+    logger.debug("Skipped search reindex for draft autosave on published document", {
+      documentId,
+      orgId,
+    });
+    return;
   }
 
   const msg: SearchIndexMessage = {
@@ -225,10 +216,9 @@ async function persistHtmlAndIndex(
     }),
   );
 
-  logger.debug("Persisted collaborative HTML snapshot", {
+  logger.debug("Persisted collaborative HTML (no version bump)", {
     documentId,
     orgId,
-    version: nextVersion,
     editedBy: editedBy ?? "owner-fallback",
   });
 }

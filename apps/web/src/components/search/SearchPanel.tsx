@@ -307,7 +307,7 @@ export function SearchPanel({
                 className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
               />
             </div>
-            {/* <div>
+            <div>
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
                 File type
               </label>
@@ -320,7 +320,7 @@ export function SearchPanel({
                 <option value="page">Page</option>
                 <option value="pdf">PDF</option>
               </select>
-            </div> */}
+            </div>
             <div>
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
                 From date

@@ -117,6 +117,7 @@ export interface DocumentVersion {
   documentId: string;
   versionNumber: number;
   contentSnapshot: string;
+  titleSnapshot: string;
   editedBy: string;
   editedByName?: string;
   editedAt: Date;
