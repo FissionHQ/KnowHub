@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
 import { FileText, Plus, ChevronRight, MoreHorizontal, Trash2, PenIcon } from "lucide-react";
@@ -83,6 +83,8 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
     if (trimmed && trimmed !== doc.title) {
       await documentsApi.update(doc.id, { title: trimmed });
       mutate();
+      void globalMutate(`doc:${doc.id}`);
+      void globalMutate("favorites");
     }
     setRenaming(false);
   }

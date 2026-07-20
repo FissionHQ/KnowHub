@@ -71,6 +71,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [useFallbackEditor, setUseFallbackEditor] = useState(false);
   const [title, setTitle] = useState("");
+  const titleFocused = useRef(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -114,6 +115,13 @@ export function DocumentView({ spaceId, docId }: Props) {
     setTitle(doc.title);
     setUseFallbackEditor(false);
   }, [doc]);
+
+  // Sync title from external changes (e.g. sidebar rename) when input is not focused
+  useEffect(() => {
+    if (!doc) return;
+    if (titleFocused.current) return;
+    setTitle(doc.title);
+  }, [doc?.title]);
 
   useEffect(() => {
     if (!doc) return;
@@ -251,6 +259,8 @@ export function DocumentView({ spaceId, docId }: Props) {
     try {
       const updated = await documentsApi.update(docId, { title: trimmed });
       mutate(updated, false);
+      void globalMutate(`space:${spaceId}:docs`);
+      void globalMutate("favorites");
       void globalMutate("recently-updated");
       setSaveStatus("saved");
     } catch {
@@ -300,7 +310,8 @@ export function DocumentView({ spaceId, docId }: Props) {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              onBlur={handleTitleBlur}
+              onFocus={() => { titleFocused.current = true; }}
+              onBlur={() => { titleFocused.current = false; handleTitleBlur(); }}
               onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
               className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex-1 leading-tight bg-transparent border-none outline-none focus:ring-0 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 w-full min-w-0"
               placeholder="Untitled"
@@ -318,6 +329,7 @@ export function DocumentView({ spaceId, docId }: Props) {
                 onClick={async () => {
                   await activityApi.toggleFavorite(docId);
                   mutateFav();
+                  void globalMutate("favorites");
                 }}
                 title={isFavorited ? "Remove from bookmarks" : "Bookmark this page"}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
