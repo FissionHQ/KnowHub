@@ -4,13 +4,11 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
-COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 COPY packages/types/package.json ./packages/types/
-COPY packages/config/package.json ./packages/config/
-COPY packages/db/package.json ./packages/db/
 COPY packages/doc-collab/package.json ./packages/doc-collab/
 
-RUN pnpm install --frozen-lockfile --filter @wiki/api...
+RUN pnpm install --frozen-lockfile --filter @wiki/web...
 
 # ─── Stage 2: build ────────────────────────────────────────────────────────────
 FROM deps AS builder
@@ -18,33 +16,43 @@ WORKDIR /app
 
 COPY tsconfig.base.json ./
 COPY packages/types ./packages/types
-COPY packages/config ./packages/config
-COPY packages/db ./packages/db
 COPY packages/doc-collab ./packages/doc-collab
-COPY apps/api ./apps/api
+COPY apps/web ./apps/web
+
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_SEARCH_URL=http://localhost:3002
+ARG NEXT_PUBLIC_COLLAB_WS_URL=ws://localhost:3003
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_SEARCH_URL=$NEXT_PUBLIC_SEARCH_URL
+ENV NEXT_PUBLIC_COLLAB_WS_URL=$NEXT_PUBLIC_COLLAB_WS_URL
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm --filter @wiki/types build && \
-    pnpm --filter @wiki/config build && \
     pnpm --filter @wiki/doc-collab build && \
-    pnpm --filter @wiki/db build && \
-    pnpm --filter @wiki/api build
+    pnpm --filter @wiki/web build
 
 # ─── Stage 3: production image ────────────────────────────────────────────────
 FROM node:22-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 wikiapi
-
-COPY --from=builder --chown=wikiapi:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=wikiapi:nodejs /app/apps/api/dist ./apps/api/dist
-COPY --from=builder --chown=wikiapi:nodejs /app/apps/api/package.json ./apps/api/
-COPY --from=builder --chown=wikiapi:nodejs /app/packages ./packages
-
-USER wikiapi
+    adduser --system --uid 1001 wikiweb
 
 ENV NODE_ENV=production
-EXPOSE 3001
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "apps/api/dist/server.js"]
+COPY --from=builder --chown=wikiweb:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=wikiweb:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=wikiweb:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+USER wikiweb
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3000/ || exit 1
+
+CMD ["node", "apps/web/server.js"]

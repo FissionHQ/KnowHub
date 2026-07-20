@@ -4,13 +4,13 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
-COPY apps/api/package.json ./apps/api/
+COPY apps/collab/package.json ./apps/collab/
 COPY packages/types/package.json ./packages/types/
 COPY packages/config/package.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
 COPY packages/doc-collab/package.json ./packages/doc-collab/
 
-RUN pnpm install --frozen-lockfile --filter @wiki/api...
+RUN pnpm install --frozen-lockfile --filter @wiki/collab...
 
 # ─── Stage 2: build ────────────────────────────────────────────────────────────
 FROM deps AS builder
@@ -21,13 +21,13 @@ COPY packages/types ./packages/types
 COPY packages/config ./packages/config
 COPY packages/db ./packages/db
 COPY packages/doc-collab ./packages/doc-collab
-COPY apps/api ./apps/api
+COPY apps/collab ./apps/collab
 
 RUN pnpm --filter @wiki/types build && \
     pnpm --filter @wiki/config build && \
     pnpm --filter @wiki/doc-collab build && \
     pnpm --filter @wiki/db build && \
-    pnpm --filter @wiki/api build
+    pnpm --filter @wiki/collab build
 
 # ─── Stage 3: production image ────────────────────────────────────────────────
 FROM node:22-alpine AS runner
@@ -35,16 +35,19 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 wikiapi
+    adduser --system --uid 1001 wikicollab
 
-COPY --from=builder --chown=wikiapi:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=wikiapi:nodejs /app/apps/api/dist ./apps/api/dist
-COPY --from=builder --chown=wikiapi:nodejs /app/apps/api/package.json ./apps/api/
-COPY --from=builder --chown=wikiapi:nodejs /app/packages ./packages
+COPY --from=builder --chown=wikicollab:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=wikicollab:nodejs /app/apps/collab/dist ./apps/collab/dist
+COPY --from=builder --chown=wikicollab:nodejs /app/apps/collab/package.json ./apps/collab/
+COPY --from=builder --chown=wikicollab:nodejs /app/packages ./packages
 
-USER wikiapi
+USER wikicollab
 
 ENV NODE_ENV=production
-EXPOSE 3001
+EXPOSE 3003
 
-CMD ["node", "apps/api/dist/server.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3003/health || exit 1
+
+CMD ["node", "apps/collab/dist/index.js"]

@@ -43,6 +43,15 @@ const server = Server.configure({
   port: env.COLLAB_PORT,
   extensions: [new RedisExtension({ redis })],
 
+  async onRequest({ request, response }) {
+    const path = request.url?.split("?")[0];
+    if (path === "/health") {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ status: "ok" }));
+      return Promise.reject(undefined);
+    }
+  },
+
   async onAuthenticate({ token, documentName }) {
     const context = await authenticateCollabConnection(
       db,
