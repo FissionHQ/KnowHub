@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, desc, ne, inArray } from "drizzle-orm";
+import { eq, and, desc, ne } from "drizzle-orm";
 import type { Db } from "@wiki/db";
 import {
   recentlyViewed,
@@ -7,12 +7,11 @@ import {
   favorites,
   documents,
   recordRecentlyViewed,
-  recordRecentlyUpdated,
 } from "@wiki/db";
 import { NotFoundError } from "../../lib/errors.js";
 import {
   assertDocumentAccess,
-  resolveAccessibleSpaceIds,
+  filterViewableDocuments,
 } from "../access/permissionResolver.js";
 
 const documentFields = {
@@ -41,7 +40,12 @@ export function createUserActivityRouter(db: Db): Router {
     const { documentId } = req.params;
 
     const docRows = await db
-      .select({ id: documents.id, spaceId: documents.spaceId, status: documents.status })
+      .select({
+        id: documents.id,
+        spaceId: documents.spaceId,
+        ownerId: documents.ownerId,
+        status: documents.status,
+      })
       .from(documents)
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
 
@@ -59,6 +63,7 @@ export function createUserActivityRouter(db: Db): Router {
       groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
       required: "view",
     });
 
@@ -67,29 +72,9 @@ export function createUserActivityRouter(db: Db): Router {
     res.json({ data: { recorded: true } });
   });
 
-  // GET /users/me/recent — recently viewed documents (ACL-scoped)
+  // GET /users/me/recent — recently viewed documents (document ACL-scoped)
   router.get("/users/me/recent", async (req, res) => {
     const { userId, orgId, userRole, groupIds } = req.tenant;
-
-    const accessibleSpaceIds = await resolveAccessibleSpaceIds({
-      db,
-      userRole,
-      userId,
-      groupIds,
-    });
-
-    if (accessibleSpaceIds !== null && !accessibleSpaceIds.length) {
-      return res.json({ data: [] });
-    }
-
-    const conditions = [
-      eq(recentlyViewed.userId, userId),
-      eq(documents.orgId, orgId),
-      ne(documents.status, "trashed"),
-      ...(accessibleSpaceIds !== null
-        ? [inArray(documents.spaceId, accessibleSpaceIds)]
-        : []),
-    ];
 
     const rows = await db
       .select({
@@ -98,36 +83,26 @@ export function createUserActivityRouter(db: Db): Router {
       })
       .from(recentlyViewed)
       .innerJoin(documents, eq(recentlyViewed.documentId, documents.id))
-      .where(and(...conditions))
+      .where(
+        and(
+          eq(recentlyViewed.userId, userId),
+          eq(documents.orgId, orgId),
+          ne(documents.status, "trashed"),
+        ),
+      )
       .orderBy(desc(recentlyViewed.viewedAt))
       .limit(20);
 
-    res.json({ data: rows });
+    const visible = await filterViewableDocuments(
+      { db, userRole, userId, groupIds },
+      rows,
+    );
+    res.json({ data: visible });
   });
 
-  // GET /users/me/recently-updated — documents this user recently edited (ACL-scoped)
+  // GET /users/me/recently-updated — documents this user recently edited (document ACL-scoped)
   router.get("/users/me/recently-updated", async (req, res) => {
     const { userId, orgId, userRole, groupIds } = req.tenant;
-
-    const accessibleSpaceIds = await resolveAccessibleSpaceIds({
-      db,
-      userRole,
-      userId,
-      groupIds,
-    });
-
-    if (accessibleSpaceIds !== null && !accessibleSpaceIds.length) {
-      return res.json({ data: [] });
-    }
-
-    const conditions = [
-      eq(recentlyUpdated.userId, userId),
-      eq(documents.orgId, orgId),
-      ne(documents.status, "trashed"),
-      ...(accessibleSpaceIds !== null
-        ? [inArray(documents.spaceId, accessibleSpaceIds)]
-        : []),
-    ];
 
     const rows = await db
       .select({
@@ -136,17 +111,44 @@ export function createUserActivityRouter(db: Db): Router {
       })
       .from(recentlyUpdated)
       .innerJoin(documents, eq(recentlyUpdated.documentId, documents.id))
-      .where(and(...conditions))
+      .where(
+        and(
+          eq(recentlyUpdated.userId, userId),
+          eq(documents.orgId, orgId),
+          ne(documents.status, "trashed"),
+        ),
+      )
       .orderBy(desc(recentlyUpdated.updatedAt))
       .limit(20);
 
-    res.json({ data: rows });
+    const visible = await filterViewableDocuments(
+      { db, userRole, userId, groupIds },
+      rows,
+    );
+    res.json({ data: visible });
   });
 
   // POST /documents/:documentId/favorite — toggle favorite
   router.post("/documents/:documentId/favorite", async (req, res) => {
-    const { userId } = req.tenant;
+    const { userId, orgId, userRole, groupIds } = req.tenant;
     const { documentId } = req.params;
+
+    const docRows = await db
+      .select({
+        id: documents.id,
+        spaceId: documents.spaceId,
+        ownerId: documents.ownerId,
+        status: documents.status,
+      })
+      .from(documents)
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+    if (!docRows.length) throw new NotFoundError("Document");
+    const doc = docRows[0]!;
+
+    if (doc.status === "trashed" && userRole !== "admin") {
+      throw new NotFoundError("Document");
+    }
 
     const existing = await db
       .select()
@@ -158,12 +160,22 @@ export function createUserActivityRouter(db: Db): Router {
         .delete(favorites)
         .where(and(eq(favorites.userId, userId), eq(favorites.documentId, documentId ?? "")));
       res.json({ data: { favorited: false } });
-    } else {
-      await db
-        .insert(favorites)
-        .values({ userId, documentId: documentId ?? "" });
-      res.json({ data: { favorited: true } });
+      return;
     }
+
+    await assertDocumentAccess({
+      db,
+      userRole,
+      userId,
+      groupIds,
+      documentId: doc.id,
+      spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
+      required: "view",
+    });
+
+    await db.insert(favorites).values({ userId, documentId: documentId ?? "" });
+    res.json({ data: { favorited: true } });
   });
 
   // GET /documents/:documentId/favorite — check if favorited
@@ -179,39 +191,29 @@ export function createUserActivityRouter(db: Db): Router {
     res.json({ data: { favorited: rows.length > 0 } });
   });
 
-  // GET /users/me/favorites — list favorites (ACL-scoped)
+  // GET /users/me/favorites — list favorites (document ACL-scoped)
   router.get("/users/me/favorites", async (req, res) => {
     const { userId, orgId, userRole, groupIds } = req.tenant;
-
-    const accessibleSpaceIds = await resolveAccessibleSpaceIds({
-      db,
-      userRole,
-      userId,
-      groupIds,
-    });
-
-    if (accessibleSpaceIds !== null && !accessibleSpaceIds.length) {
-      return res.json({ data: [] });
-    }
-
-    const conditions = [
-      eq(favorites.userId, userId),
-      eq(documents.orgId, orgId),
-      ne(documents.status, "trashed"),
-      ...(accessibleSpaceIds !== null
-        ? [inArray(documents.spaceId, accessibleSpaceIds)]
-        : []),
-    ];
 
     const rows = await db
       .select(documentFields)
       .from(favorites)
       .innerJoin(documents, eq(favorites.documentId, documents.id))
-      .where(and(...conditions))
+      .where(
+        and(
+          eq(favorites.userId, userId),
+          eq(documents.orgId, orgId),
+          ne(documents.status, "trashed"),
+        ),
+      )
       .orderBy(desc(favorites.createdAt))
       .limit(50);
 
-    res.json({ data: rows });
+    const visible = await filterViewableDocuments(
+      { db, userRole, userId, groupIds },
+      rows,
+    );
+    res.json({ data: visible });
   });
 
   return router;

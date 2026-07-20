@@ -16,7 +16,7 @@ import { parseSearchEnv } from "@wiki/config";
 import { getDb } from "@wiki/db";
 import { SearchService, type AccessibleSpaces } from "./searchService.js";
 import winston from "winston";
-import { groupMemberships, groups, spacePermissions, spaces, users } from "@wiki/db";
+import { groupMemberships, groups, spacePermissions, spaces, users, documentPermissions, documents } from "@wiki/db";
 import { eq, and, inArray } from "drizzle-orm";
 import * as jose from "jose";
 import type { UserRole } from "@wiki/types";
@@ -124,6 +124,30 @@ async function resolveAccessibleSpaceIds(
   return [...new Set(rows.map((r) => r.spaceId))];
 }
 
+async function canRunSearch(
+  orgId: string,
+  userId: string,
+  role: UserRole,
+  groupIds: string[],
+): Promise<boolean> {
+  if (role === "admin") return true;
+  if (groupIds.length > 0) return true;
+
+  const rows = await db
+    .select({ documentId: documentPermissions.documentId })
+    .from(documentPermissions)
+    .innerJoin(documents, eq(documentPermissions.documentId, documents.id))
+    .where(
+      and(
+        eq(documentPermissions.userId, userId),
+        eq(documents.orgId, orgId),
+      ),
+    )
+    .limit(1);
+
+  return rows.length > 0;
+}
+
 app.get("/search", async (req, res) => {
   const tenant = await extractTenant(req);
   const q = querySchema.safeParse(req.query);
@@ -136,6 +160,12 @@ app.get("/search", async (req, res) => {
     tenant.orgId,
     tenant.groupIds,
     tenant.role,
+  );
+  const canSearch = await canRunSearch(
+    tenant.orgId,
+    tenant.userId,
+    tenant.role,
+    tenant.groupIds,
   );
 
   if (q.data.authorId) {
@@ -162,6 +192,7 @@ app.get("/search", async (req, res) => {
     tenant.userId,
     tenant.groupIds,
     accessibleSpaceIds,
+    canSearch,
   );
   res.json({ data: results });
 });
@@ -179,6 +210,12 @@ app.get("/search/suggest", async (req, res) => {
     tenant.groupIds,
     tenant.role,
   );
+  const canSearch = await canRunSearch(
+    tenant.orgId,
+    tenant.userId,
+    tenant.role,
+    tenant.groupIds,
+  );
 
   const suggestions = await searchService.suggest(
     q.data,
@@ -186,6 +223,7 @@ app.get("/search/suggest", async (req, res) => {
     tenant.userId,
     tenant.groupIds,
     accessibleSpaceIds,
+    canSearch,
     filterSpaceId,
   );
   res.json({ data: suggestions });

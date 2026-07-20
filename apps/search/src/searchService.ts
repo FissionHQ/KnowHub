@@ -22,20 +22,13 @@ export class SearchService {
     userId: string,
     userGroupIds: string[],
     accessibleSpaceIds: AccessibleSpaces,
+    canSearch: boolean,
   ): Promise<SearchResponse> {
     const page = query.page ?? 1;
     const size = Math.min(query.size ?? 20, 100);
     const from = (page - 1) * size;
 
-    if (!this.hasSearchAccess(userGroupIds, accessibleSpaceIds)) {
-      return { hits: [], total: 0, page, size };
-    }
-
-    if (
-      query.spaceId &&
-      accessibleSpaceIds !== null &&
-      !accessibleSpaceIds.includes(query.spaceId)
-    ) {
+    if (!canSearch) {
       return { hits: [], total: 0, page, size };
     }
 
@@ -93,18 +86,11 @@ export class SearchService {
     userId: string,
     userGroupIds: string[],
     accessibleSpaceIds: AccessibleSpaces,
+    canSearch: boolean,
     spaceId?: string,
   ): Promise<string[]> {
     if (!q.trim()) return [];
-    if (!this.hasSearchAccess(userGroupIds, accessibleSpaceIds)) return [];
-
-    if (
-      spaceId &&
-      accessibleSpaceIds !== null &&
-      !accessibleSpaceIds.includes(spaceId)
-    ) {
-      return [];
-    }
+    if (!canSearch) return [];
 
     const filters = this.buildAclFilters(orgId, userId, userGroupIds, accessibleSpaceIds);
     if (spaceId) filters.push({ term: { space_id: spaceId } });
@@ -141,15 +127,6 @@ export class SearchService {
     );
   }
 
-  /** Mirrors API: space access via groups first; admin bypasses. */
-  private hasSearchAccess(
-    userGroupIds: string[],
-    accessibleSpaceIds: AccessibleSpaces,
-  ): boolean {
-    if (accessibleSpaceIds === null) return true;
-    return userGroupIds.length > 0 && accessibleSpaceIds.length > 0;
-  }
-
   private buildAclFilters(
     orgId: string,
     userId: string,
@@ -159,8 +136,6 @@ export class SearchService {
     const filters: unknown[] = [{ term: { org_id: orgId } }];
 
     if (accessibleSpaceIds === null) return filters;
-
-    filters.push({ terms: { space_id: accessibleSpaceIds } });
 
     const aclShould: unknown[] = [{ term: { acl_user_ids: userId } }];
     if (userGroupIds.length) {

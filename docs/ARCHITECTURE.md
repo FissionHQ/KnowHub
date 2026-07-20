@@ -134,13 +134,13 @@ Admins (`role = admin`) bypass group checks entirely — they can access all spa
 
 ### Permission cache
 
-Group membership (`userId → [groupId, ...]`) is cached in Redis with a 30 s TTL:
+Group membership (`userId → [groupId, ...]`) is cached in Redis with a ~30 s TTL (30 s base plus up to 7 s of random jitter, so simultaneously-written keys do not all expire at once and stampede the database):
 
 ```
 Key: acl:groups:<orgId>:<userId>
 ```
 
-On any group membership change (add/remove member), the cache key is deleted **and** a pub/sub message is published to `acl-invalidate:<orgId>` so other API instances can drop their local state if applicable. The 30 s TTL acts as the backstop if the pub/sub message is lost.
+On any group membership change (add/remove member), the cache key is deleted. The cache lives in shared Redis, so a single `DEL` drops the entry for every API instance — no cross-instance pub/sub is required. The TTL acts as the backstop if the `DEL` is lost (e.g. Redis briefly unavailable). Cache reads and writes are best-effort: if Redis is unavailable the request falls back to querying group membership directly from PostgreSQL.
 
 ---
 

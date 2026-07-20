@@ -65,6 +65,7 @@ export function createStorageRouter(
         db, userRole, userId, groupIds,
         documentId: doc.id,
         spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
         required: "edit",
       });
 
@@ -154,6 +155,7 @@ export function createStorageRouter(
         db, userRole, userId, groupIds,
         documentId: doc.id,
         spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
         required: "edit",
       });
 
@@ -213,9 +215,10 @@ export function createStorageRouter(
 
     await assertDocumentAccess({
       db, userRole, userId, groupIds,
-      documentId: doc.id,
-      spaceId: doc.spaceId,
-      required: "view",
+        documentId: doc.id,
+        spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
+        required: "view",
     });
 
     const rows = await db
@@ -291,9 +294,10 @@ export function createStorageRouter(
 
     await assertDocumentAccess({
       db, userRole, userId, groupIds,
-      documentId: doc.id,
-      spaceId: doc.spaceId,
-      required: "view",
+        documentId: doc.id,
+        spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
+        required: "view",
     });
 
     // Generate presigned URL — ACL check done above, URL is short-lived

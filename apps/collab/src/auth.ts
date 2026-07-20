@@ -5,6 +5,7 @@ import type { Db } from "@wiki/db";
 import { documents, groupMemberships, groups, users, setTenantContext } from "@wiki/db";
 import type { UserRole } from "@wiki/types";
 import { assertDocumentAccess, resolveDocumentAccess } from "./permissions.js";
+import { logger } from "./logger.js";
 
 export interface CollabUser {
   id: string;
@@ -23,6 +24,13 @@ export interface CollabAuthContext {
 }
 
 const CACHE_TTL_SECONDS = 30;
+// Jitter added on top of the base TTL so that many users' cache entries do not
+// expire at the same instant and stampede the database. Effective TTL: 30–37 s.
+const CACHE_TTL_JITTER_SECONDS = 7;
+
+function cacheTtlSeconds(): number {
+  return CACHE_TTL_SECONDS + Math.floor(Math.random() * (CACHE_TTL_JITTER_SECONDS + 1));
+}
 
 function cacheKey(orgId: string, userId: string) {
   return `acl:groups:${orgId}:${userId}`;
@@ -34,8 +42,14 @@ async function loadGroupIds(
   orgId: string,
   userId: string,
 ): Promise<string[]> {
-  const cached = await redis.get(cacheKey(orgId, userId));
-  if (cached) return JSON.parse(cached) as string[];
+  // The cache is a best-effort optimization: if Redis is unavailable we fall
+  // back to the database rather than failing authentication.
+  try {
+    const cached = await redis.get(cacheKey(orgId, userId));
+    if (cached) return JSON.parse(cached) as string[];
+  } catch (err) {
+    logger.warn("Group cache read failed; falling back to database", { err });
+  }
 
   await setTenantContext(db, orgId);
   const rows = await db
@@ -45,7 +59,16 @@ async function loadGroupIds(
     .where(and(eq(groupMemberships.userId, userId), eq(groups.orgId, orgId)));
 
   const groupIds = rows.map((r) => r.groupId);
-  await redis.set(cacheKey(orgId, userId), JSON.stringify(groupIds), "EX", CACHE_TTL_SECONDS);
+  try {
+    await redis.set(
+      cacheKey(orgId, userId),
+      JSON.stringify(groupIds),
+      "EX",
+      cacheTtlSeconds(),
+    );
+  } catch (err) {
+    logger.warn("Group cache write failed", { err });
+  }
   return groupIds;
 }
 
@@ -109,6 +132,7 @@ export async function authenticateCollabConnection(
     groupIds,
     documentId: doc.id,
     spaceId: doc.spaceId,
+    ownerId: doc.ownerId,
     required: "view",
   });
 
@@ -119,6 +143,7 @@ export async function authenticateCollabConnection(
     groupIds,
     documentId: doc.id,
     spaceId: doc.spaceId,
+    ownerId: doc.ownerId,
   });
   const canEdit = accessLevel === "edit";
 

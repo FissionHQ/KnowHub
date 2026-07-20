@@ -25,7 +25,15 @@ import {
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64 } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
-import { assertDocumentAccess, assertSpaceAccess, resolveDocumentAccess, assertCanManageDocumentPermissions, assertCanMutateDocumentContent } from "../access/permissionResolver.js";
+import {
+  assertDocumentAccess,
+  assertSpaceAccess,
+  resolveDocumentAccess,
+  assertCanManageDocumentPermissions,
+  assertCanGrantDocumentPermissionToUser,
+  assertCanMutateDocumentContent,
+  filterViewableDocuments,
+} from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
 import { notifyCollabDocumentReset } from "../../lib/collabReset.js";
 import { logger } from "../../lib/logger.js";
@@ -135,7 +143,12 @@ export function createContentRouter(
           ne(documents.status, "trashed"),
         ),
       );
-    res.json({ data: rows });
+
+    const visible = await filterViewableDocuments(
+      { db, userRole, userId, groupIds },
+      rows,
+    );
+    res.json({ data: visible });
   });
 
   // GET /trash — list trashed documents (admin only)
@@ -272,6 +285,7 @@ export function createContentRouter(
       db, userRole, userId, groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
       required: "view",
     });
 
@@ -282,6 +296,7 @@ export function createContentRouter(
       groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
     });
 
     res.json({ data: { ...doc, accessLevel } });
@@ -536,6 +551,7 @@ export function createContentRouter(
       db, userRole, userId, groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
       required: "view",
     });
 
@@ -690,6 +706,7 @@ export function createContentRouter(
       groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
       required: "view",
     });
     assertCanManageDocumentPermissions({ userRole, userId, ownerId: doc.ownerId });
@@ -757,6 +774,7 @@ export function createContentRouter(
       groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
       required: "view",
     });
 
@@ -768,10 +786,16 @@ export function createContentRouter(
       if (!groupRows.length) throw new NotFoundError("Group");
     } else if (body.data.userId) {
       const userRows = await db
-        .select({ id: users.id })
+        .select({ id: users.id, role: users.role })
         .from(users)
         .where(and(eq(users.id, body.data.userId), eq(users.orgId, orgId)));
       if (!userRows.length) throw new NotFoundError("User");
+      assertCanGrantDocumentPermissionToUser({
+        actorRole: userRole,
+        actorId: userId,
+        targetUserId: userRows[0]!.id,
+        targetUserRole: userRows[0]!.role,
+      });
     }
 
     const existing = await db
@@ -848,6 +872,7 @@ export function createContentRouter(
       groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
       required: "view",
     });
 
@@ -861,6 +886,21 @@ export function createContentRouter(
         ),
       );
     if (!permRows.length) throw new NotFoundError("Permission");
+
+    if (permRows[0]!.userId) {
+      const targetRows = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(and(eq(users.id, permRows[0]!.userId!), eq(users.orgId, orgId)));
+      if (targetRows.length) {
+        assertCanGrantDocumentPermissionToUser({
+          actorRole: userRole,
+          actorId: userId,
+          targetUserId: targetRows[0]!.id,
+          targetUserRole: targetRows[0]!.role,
+        });
+      }
+    }
 
     await db
       .update(documentPermissions)
@@ -906,6 +946,7 @@ export function createContentRouter(
       groupIds,
       documentId: doc.id,
       spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
       required: "view",
     });
 
@@ -919,6 +960,21 @@ export function createContentRouter(
         ),
       );
     if (!permRows.length) throw new NotFoundError("Permission");
+
+    if (permRows[0]!.userId) {
+      const targetRows = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(and(eq(users.id, permRows[0]!.userId!), eq(users.orgId, orgId)));
+      if (targetRows.length) {
+        assertCanGrantDocumentPermissionToUser({
+          actorRole: userRole,
+          actorId: userId,
+          targetUserId: targetRows[0]!.id,
+          targetUserRole: targetRows[0]!.role,
+        });
+      }
+    }
 
     await db.delete(documentPermissions).where(eq(documentPermissions.id, permissionId ?? ""));
 
