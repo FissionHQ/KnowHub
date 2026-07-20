@@ -80,18 +80,16 @@ async function main() {
       .from(documentPermissions)
       .where(eq(documentPermissions.documentId, doc.id));
 
-    const aclGroupIds = [
-      ...new Set([
-        ...spacePerm.map((r) => r.groupId),
-        ...docPerm.filter((r) => r.groupId).map((r) => r.groupId!),
-      ]),
-    ];
     const aclUserIds = [
       ...new Set([
         doc.ownerId,
         ...docPerm.filter((r) => r.userId).map((r) => r.userId!),
       ]),
     ];
+
+    const aclGroupIds = docPerm.length
+      ? [...new Set(docPerm.filter((r) => r.groupId).map((r) => r.groupId!))]
+      : [...new Set(spacePerm.map((r) => r.groupId))];
 
     const searchable = await resolveSearchIndexContent(db, doc);
     const plainText = htmlToPlainText(searchable.body);

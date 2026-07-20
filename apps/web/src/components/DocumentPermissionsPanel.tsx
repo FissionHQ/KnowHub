@@ -3,9 +3,20 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { documentsApi, groupsApi, usersApi } from "@/lib/api";
-import type { AccessLevel } from "@wiki/types";
+import { useAuth } from "@/lib/auth";
+import type { AccessLevel, User, UserRole } from "@wiki/types";
 import { Button, Skeleton } from "@heroui/react";
-import { Users, User } from "lucide-react";
+import { Users, User as UserIcon } from "lucide-react";
+
+function canGrantDocumentPermissionToUser(
+  actorRole: UserRole,
+  actorId: string,
+  target: Pick<User, "id" | "role">,
+): boolean {
+  if (actorId === target.id) return false;
+  if (target.role === "admin" && actorRole !== "admin") return false;
+  return true;
+}
 
 interface Props {
   documentId: string;
@@ -14,6 +25,7 @@ interface Props {
 type GranteeType = "group" | "user";
 
 export function DocumentPermissionsPanel({ documentId }: Props) {
+  const { user: currentUser } = useAuth();
   const [granteeType, setGranteeType] = useState<GranteeType>("group");
   const [granteeId, setGranteeId] = useState("");
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("view");
@@ -43,7 +55,11 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
     (g) => !data.overrides.some((o) => o.groupId === g.id),
   );
   const availableUsers = users.filter(
-    (u) => u.status === "active" && !data.overrides.some((o) => o.userId === u.id),
+    (u) =>
+      u.status === "active" &&
+      !data.overrides.some((o) => o.userId === u.id) &&
+      currentUser &&
+      canGrantDocumentPermissionToUser(currentUser.role, currentUser.id, u),
   );
   const selectedGranteeId =
     granteeId ||
@@ -106,7 +122,8 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
           </ul>
         )}
         <p className="text-xs text-zinc-400 mt-2">
-          Users without a document override inherit these space permissions.
+          Without overrides, everyone with space access can see this document. Adding an
+          override restricts visibility to only the listed groups or users.
         </p>
       </section>
 
@@ -116,8 +133,8 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
         </h3>
         {data.overrides.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
-            No document-specific permissions. Add an override to restrict or grant access
-            for a group or user.
+            No document-specific permissions. Add an override to restrict visibility or
+            grant access to a specific group or user.
           </p>
         ) : (
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden mb-3">
@@ -125,6 +142,18 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
               const label = perm.groupId
                 ? (perm.groupName ?? "Group")
                 : (perm.userName ?? perm.userEmail ?? "User");
+              const targetUser = perm.userId
+                ? users.find((u) => u.id === perm.userId)
+                : undefined;
+              const canManageOverride =
+                !perm.userId ||
+                (currentUser &&
+                  targetUser &&
+                  canGrantDocumentPermissionToUser(
+                    currentUser.role,
+                    currentUser.id,
+                    targetUser,
+                  ));
               return (
                 <li
                   key={perm.id}
@@ -134,7 +163,7 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                     {perm.groupId ? (
                       <Users size={14} className="text-zinc-400 shrink-0" />
                     ) : (
-                      <User size={14} className="text-zinc-400 shrink-0" />
+                      <UserIcon size={14} className="text-zinc-400 shrink-0" />
                     )}
                     <span className="truncate">
                       {label}
@@ -144,23 +173,29 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                     </span>
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
-                    <select
-                      value={perm.accessLevel}
-                      onChange={(e) =>
-                        handleAccessChange(perm.id, e.target.value as AccessLevel)
-                      }
-                      className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
-                    >
-                      <option value="view">View</option>
-                      <option value="edit">Edit</option>
-                    </select>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onPress={() => handleRemove(perm.id, label)}
-                    >
-                      Remove
-                    </Button>
+                    {canManageOverride ? (
+                      <>
+                        <select
+                          value={perm.accessLevel}
+                          onChange={(e) =>
+                            handleAccessChange(perm.id, e.target.value as AccessLevel)
+                          }
+                          className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
+                        >
+                          <option value="view">View</option>
+                          <option value="edit">Edit</option>
+                        </select>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => handleRemove(perm.id, label)}
+                        >
+                          Remove
+                        </Button>
+                      </>
+                    ) : (
+                      <AccessBadge level={perm.accessLevel} />
+                    )}
                   </div>
                 </li>
               );
@@ -195,17 +230,25 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
             onChange={(e) => setGranteeId(e.target.value)}
             className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
           >
-            {granteeType === "group"
-              ? availableGroups.map((g) => (
+            {granteeType === "group" ? (
+              availableGroups.length === 0 ? (
+                <option value="">No groups available</option>
+              ) : (
+                availableGroups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
                   </option>
                 ))
-              : availableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.email})
-                  </option>
-                ))}
+              )
+            ) : availableUsers.length === 0 ? (
+              <option value="">No users available</option>
+            ) : (
+              availableUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.email})
+                </option>
+              ))
+            )}
           </select>
           <Button
             type="submit"
