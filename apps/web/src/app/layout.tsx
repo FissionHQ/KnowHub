@@ -11,6 +11,9 @@ const inter = Inter({ subsets: ["latin"], display: "swap" });
 export const metadata: Metadata = {
   title: "FissionDocs",
   description: "Organizational knowledge base",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
