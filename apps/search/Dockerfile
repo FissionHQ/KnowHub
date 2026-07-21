@@ -37,6 +37,8 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 wikisearch
 
 COPY --from=builder --chown=wikisearch:nodejs /app/node_modules ./node_modules
+# pnpm symlinks each package's direct deps under its own node_modules
+COPY --from=builder --chown=wikisearch:nodejs /app/apps/search/node_modules ./apps/search/node_modules
 COPY --from=builder --chown=wikisearch:nodejs /app/apps/search/dist ./apps/search/dist
 COPY --from=builder --chown=wikisearch:nodejs /app/apps/search/package.json ./apps/search/
 COPY --from=builder --chown=wikisearch:nodejs /app/packages ./packages

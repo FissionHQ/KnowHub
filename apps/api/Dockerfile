@@ -40,6 +40,8 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 wikiapi
 
 COPY --from=builder --chown=wikiapi:nodejs /app/node_modules ./node_modules
+# pnpm symlinks each package's direct deps under its own node_modules
+COPY --from=builder --chown=wikiapi:nodejs /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder --chown=wikiapi:nodejs /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=wikiapi:nodejs /app/apps/api/package.json ./apps/api/
 COPY --from=builder --chown=wikiapi:nodejs /app/packages ./packages

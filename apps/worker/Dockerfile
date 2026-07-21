@@ -37,6 +37,8 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 wikiworker
 
 COPY --from=builder --chown=wikiworker:nodejs /app/node_modules ./node_modules
+# pnpm symlinks each package's direct deps under its own node_modules
+COPY --from=builder --chown=wikiworker:nodejs /app/apps/worker/node_modules ./apps/worker/node_modules
 COPY --from=builder --chown=wikiworker:nodejs /app/apps/worker/dist ./apps/worker/dist
 COPY --from=builder --chown=wikiworker:nodejs /app/apps/worker/package.json ./apps/worker/
 COPY --from=builder --chown=wikiworker:nodejs /app/packages ./packages

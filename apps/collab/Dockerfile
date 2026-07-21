@@ -40,6 +40,8 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 wikicollab
 
 COPY --from=builder --chown=wikicollab:nodejs /app/node_modules ./node_modules
+# pnpm symlinks each package's direct deps under its own node_modules
+COPY --from=builder --chown=wikicollab:nodejs /app/apps/collab/node_modules ./apps/collab/node_modules
 COPY --from=builder --chown=wikicollab:nodejs /app/apps/collab/dist ./apps/collab/dist
 COPY --from=builder --chown=wikicollab:nodejs /app/apps/collab/package.json ./apps/collab/
 COPY --from=builder --chown=wikicollab:nodejs /app/packages ./packages
