@@ -1,6 +1,127 @@
-version: "3.9"
+# Shared env for the app services. Hosts use compose service names, which only
+# resolve inside the compose network (the host machine uses localhost + the
+# published ports from .env instead).
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://wiki:wiki@postgres:5432/wiki
+  DATABASE_URL_READER: postgresql://wiki:wiki@postgres:5432/wiki
+  REDIS_URL: redis://redis:6379
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  S3_ENDPOINT: http://localstack:4566
+  S3_QUARANTINE_BUCKET: wiki-quarantine
+  S3_SERVED_BUCKET: wiki-served
+  OPENSEARCH_URL: http://opensearch:9200
+  SQS_ENDPOINT: http://localstack:4566
+  SQS_PDF_QUEUE_URL: http://localstack:4566/000000000000/wiki-pdf-processing
+  SQS_INDEX_QUEUE_URL: http://localstack:4566/000000000000/wiki-search-indexing
+  BASE_DOMAIN: localhost
+  JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-32chars}
+  # mailhog only runs with the "tools" profile; email sending fails without it.
+  SES_ENDPOINT: http://mailhog:1025
+  SES_FROM_ADDRESS: noreply@wiki.example.com
+
+x-app-depends: &app-depends
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  opensearch:
+    condition: service_healthy
+  localstack:
+    condition: service_healthy
 
 services:
+  # ─── Web (Next.js) ─────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the client bundle at build time; the browser reaches the
+        # backends via the ports published on the host.
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+        NEXT_PUBLIC_SEARCH_URL: http://localhost:3002
+        NEXT_PUBLIC_COLLAB_WS_URL: ws://localhost:3003
+    environment:
+      # Read at runtime by the server-side route handlers, which must use the
+      # in-network service names rather than localhost.
+      NEXT_PUBLIC_API_URL: http://api:3001
+      NEXT_PUBLIC_SEARCH_URL: http://search:3002
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+      collab:
+        condition: service_healthy
+
+  # ─── API ───────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      <<: *app-env
+      API_PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on: *app-depends
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ─── Search ────────────────────────────────────────────────────────────────
+  search:
+    build:
+      context: .
+      dockerfile: apps/search/Dockerfile
+    environment:
+      <<: *app-env
+      SEARCH_PORT: 3002
+    ports:
+      - "3002:3002"
+    depends_on: *app-depends
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ─── Collab (WebSocket) ────────────────────────────────────────────────────
+  collab:
+    build:
+      context: .
+      dockerfile: apps/collab/Dockerfile
+    environment:
+      <<: *app-env
+      COLLAB_PORT: 3003
+    ports:
+      - "3003:3003"
+    depends_on: *app-depends
+    # healthcheck comes from the Dockerfile (wget /health)
+
+  # ─── Worker (PDF processing, virus scan, indexing) ────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      <<: *app-env
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+    depends_on:
+      <<: *app-depends
+      clamav:
+        condition: service_healthy
+
   # ─── PostgreSQL ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -82,13 +203,14 @@ services:
 
   # ─── ClamAV (virus scanning) ──────────────────────────────────────────────
   clamav:
-    image: clamav/clamav:stable
+    # clamav/clamav has no ARM64 build; the -debian variant does
+    image: clamav/clamav-debian:stable
     ports:
       - "3310:3310"
     volumes:
       - clamav_data:/var/lib/clamav
     healthcheck:
-      test: ["CMD", "clamdcheck"]
+      test: ["CMD", "clamdcheck.sh"]
       interval: 30s
       timeout: 10s
       retries: 5
