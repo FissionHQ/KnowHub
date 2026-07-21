@@ -1,23 +1,26 @@
 # Shared env for the app services. Hosts use compose service names, which only
 # resolve inside the compose network (the host machine uses localhost + the
 # published ports from .env instead).
+# Credentials and names come from .env (gitignored) with no fallbacks; hosts
+# are compose service names, which are topology rather than secrets.
 x-app-env: &app-env
   NODE_ENV: production
-  DATABASE_URL: postgresql://wiki:wiki@postgres:5432/wiki
-  DATABASE_URL_READER: postgresql://wiki:wiki@postgres:5432/wiki
+  DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}
+  DATABASE_URL_READER: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
   REDIS_URL: redis://redis:6379
-  AWS_REGION: us-east-1
-  AWS_ACCESS_KEY_ID: test
-  AWS_SECRET_ACCESS_KEY: test
+  AWS_REGION: ${AWS_REGION:?set in .env}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?set in .env}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?set in .env}
   S3_ENDPOINT: http://localstack:4566
-  S3_QUARANTINE_BUCKET: wiki-quarantine
-  S3_SERVED_BUCKET: wiki-served
+  S3_QUARANTINE_BUCKET: ${S3_QUARANTINE_BUCKET:?set in .env}
+  S3_SERVED_BUCKET: ${S3_SERVED_BUCKET:?set in .env}
   OPENSEARCH_URL: http://opensearch:9200
   SQS_ENDPOINT: http://localstack:4566
   SQS_PDF_QUEUE_URL: http://localstack:4566/000000000000/wiki-pdf-processing
   SQS_INDEX_QUEUE_URL: http://localstack:4566/000000000000/wiki-search-indexing
   BASE_DOMAIN: localhost
-  JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-32chars}
+  # Required — set in .env (gitignored); see .env.example
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
   # mailhog only runs with the "tools" profile; email sending fails without it.
   SES_ENDPOINT: http://mailhog:1025
   SES_FROM_ADDRESS: noreply@wiki.example.com
@@ -126,15 +129,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: wiki
-      POSTGRES_PASSWORD: wiki
-      POSTGRES_DB: wiki
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
     ports:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wiki -d wiki"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
