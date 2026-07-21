@@ -7,6 +7,7 @@ import { membersForGroup, usersNotInGroup } from "@/components/admin/GroupMember
 import { Button, Card, CardContent, Chip } from "@heroui/react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import clsx from "clsx";
+import { Select } from "@/components/ui/Select";
 
 export function GroupsSection() {
   const { data: groups = [], mutate: mutateGroups } = useSWR("admin:groups", groupsApi.list);
@@ -198,24 +199,16 @@ export function GroupsSection() {
 
                     {availableUsers.length > 0 ? (
                       <div className="flex items-center gap-2">
-                        <select
-                          defaultValue=""
-                          disabled={busyKey?.startsWith(`${group.id}:`) ?? false}
-                          onChange={(e) => {
-                            const userId = e.target.value;
-                            if (!userId) return;
-                            void handleAddMember(group.id, userId);
-                            e.target.value = "";
-                          }}
-                          className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm flex-1"
-                        >
-                          <option value="">Add member…</option>
-                          {availableUsers.map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.name} ({user.email})
-                            </option>
-                          ))}
-                        </select>
+                      <Select
+                        value=""
+                        onChange={(userId) => {
+                          if (!userId) return;
+                          void handleAddMember(group.id, userId);
+                        }}
+                        options={[{ value: "", label: "Add member…" }, ...availableUsers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))]}
+                        disabled={busyKey?.startsWith(`${group.id}:`) ?? false}
+                        className="h-9 flex-1"
+                      />
                       </div>
                     ) : (
                       <p className="text-xs text-zinc-400">

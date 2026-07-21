@@ -7,6 +7,7 @@ import { groupsApi, spacesApi } from "@/lib/api";
 import type { AccessLevel, Space, SpacePermissionRecord } from "@wiki/types";
 import { Button, Card, CardContent } from "@heroui/react";
 import { Users } from "lucide-react";
+import { Select } from "@/components/ui/Select";
 
 export function SpacesSection() {
   const { data: spaces = [], mutate } = useSWR("admin:spaces", spacesApi.list);
@@ -74,25 +75,18 @@ export function SpacesSection() {
               onChange={(e) => setDescription(e.target.value)}
               className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm md:col-span-2"
             />
-            <select
+            <Select
               value={defaultGroupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-            <select
+              onChange={setGroupId}
+              options={groups.map((g) => ({ value: g.id, label: g.name }))}
+              className="h-10"
+            />
+            <Select
               value={accessLevel}
-              onChange={(e) => setAccessLevel(e.target.value as AccessLevel)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              <option value="view">View access</option>
-              <option value="edit">Edit access</option>
-            </select>
+              onChange={(v) => setAccessLevel(v as AccessLevel)}
+              options={[{ value: "view", label: "View access" }, { value: "edit", label: "Edit access" }]}
+              className="h-10"
+            />
             <div className="md:col-span-2">
               <Button
                 type="submit"
@@ -247,22 +241,20 @@ function SpaceRow({
                     {perm.groupName}
                   </span>
                   <div className="flex items-center gap-2">
-                    <select
+                    <Select
                       value={perm.accessLevel}
-                      onChange={(e) =>
+                      onChange={(v) =>
                         updateDraft((current) =>
                           current.map((row) =>
                             row.groupId === perm.groupId
-                              ? { ...row, accessLevel: e.target.value as AccessLevel }
+                              ? { ...row, accessLevel: v as AccessLevel }
                               : row,
                           ),
                         )
                       }
-                      className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
-                    >
-                      <option value="view">View</option>
-                      <option value="edit">Edit</option>
-                    </select>
+                      options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]}
+                      className="h-8 w-24"
+                    />
                     <Button
                       variant="secondary"
                       size="sm"
@@ -282,25 +274,18 @@ function SpaceRow({
 
           {availableGroups.length > 0 && (
             <form onSubmit={handleAddGroup} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <select
+              <Select
                 value={selectedAddGroupId}
-                onChange={(e) => setAddGroupId(e.target.value)}
-                className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-              >
-                {availableGroups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setAddGroupId}
+                options={availableGroups.map((g) => ({ value: g.id, label: g.name }))}
+                className="h-9"
+              />
+              <Select
                 value={addAccessLevel}
-                onChange={(e) => setAddAccessLevel(e.target.value as AccessLevel)}
-                className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-              >
-                <option value="view">View access</option>
-                <option value="edit">Edit access</option>
-              </select>
+                onChange={(v) => setAddAccessLevel(v as AccessLevel)}
+                options={[{ value: "view", label: "View access" }, { value: "edit", label: "Edit access" }]}
+                className="h-9"
+              />
               <Button
                 type="submit"
                 variant="secondary"

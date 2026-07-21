@@ -6,6 +6,7 @@ import { groupsApi, usersApi } from "@/lib/api";
 import { UserGroupChips, GroupSelectChips } from "@/components/admin/GroupMembershipChips";
 import type { User, UserRole } from "@wiki/types";
 import { Button, Card, CardContent, Chip } from "@heroui/react";
+import { Select } from "@/components/ui/Select";
 
 const ROLES: UserRole[] = ["admin", "member", "viewer"];
 
@@ -114,17 +115,12 @@ export function UsersSection() {
               className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
               required
             />
-            <select
+            <Select
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setRole(v as UserRole)}
+              options={ROLES.map((r) => ({ value: r, label: r }))}
+              className="h-10"
+            />
             <Button type="submit" variant="primary" size="sm" isDisabled={submitting}>
               Send invite
             </Button>
@@ -233,18 +229,13 @@ export function UsersSection() {
                     <div className="text-xs text-zinc-500 dark:text-zinc-400">{user.email}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <select
+                    <Select
                       value={user.role}
-                      onChange={(e) => changeRole(user, e.target.value as UserRole)}
+                      onChange={(v) => changeRole(user, v as UserRole)}
+                      options={ROLES.map((r) => ({ value: r, label: r }))}
                       disabled={user.status === "invited"}
-                      className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs disabled:opacity-50"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
+                      className="h-8 w-28"
+                    />
                   </td>
                   <td className="px-4 py-3 min-w-[180px] max-w-[280px]">
                     {user.status === "deactivated" ? (
