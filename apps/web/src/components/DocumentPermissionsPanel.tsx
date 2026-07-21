@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import type { AccessLevel, User, UserRole } from "@wiki/types";
 import { Button, Skeleton } from "@heroui/react";
 import { Users, User as UserIcon } from "lucide-react";
+import { Select } from "@/components/ui/Select";
 
 function canGrantDocumentPermissionToUser(
   actorRole: UserRole,
@@ -175,16 +176,12 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                   <div className="flex items-center gap-2 shrink-0">
                     {canManageOverride ? (
                       <>
-                        <select
+                        <Select
                           value={perm.accessLevel}
-                          onChange={(e) =>
-                            handleAccessChange(perm.id, e.target.value as AccessLevel)
-                          }
-                          className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
-                        >
-                          <option value="view">View</option>
-                          <option value="edit">Edit</option>
-                        </select>
+                          onChange={(v) => handleAccessChange(perm.id, v as AccessLevel)}
+                          options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]}
+                          className="h-8 w-24"
+                        />
                         <Button
                           variant="secondary"
                           size="sm"
@@ -205,51 +202,30 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
 
         <form onSubmit={handleAdd} className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
-            <select
+            <Select
               value={granteeType}
-              onChange={(e) => {
-                setGranteeType(e.target.value as GranteeType);
-                setGranteeId("");
-              }}
-              className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              <option value="group">Group</option>
-              <option value="user">User</option>
-            </select>
-            <select
+              onChange={(v) => { setGranteeType(v as GranteeType); setGranteeId(""); }}
+              options={[{ value: "group", label: "Group" }, { value: "user", label: "User" }]}
+            />
+            <Select
               value={accessLevel}
-              onChange={(e) => setAccessLevel(e.target.value as AccessLevel)}
-              className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              <option value="view">View access</option>
-              <option value="edit">Edit access</option>
-            </select>
+              onChange={(v) => setAccessLevel(v as AccessLevel)}
+              options={[{ value: "view", label: "View access" }, { value: "edit", label: "Edit access" }]}
+            />
           </div>
-          <select
+          <Select
             value={selectedGranteeId}
-            onChange={(e) => setGranteeId(e.target.value)}
-            className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-          >
-            {granteeType === "group" ? (
-              availableGroups.length === 0 ? (
-                <option value="">No groups available</option>
-              ) : (
-                availableGroups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))
-              )
-            ) : availableUsers.length === 0 ? (
-              <option value="">No users available</option>
-            ) : (
-              availableUsers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.email})
-                </option>
-              ))
-            )}
-          </select>
+            onChange={setGranteeId}
+            options={
+              granteeType === "group"
+                ? availableGroups.length === 0
+                  ? [{ value: "", label: "No groups available" }]
+                  : availableGroups.map((g) => ({ value: g.id, label: g.name }))
+                : availableUsers.length === 0
+                  ? [{ value: "", label: "No users available" }]
+                  : availableUsers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))
+            }
+          />
           <Button
             type="submit"
             variant="primary"
