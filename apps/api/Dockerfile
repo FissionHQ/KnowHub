@@ -10,7 +10,9 @@ COPY packages/config/package.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
 COPY packages/doc-collab/package.json ./packages/doc-collab/
 
-RUN pnpm install --frozen-lockfile --filter @wiki/api...
+# --ignore-scripts: the root postinstall/prepare scripts run turbo builds,
+# which need turbo.json and sources that aren't copied at this stage.
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @wiki/api...
 
 # ─── Stage 2: build ────────────────────────────────────────────────────────────
 FROM deps AS builder

@@ -8,7 +8,9 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/types/package.json ./packages/types/
 COPY packages/doc-collab/package.json ./packages/doc-collab/
 
-RUN pnpm install --frozen-lockfile --filter @wiki/web...
+# --ignore-scripts: the root postinstall/prepare scripts run turbo builds,
+# which need turbo.json and sources that aren't copied at this stage.
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @wiki/web...
 
 # ─── Stage 2: build ────────────────────────────────────────────────────────────
 FROM deps AS builder

@@ -9,7 +9,9 @@ COPY packages/types/package.json ./packages/types/
 COPY packages/config/package.json ./packages/config/
 COPY packages/db/package.json ./packages/db/
 
-RUN pnpm install --frozen-lockfile --filter @wiki/search...
+# --ignore-scripts: the root postinstall/prepare scripts run turbo builds,
+# which need turbo.json and sources that aren't copied at this stage.
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @wiki/search...
 
 # ─── Stage 2: build ────────────────────────────────────────────────────────────
 FROM deps AS builder
