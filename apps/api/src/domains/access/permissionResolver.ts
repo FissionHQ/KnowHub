@@ -4,6 +4,21 @@ import { eq, and, inArray } from "drizzle-orm";
 import type { AccessLevel, UserRole } from "@wiki/types";
 import { ForbiddenError } from "../../lib/errors.js";
 
+export type DocumentVisibility = "inherit" | "restricted";
+
+/** Loads a document's visibility mode (defaults to "inherit" if the row is missing). */
+async function loadDocumentVisibility(
+  db: Db,
+  documentId: string,
+): Promise<DocumentVisibility> {
+  const rows = await db
+    .select({ visibility: documents.visibility })
+    .from(documents)
+    .where(eq(documents.id, documentId))
+    .limit(1);
+  return (rows[0]?.visibility as DocumentVisibility | undefined) ?? "inherit";
+}
+
 export interface PermissionCheck {
   db: Db;
   userRole: UserRole;
@@ -65,58 +80,75 @@ function resolveRestrictedDocumentAccess(
   return capForViewer(opts.userRole, level);
 }
 
-async function resolveInheritedDocumentAccess(
+/**
+ * Additive access (visibility = "inherit"):
+ * effective access = space-inherited access UNION document overrides, taking the highest level.
+ * Overrides only ever ADD access (extra people or view->edit); they never restrict, so an
+ * individual share sits "on top of" the group-based space defaults.
+ */
+async function resolveAdditiveDocumentAccess(
   opts: PermissionCheck & { spaceId: string; ownerId: string },
+  allDocPerms: DocPermRow[],
 ): Promise<AccessLevel> {
   if (opts.userId === opts.ownerId) return capForViewer(opts.userRole, "edit");
 
-  await resolveSpaceAccess({
-    db: opts.db,
-    userRole: opts.userRole,
-    userId: opts.userId,
-    groupIds: opts.groupIds,
-    spaceId: opts.spaceId,
-  });
+  const levels: AccessLevel[] = [];
 
-  if (opts.userRole === "viewer") return "view";
+  // Document-level overrides matching this user (individual share or group share).
+  const userOverride = allDocPerms.find((row) => row.userId === opts.userId);
+  if (userOverride) levels.push(userOverride.accessLevel);
+  for (const row of allDocPerms) {
+    if (row.groupId && opts.groupIds.includes(row.groupId)) levels.push(row.accessLevel);
+  }
 
-  const spaceRows = await opts.db
-    .select({
-      groupId: spacePermissions.groupId,
-      accessLevel: spacePermissions.accessLevel,
-    })
-    .from(spacePermissions)
-    .where(
-      and(
-        eq(spacePermissions.spaceId, opts.spaceId),
-        inArray(spacePermissions.groupId, opts.groupIds),
-      ),
-    );
+  // Inherited space access — unlike resolveInheritedDocumentAccess this does NOT throw when
+  // absent, because doc overrides alone may still grant access.
+  if (opts.groupIds.length) {
+    const spaceRows = await opts.db
+      .select({ accessLevel: spacePermissions.accessLevel })
+      .from(spacePermissions)
+      .where(
+        and(
+          eq(spacePermissions.spaceId, opts.spaceId),
+          inArray(spacePermissions.groupId, opts.groupIds),
+        ),
+      );
+    for (const row of spaceRows) levels.push(row.accessLevel);
+  }
 
-  if (!spaceRows.length) throw new ForbiddenError();
+  if (!levels.length) throw new ForbiddenError();
 
-  return spaceRows.some((r) => r.accessLevel === "edit") ? "edit" : "view";
+  return capForViewer(opts.userRole, levels.some((l) => l === "edit") ? "edit" : "view");
 }
 
 /**
- * Resolves effective document access.
+ * Resolves effective document access based on the document's visibility mode.
  *
- * - No document overrides: inherit parent space group ACL (default-deny without space access).
- * - With document overrides: only listed groups/users (+ owner, admin) may access; space
- *   membership alone is not enough.
+ * - "inherit" (default): additive — space-inherited access UNION document overrides.
+ * - "restricted": whitelist — only listed groups/users (+ owner, admin); space membership
+ *   alone is not enough.
+ *
+ * `visibility` may be supplied by the caller (which usually already has the doc row); if
+ * omitted it is loaded from the database.
  */
 export async function resolveDocumentAccess(
-  opts: PermissionCheck & { documentId: string; spaceId: string; ownerId: string },
+  opts: PermissionCheck & {
+    documentId: string;
+    spaceId: string;
+    ownerId: string;
+    visibility?: DocumentVisibility;
+  },
 ): Promise<AccessLevel> {
   if (opts.userRole === "admin") return "edit";
 
   const allDocPerms = await loadDocumentPermissions(opts.db, opts.documentId);
+  const visibility = opts.visibility ?? (await loadDocumentVisibility(opts.db, opts.documentId));
 
-  if (allDocPerms.length) {
+  if (visibility === "restricted") {
     return resolveRestrictedDocumentAccess(opts, allDocPerms);
   }
 
-  return resolveInheritedDocumentAccess(opts);
+  return resolveAdditiveDocumentAccess(opts, allDocPerms);
 }
 
 export async function resolveSpaceAccess(
@@ -198,18 +230,28 @@ export async function filterViewableDocuments<
     permsByDoc.set(row.documentId, list);
   }
 
+  // Batch-load visibility so we do not query per document.
+  const visRows = await opts.db
+    .select({ id: documents.id, visibility: documents.visibility })
+    .from(documents)
+    .where(inArray(documents.id, docIds));
+  const visibilityByDoc = new Map<string, DocumentVisibility>();
+  for (const row of visRows) {
+    visibilityByDoc.set(row.id, (row.visibility as DocumentVisibility) ?? "inherit");
+  }
+
   const visible: T[] = [];
   for (const doc of docs) {
     const docPerms = permsByDoc.get(doc.id) ?? [];
+    const visibility = visibilityByDoc.get(doc.id) ?? "inherit";
     try {
-      if (docPerms.length) {
+      if (visibility === "restricted") {
         resolveRestrictedDocumentAccess({ ...opts, ownerId: doc.ownerId }, docPerms);
       } else {
-        await resolveInheritedDocumentAccess({
-          ...opts,
-          spaceId: doc.spaceId,
-          ownerId: doc.ownerId,
-        });
+        await resolveAdditiveDocumentAccess(
+          { ...opts, spaceId: doc.spaceId, ownerId: doc.ownerId },
+          docPerms,
+        );
       }
       visible.push(doc);
     } catch {
@@ -250,7 +292,12 @@ export function assertCanGrantDocumentPermissionToUser(opts: {
  * Viewers cannot mutate content.
  */
 export async function assertCanMutateDocumentContent(
-  opts: PermissionCheck & { documentId: string; spaceId: string; ownerId: string },
+  opts: PermissionCheck & {
+    documentId: string;
+    spaceId: string;
+    ownerId: string;
+    visibility?: DocumentVisibility;
+  },
 ): Promise<void> {
   if (opts.userRole === "admin") return;
   if (opts.userRole === "viewer") throw new ForbiddenError();
@@ -264,6 +311,7 @@ export async function assertCanMutateDocumentContent(
     documentId: opts.documentId,
     spaceId: opts.spaceId,
     ownerId: opts.ownerId,
+    ...(opts.visibility !== undefined ? { visibility: opts.visibility } : {}),
     required: "edit",
   });
 }
@@ -273,6 +321,7 @@ export async function assertDocumentAccess(
     documentId: string;
     spaceId: string;
     ownerId: string;
+    visibility?: DocumentVisibility;
     required: AccessLevel;
   },
 ): Promise<void> {

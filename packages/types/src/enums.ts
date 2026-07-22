@@ -8,6 +8,8 @@ export type DocumentType = "page" | "pdf";
 
 export type DocumentStatus = "draft" | "published" | "trashed";
 
+export type DocumentVisibility = "inherit" | "restricted";
+
 export type ScanStatus = "pending" | "scanning" | "clean" | "infected" | "error";
 
 export type AuditAction =

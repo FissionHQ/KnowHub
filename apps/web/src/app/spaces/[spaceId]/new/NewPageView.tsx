@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { documentsApi } from "@/lib/api";
+import useSWR from "swr";
+import { documentsApi, spacesApi } from "@/lib/api";
+import type { Space } from "@wiki/types";
 import { Button, Card, CardContent, Skeleton } from "@heroui/react";
 
 interface Props {
@@ -12,8 +14,18 @@ interface Props {
 export function NewPageView({ spaceId }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const { data: space, isLoading } = useSWR<Space>(
+    `space:${spaceId}`,
+    () => spacesApi.get(spaceId),
+  );
 
   useEffect(() => {
+    if (isLoading || !space) return;
+    if (space.accessLevel !== "edit") {
+      setError("You need edit access to create pages in this space.");
+      return;
+    }
+
     let cancelled = false;
 
     async function createPage() {
@@ -40,7 +52,7 @@ export function NewPageView({ spaceId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [spaceId, router]);
+  }, [spaceId, router, space, isLoading]);
 
   if (error) {
     return (

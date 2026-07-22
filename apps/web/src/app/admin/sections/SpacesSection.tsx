@@ -16,10 +16,11 @@ export function SpacesSection() {
   const [description, setDescription] = useState("");
   const [iconEmoji, setIconEmoji] = useState("📄");
   const [groupId, setGroupId] = useState("");
-  const [accessLevel, setAccessLevel] = useState<AccessLevel>("edit");
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>("view");
   const [submitting, setSubmitting] = useState(false);
 
-  const defaultGroupId = groupId || groups[0]?.id || "";
+  const defaultGroup = groups.find((g) => g.isDefault) ?? groups[0];
+  const defaultGroupId = groupId || defaultGroup?.id || "";
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -230,17 +231,17 @@ function SpaceRow({
               No groups assigned. Add a group to grant access.
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
               {activePermissions.map((perm) => (
                 <li
                   key={perm.groupId}
                   className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white dark:bg-zinc-900 text-sm"
                 >
-                  <span className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                    <Users size={14} className="text-zinc-400" />
+                  <span className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300 min-w-0 truncate">
+                    <Users size={14} className="text-zinc-400 shrink-0" />
                     {perm.groupName}
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Select
                       value={perm.accessLevel}
                       onChange={(v) =>
@@ -253,7 +254,7 @@ function SpaceRow({
                         )
                       }
                       options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]}
-                      className="h-8 w-24"
+                      className="h-8 w-28"
                     />
                     <Button
                       variant="secondary"

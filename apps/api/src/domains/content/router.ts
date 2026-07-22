@@ -57,6 +57,7 @@ const updateDocSchema = z.object({
   tags: z.array(z.string()).optional(),
   status: z.enum(["draft", "published"]).optional(),
   restrictDownload: z.boolean().optional(),
+  visibility: z.enum(["inherit", "restricted"]).optional(),
   publish: z.boolean().optional(),
 });
 
@@ -267,6 +268,7 @@ export function createContentRouter(
         version: documents.version,
         tags: documents.tags,
         restrictDownload: documents.restrictDownload,
+        visibility: documents.visibility,
         createdAt: documents.createdAt,
         updatedAt: documents.updatedAt,
       })
@@ -286,6 +288,7 @@ export function createContentRouter(
       documentId: doc.id,
       spaceId: doc.spaceId,
       ownerId: doc.ownerId,
+      visibility: doc.visibility,
       required: "view",
     });
 
@@ -297,6 +300,7 @@ export function createContentRouter(
       documentId: doc.id,
       spaceId: doc.spaceId,
       ownerId: doc.ownerId,
+      visibility: doc.visibility,
     });
 
     res.json({ data: { ...doc, accessLevel } });
@@ -334,7 +338,8 @@ export function createContentRouter(
     const hasMetadata =
       body.data.tags !== undefined ||
       body.data.status !== undefined ||
-      body.data.restrictDownload !== undefined;
+      body.data.restrictDownload !== undefined ||
+      body.data.visibility !== undefined;
 
     const titleWillChange =
       hasTitle && isTitleChanged(doc.title, body.data.title!);
@@ -351,11 +356,15 @@ export function createContentRouter(
       tags?: string[];
       status?: "draft" | "published";
       restrictDownload?: boolean;
+      visibility?: "inherit" | "restricted";
       updatedAt?: Date;
     } = {};
     if (body.data.tags !== undefined) metadataUpdates.tags = body.data.tags;
     if (body.data.restrictDownload !== undefined) {
       metadataUpdates.restrictDownload = body.data.restrictDownload;
+    }
+    if (body.data.visibility !== undefined) {
+      metadataUpdates.visibility = body.data.visibility;
     }
     if (body.data.status !== undefined && !publishing) {
       metadataUpdates.status = body.data.status;

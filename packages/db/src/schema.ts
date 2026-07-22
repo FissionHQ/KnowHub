@@ -20,6 +20,7 @@ export const userStatusEnum = pgEnum("user_status", ["active", "invited", "deact
 export const accessLevelEnum = pgEnum("access_level", ["view", "edit"]);
 export const documentTypeEnum = pgEnum("document_type", ["page", "pdf"]);
 export const documentStatusEnum = pgEnum("document_status", ["draft", "published", "trashed"]);
+export const documentVisibilityEnum = pgEnum("document_visibility", ["inherit", "restricted"]);
 export const scanStatusEnum = pgEnum("scan_status", [
   "pending",
   "scanning",
@@ -162,6 +163,12 @@ export const documents = pgTable(
     version: integer("version").notNull().default(1),
     tags: text("tags").array().notNull().default([]),
     restrictDownload: boolean("restrict_download").notNull().default(false),
+    /**
+     * Access model for the document:
+     * - inherit (default): effective access = space-inherited access UNION doc overrides (additive).
+     * - restricted: whitelist — only doc overrides (+ owner + admin); space inheritance ignored.
+     */
+    visibility: documentVisibilityEnum("visibility").notNull().default("inherit"),
     trashedAt: timestamp("trashed_at", { withTimezone: true }),
     /** draft | published — preserved when moved to trash for restore */
     statusBeforeTrash: documentStatusEnum("status_before_trash"),

@@ -3,15 +3,17 @@ import type { Db } from "@wiki/db";
 import { spacePermissions, documentPermissions } from "@wiki/db";
 
 /**
- * Denormalized search ACL.
- * - No document overrides: all space groups (+ owner) may discover the document.
- * - With overrides: only listed groups/users (+ owner) — hides from other space members.
+ * Denormalized search ACL. Must mirror resolveDocumentAccess so search results match page access.
+ * - visibility "inherit" (default): union of space groups + document-override groups/users (+ owner).
+ * - visibility "restricted": only document-override groups/users (+ owner) — hidden from other
+ *   space members.
  */
 export async function resolveIndexAcl(
   db: Db,
   documentId: string,
   spaceId: string,
   ownerId: string,
+  visibility: "inherit" | "restricted" = "inherit",
 ): Promise<{ aclGroupIds: string[]; aclUserIds: string[] }> {
   const docPerm = await db
     .select({ groupId: documentPermissions.groupId, userId: documentPermissions.userId })
@@ -24,12 +26,10 @@ export async function resolveIndexAcl(
       ...docPerm.filter((r) => r.userId).map((r) => r.userId!),
     ]),
   ];
+  const docGroupIds = docPerm.filter((r) => r.groupId).map((r) => r.groupId!);
 
-  if (docPerm.length) {
-    const aclGroupIds = [
-      ...new Set(docPerm.filter((r) => r.groupId).map((r) => r.groupId!)),
-    ];
-    return { aclGroupIds, aclUserIds };
+  if (visibility === "restricted") {
+    return { aclGroupIds: [...new Set(docGroupIds)], aclUserIds };
   }
 
   const spacePerm = await db
@@ -37,6 +37,6 @@ export async function resolveIndexAcl(
     .from(spacePermissions)
     .where(eq(spacePermissions.spaceId, spaceId));
 
-  const aclGroupIds = [...new Set(spacePerm.map((r) => r.groupId))];
+  const aclGroupIds = [...new Set([...spacePerm.map((r) => r.groupId), ...docGroupIds])];
   return { aclGroupIds, aclUserIds };
 }

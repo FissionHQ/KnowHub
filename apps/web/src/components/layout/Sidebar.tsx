@@ -123,11 +123,17 @@ export function Sidebar() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      if (space.accessLevel !== "edit") return;
                       const rect = e.currentTarget.getBoundingClientRect();
                       setMenuPos({ top: rect.bottom + 4, left: rect.left });
                       setSpaceMenu(spaceMenu === space.id ? null : space.id);
                     }}
-                    className="shrink-0 opacity-0 group-hover/space:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
+                    className={clsx(
+                      "shrink-0 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded",
+                      space.accessLevel === "edit"
+                        ? "opacity-0 group-hover/space:opacity-100"
+                        : "hidden",
+                    )}
                     title="More options"
                   >
                     <MoreHorizontal size={12} />
@@ -135,7 +141,12 @@ export function Sidebar() {
                 </div>
 
                 {/* Doc tree — only for the active space */}
-                {isActive && <SpaceDocTree spaceId={space.id} />}
+                {isActive && (
+                  <SpaceDocTree
+                    spaceId={space.id}
+                    canEdit={space.accessLevel === "edit"}
+                  />
+                )}
               </div>
             );
           })}

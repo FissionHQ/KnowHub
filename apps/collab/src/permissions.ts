@@ -1,7 +1,21 @@
 import type { Db } from "@wiki/db";
-import { documentPermissions, spacePermissions } from "@wiki/db";
+import { documentPermissions, documents, spacePermissions } from "@wiki/db";
 import { eq, and, inArray } from "drizzle-orm";
 import type { AccessLevel, UserRole } from "@wiki/types";
+
+type DocumentVisibility = "inherit" | "restricted";
+
+async function loadDocumentVisibility(
+  db: Db,
+  documentId: string,
+): Promise<DocumentVisibility> {
+  const rows = await db
+    .select({ visibility: documents.visibility })
+    .from(documents)
+    .where(eq(documents.id, documentId))
+    .limit(1);
+  return (rows[0]?.visibility as DocumentVisibility | undefined) ?? "inherit";
+}
 
 export interface PermissionCheck {
   db: Db;
@@ -64,51 +78,60 @@ function resolveRestrictedDocumentAccess(
   return capForViewer(opts.userRole, level);
 }
 
-async function resolveInheritedDocumentAccess(
+/**
+ * Additive access (visibility = "inherit"): space-inherited access UNION document overrides,
+ * taking the highest level. Overrides only add access; they never restrict.
+ */
+async function resolveAdditiveDocumentAccess(
   opts: PermissionCheck & { spaceId: string; ownerId: string },
+  allDocPerms: DocPermRow[],
 ): Promise<AccessLevel> {
   if (opts.userId === opts.ownerId) return capForViewer(opts.userRole, "edit");
 
-  await resolveSpaceAccess({
-    db: opts.db,
-    userRole: opts.userRole,
-    userId: opts.userId,
-    groupIds: opts.groupIds,
-    spaceId: opts.spaceId,
-  });
+  const levels: AccessLevel[] = [];
 
-  if (opts.userRole === "viewer") return "view";
+  const userOverride = allDocPerms.find((row) => row.userId === opts.userId);
+  if (userOverride) levels.push(userOverride.accessLevel);
+  for (const row of allDocPerms) {
+    if (row.groupId && opts.groupIds.includes(row.groupId)) levels.push(row.accessLevel);
+  }
 
-  const spaceRows = await opts.db
-    .select({
-      groupId: spacePermissions.groupId,
-      accessLevel: spacePermissions.accessLevel,
-    })
-    .from(spacePermissions)
-    .where(
-      and(
-        eq(spacePermissions.spaceId, opts.spaceId),
-        inArray(spacePermissions.groupId, opts.groupIds),
-      ),
-    );
+  if (opts.groupIds.length) {
+    const spaceRows = await opts.db
+      .select({ accessLevel: spacePermissions.accessLevel })
+      .from(spacePermissions)
+      .where(
+        and(
+          eq(spacePermissions.spaceId, opts.spaceId),
+          inArray(spacePermissions.groupId, opts.groupIds),
+        ),
+      );
+    for (const row of spaceRows) levels.push(row.accessLevel);
+  }
 
-  if (!spaceRows.length) throw new ForbiddenError();
+  if (!levels.length) throw new ForbiddenError();
 
-  return spaceRows.some((r) => r.accessLevel === "edit") ? "edit" : "view";
+  return capForViewer(opts.userRole, levels.some((l) => l === "edit") ? "edit" : "view");
 }
 
 export async function resolveDocumentAccess(
-  opts: PermissionCheck & { documentId: string; spaceId: string; ownerId: string },
+  opts: PermissionCheck & {
+    documentId: string;
+    spaceId: string;
+    ownerId: string;
+    visibility?: DocumentVisibility;
+  },
 ): Promise<AccessLevel> {
   if (opts.userRole === "admin") return "edit";
 
   const allDocPerms = await loadDocumentPermissions(opts.db, opts.documentId);
+  const visibility = opts.visibility ?? (await loadDocumentVisibility(opts.db, opts.documentId));
 
-  if (allDocPerms.length) {
+  if (visibility === "restricted") {
     return resolveRestrictedDocumentAccess(opts, allDocPerms);
   }
 
-  return resolveInheritedDocumentAccess(opts);
+  return resolveAdditiveDocumentAccess(opts, allDocPerms);
 }
 
 export async function resolveSpaceAccess(

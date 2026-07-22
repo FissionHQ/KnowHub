@@ -6,8 +6,9 @@ import { documentsApi, groupsApi, usersApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { AccessLevel, User, UserRole } from "@wiki/types";
 import { Button, Skeleton } from "@heroui/react";
-import { Users, User as UserIcon } from "lucide-react";
+import { Users, User as UserIcon, Globe, Lock } from "lucide-react";
 import { Select } from "@/components/ui/Select";
+import type { DocumentVisibility } from "@wiki/types";
 
 function canGrantDocumentPermissionToUser(
   actorRole: UserRole,
@@ -31,13 +32,33 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
   const [granteeId, setGranteeId] = useState("");
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("view");
   const [submitting, setSubmitting] = useState(false);
+  const [savingVisibility, setSavingVisibility] = useState(false);
 
   const { data, error, mutate, isLoading } = useSWR(
     `doc-perms:${documentId}`,
     () => documentsApi.listPermissions(documentId),
   );
+  // Shares the same SWR key as DocumentView so the document view stays in sync.
+  const { data: doc, mutate: mutateDoc } = useSWR(
+    `doc:${documentId}`,
+    () => documentsApi.get(documentId),
+  );
   const { data: groups = [] } = useSWR("groups", groupsApi.list);
   const { data: users = [] } = useSWR("users", usersApi.list);
+
+  const visibility: DocumentVisibility = doc?.visibility ?? "inherit";
+  const isRestricted = visibility === "restricted";
+
+  async function handleVisibilityChange(next: DocumentVisibility) {
+    if (next === visibility || savingVisibility) return;
+    setSavingVisibility(true);
+    try {
+      const updated = await documentsApi.update(documentId, { visibility: next });
+      await mutateDoc(updated, false);
+    } finally {
+      setSavingVisibility(false);
+    }
+  }
 
   if (error) return null;
 
@@ -100,6 +121,30 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
     <div className="p-5 space-y-6">
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
+          Access mode
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          <VisibilityOption
+            active={!isRestricted}
+            disabled={savingVisibility}
+            icon={<Globe size={15} />}
+            title="Inherit"
+            description="Everyone with space access can view. Shares below add extra people."
+            onSelect={() => handleVisibilityChange("inherit")}
+          />
+          <VisibilityOption
+            active={isRestricted}
+            disabled={savingVisibility}
+            icon={<Lock size={15} />}
+            title="Restricted"
+            description="Only the people and groups listed below (plus owner and admins)."
+            onSelect={() => handleVisibilityChange("restricted")}
+          />
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
           Inherited from space
         </h3>
         {data.inherited.length === 0 ? (
@@ -123,8 +168,9 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
           </ul>
         )}
         <p className="text-xs text-zinc-400 mt-2">
-          Without overrides, everyone with space access can see this document. Adding an
-          override restricts visibility to only the listed groups or users.
+          {isRestricted
+            ? "This document is restricted, so inherited space access does not apply — only the overrides below grant access."
+            : "Everyone with space access can view this document. Overrides below grant additional access on top of this."}
         </p>
       </section>
 
@@ -134,8 +180,9 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
         </h3>
         {data.overrides.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
-            No document-specific permissions. Add an override to restrict visibility or
-            grant access to a specific group or user.
+            {isRestricted
+              ? "No one is listed yet. Add a group or user below to grant them access to this restricted document."
+              : "No document-specific permissions. Add an override to grant a specific group or user extra access on top of the space defaults."}
           </p>
         ) : (
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden mb-3">
@@ -238,6 +285,48 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
         </form>
       </section>
     </div>
+  );
+}
+
+function VisibilityOption({
+  active,
+  disabled,
+  icon,
+  title,
+  description,
+  onSelect,
+}: {
+  active: boolean;
+  disabled: boolean;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={onSelect}
+      className={`flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors disabled:opacity-60 ${
+        active
+          ? "border-[#f25011] bg-orange-50 dark:bg-orange-950/30"
+          : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900"
+      }`}
+    >
+      <span
+        className={`inline-flex items-center gap-1.5 text-sm font-medium ${
+          active ? "text-[#f25011]" : "text-zinc-700 dark:text-zinc-200"
+        }`}
+      >
+        {icon}
+        {title}
+      </span>
+      <span className="text-xs text-zinc-500 dark:text-zinc-400 leading-snug">
+        {description}
+      </span>
+    </button>
   );
 }
 

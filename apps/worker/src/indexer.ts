@@ -50,6 +50,7 @@ export class Indexer {
       documentId,
       doc.spaceId,
       doc.ownerId,
+      doc.visibility,
     );
 
     const searchable = await resolveSearchIndexContent(this.db, doc);

@@ -186,6 +186,7 @@ export class PdfProcessor {
       documentId,
       doc.spaceId,
       doc.ownerId,
+      doc.visibility,
     );
 
     const viewCount = await resolveDocumentViewCount(this.db, documentId);
