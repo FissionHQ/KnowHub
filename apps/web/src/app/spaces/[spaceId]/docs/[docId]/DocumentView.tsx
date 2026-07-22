@@ -130,13 +130,13 @@ export function DocumentView({ spaceId, docId }: Props) {
     const timer = setTimeout(() => {
       setUseFallbackEditor((prev) => {
         if (prev) return prev;
-        if (collab.status !== "connected") return true;
+        if (collab.status !== "connected" && !collab.provider) return true;
         return prev;
       });
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
+  }, [doc?.id, doc?.type, useFallbackEditor, collab.status, collab.provider]);
 
   useEffect(() => {
     if (useFallbackEditor) return;
@@ -220,13 +220,7 @@ export function DocumentView({ spaceId, docId }: Props) {
 
   const currentDoc = doc;
   const showPageEditor = isEditableDoc(currentDoc) && Boolean(user);
-  const showCollab =
-    showPageEditor &&
-    !useFallbackEditor &&
-    collab.status === "connected" &&
-    Boolean(collab.provider);
-  const showConnecting = showPageEditor && authLoading;
-  const showFallback = showPageEditor && !showCollab && !showConnecting;
+  const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const isConnected = showFallback ? true : collab.status === "connected";
 
@@ -235,7 +229,7 @@ export function DocumentView({ spaceId, docId }: Props) {
     if (showFallback) {
       return { title: trimmedTitle, content };
     }
-    if (showCollab) {
+    if (collab.provider && collab.ydoc) {
       try {
         return { title: trimmedTitle, content: ydocToHtml(collab.ydoc) };
       } catch {
@@ -409,32 +403,30 @@ export function DocumentView({ spaceId, docId }: Props) {
               </CardContent>
             </Card>
           )
-        ) : showCollab && collab.provider ? (
-          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-            <CollaborativeEditor
-              ydoc={collab.ydoc}
-              provider={collab.provider}
-              readOnly={!canEdit}
-              documentId={docId}
-            />
-          </div>
-        ) : showConnecting ? (
-          <Card>
-            <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
-              <Clock size={18} className="animate-pulse" />
-              <span className="text-sm">Loading…</span>
-            </CardContent>
-          </Card>
-        ) : showFallback ? (
-          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-            <RichTextEditor
-              content={content}
-              onChange={setContent}
-              {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
-              readOnly={!canEdit}
-              title={doc.title}
-              documentId={docId}
-            />
+        ) : showPageEditor ? (
+          <div className="relative">
+            {collab.provider && collab.ydoc && !useFallbackEditor ? (
+              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+                <CollaborativeEditor
+                  key={collab.ydoc.clientID}
+                  ydoc={collab.ydoc}
+                  provider={collab.provider}
+                  readOnly={!canEdit}
+                  documentId={docId}
+                />
+              </div>
+            ) : showFallback ? (
+              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+                <RichTextEditor
+                  content={content}
+                  onChange={setContent}
+                  {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
+                  readOnly={!canEdit}
+                  title={doc.title}
+                  documentId={docId}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
