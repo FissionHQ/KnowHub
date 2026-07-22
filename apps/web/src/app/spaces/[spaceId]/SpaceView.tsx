@@ -257,6 +257,7 @@ export function SpaceView({ spaceId }: Props) {
         <PagePreviewPanel
           spaceId={spaceId}
           docId={previewDocId}
+          open={Boolean(previewDocId)}
           onClose={() => setPreviewDocId(null)}
         />
       )}

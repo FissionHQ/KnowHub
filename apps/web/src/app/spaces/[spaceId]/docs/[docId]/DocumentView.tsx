@@ -446,7 +446,7 @@ export function DocumentView({ spaceId, docId }: Props) {
         <div className="fixed inset-0 z-40" onClick={() => setCommentsOpen(false)} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[48%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-[30%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
           commentsOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

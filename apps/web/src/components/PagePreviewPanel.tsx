@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { X, ExternalLink, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { ExternalLink, CheckCircle2, AlertCircle, Clock, ChevronRight } from "lucide-react";
 import { Card, CardContent, Skeleton } from "@heroui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
@@ -30,10 +30,11 @@ function isEditableDoc(doc: Pick<Document, "type" | "contentRef">) {
 interface Props {
   spaceId: string;
   docId: string;
+  open: boolean;
   onClose: () => void;
 }
 
-export function PagePreviewPanel({ spaceId, docId, onClose }: Props) {
+export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
   const { user, loading: authLoading } = useAuth();
   const { data: doc, mutate } = useSWR<Document>(`doc:${docId}`, () => documentsApi.get(docId));
 
@@ -141,21 +142,30 @@ export function PagePreviewPanel({ spaceId, docId, onClose }: Props) {
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      {open && <div className="fixed inset-0 z-40" onClick={onClose} />}
 
-      {/* Slide-in panel */}
-      <div className="fixed top-0 right-0 h-full w-[60%] min-w-[480px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl">
-
+      <div
+        className={`fixed top-0 right-0 h-full w-[60%] min-w-[480px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
           <button
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Close preview"
           >
-            <X size={16} />
+            <ChevronRight size={18} />
           </button>
+          <div className="flex items-center gap-2">
+            {doc && (
+              <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100 truncate max-w-[200px]">
+                {doc.title}
+              </span>
+            )}
+          </div>
           <div className="flex-1" />
           {doc && isEditableDoc(doc) && user && (
             <SaveIndicator status={activeSaveStatus} connected={isConnected} />
