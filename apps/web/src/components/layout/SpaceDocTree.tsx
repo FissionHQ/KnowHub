@@ -17,9 +17,10 @@ interface NodeProps {
   spaceId: string;
   depth: number;
   mutate: () => void;
+  canEdit: boolean;
 }
 
-function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
+function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -160,17 +161,20 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
         )}
 
         {/* + new subpage */}
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={creating}
-          title="New sub-page"
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
-        >
-          <Plus size={12} />
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={creating}
+            title="New sub-page"
+            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
+          >
+            <Plus size={12} />
+          </button>
+        )}
 
         {/* ⋯ context menu */}
+        {canEdit && (
         <button
           ref={btnRef}
           type="button"
@@ -186,6 +190,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
         >
           <MoreHorizontal size={12} />
         </button>
+        )}
 
         {menuOpen && typeof window !== "undefined" && createPortal(
           <div
@@ -237,6 +242,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
               spaceId={spaceId}
               depth={depth + 1}
               mutate={mutate}
+              canEdit={canEdit}
             />
           ))}
         </div>
@@ -247,9 +253,10 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
 
 interface Props {
   spaceId: string;
+  canEdit?: boolean;
 }
 
-export function SpaceDocTree({ spaceId }: Props) {
+export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
   const router = useRouter();
   const { data: docs = [], mutate } = useSWR<Document[]>(
     `space:${spaceId}:docs`,
@@ -280,16 +287,19 @@ export function SpaceDocTree({ spaceId }: Props) {
           spaceId={spaceId}
           depth={0}
           mutate={mutate}
+          canEdit={canEdit}
         />
       ))}
-      <button
-        type="button"
-        onClick={handleNewRootPage}
-        className="flex items-center gap-1.5 px-3 py-1.5 mt-0.5 w-full text-left text-[12px] text-zinc-500 hover:text-[#f25011] hover:bg-white/10 rounded-md transition-colors"
-      >
-        <Plus size={11} />
-        New page
-      </button>
+      {canEdit && (
+        <button
+          type="button"
+          onClick={handleNewRootPage}
+          className="flex items-center gap-1.5 px-3 py-1.5 mt-0.5 w-full text-left text-[12px] text-zinc-500 hover:text-[#f25011] hover:bg-white/10 rounded-md transition-colors"
+        >
+          <Plus size={11} />
+          New page
+        </button>
+      )}
     </div>
   );
 }

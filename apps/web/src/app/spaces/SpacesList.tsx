@@ -172,6 +172,7 @@ export function SpacesList() {
             </Link>
 
             {/* 3-dot menu button */}
+            {space.accessLevel === "edit" && (
             <button
               type="button"
               onClick={(e) => {
@@ -184,9 +185,10 @@ export function SpacesList() {
             >
               <MoreVertical size={14} />
             </button>
+            )}
 
             {/* Dropdown menu */}
-            {menuOpen === space.id && (
+            {menuOpen === space.id && space.accessLevel === "edit" && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(null)} />
                 <div className="absolute top-10 right-3 z-30 w-44 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]">

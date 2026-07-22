@@ -138,20 +138,23 @@ export function UserGroupChips({
             ) : (
               filteredGroups.map((group) => {
                 const isMember = memberGroupIds.has(group.id);
+                const lockedDefault = group.isDefault && isMember;
                 return (
                   <li key={group.id}>
                     <button
                       type="button"
-                      disabled={disabled}
+                      disabled={disabled || lockedDefault}
                       onClick={() => onToggle(group.id, isMember)}
                       className={clsx(
                         "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors",
                         "hover:bg-zinc-50 dark:hover:bg-zinc-800/80",
-                        disabled && "opacity-50",
+                        (disabled || lockedDefault) && "opacity-50",
+                        lockedDefault && "cursor-not-allowed",
                       )}
                     >
                       <span className="truncate font-medium text-zinc-800 dark:text-zinc-200">
                         {group.name}
+                        {group.isDefault ? " (default)" : ""}
                       </span>
                       <span
                         className={clsx(
@@ -161,7 +164,7 @@ export function UserGroupChips({
                             : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
                         )}
                       >
-                        {isMember ? "In" : "Add"}
+                        {lockedDefault ? "Required" : isMember ? "In" : "Add"}
                       </span>
                     </button>
                   </li>

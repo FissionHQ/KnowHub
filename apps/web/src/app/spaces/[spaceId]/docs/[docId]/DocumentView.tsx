@@ -14,7 +14,7 @@ import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
-import { ydocToHtml } from "@wiki/doc-collab";
+import { htmlToYdoc, ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
 import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import * as Y from "yjs";
 
 const PdfViewer = dynamic(
   () => import("@/components/pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -41,6 +42,10 @@ const PdfViewer = dynamic(
 );
 
 type SaveStatus = "saved" | "saving" | "unsaved";
+
+function isHtmlEmpty(html: string): boolean {
+  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length === 0;
+}
 
 /** Attachment-backed PDFs have no HTML body; imported PDFs store converted HTML. */
 function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef">): boolean {
@@ -77,6 +82,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
+  const collabSeededDocId = useRef<string | null>(null);
 
   function refreshDocAndVersions() {
     void mutate();
@@ -111,6 +117,7 @@ export function DocumentView({ spaceId, docId }: Props) {
     if (!doc) return;
     if (loadedDocId.current === doc.id) return;
     loadedDocId.current = doc.id;
+    collabSeededDocId.current = null;
     setContent(doc.contentRef ?? "");
     setTitle(doc.title);
     setUseFallbackEditor(false);
@@ -136,13 +143,50 @@ export function DocumentView({ spaceId, docId }: Props) {
     const timer = setTimeout(() => {
       setUseFallbackEditor((prev) => {
         if (prev) return prev;
-        if (collab.status !== "connected") return true;
+        // Fall back if still connecting, or connected but provider never arrived.
+        if (collab.status !== "connected" || !collab.provider) return true;
         return prev;
       });
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
+  }, [doc?.id, doc?.type, useFallbackEditor, collab.status, collab.provider]);
+
+  /** If Yjs is empty after connect, seed from API HTML so the editor isn't blank. */
+  useEffect(() => {
+    if (!doc || useFallbackEditor) return;
+    if (collab.status !== "connected" || !collab.provider) return;
+    if (collabSeededDocId.current === doc.id) return;
+
+    const seedIfEmpty = () => {
+      if (collabSeededDocId.current === doc.id) return;
+      collabSeededDocId.current = doc.id;
+      try {
+        const current = ydocToHtml(collab.ydoc);
+        if (!isHtmlEmpty(current)) return;
+        const html = doc.contentRef ?? "";
+        if (isHtmlEmpty(html)) return;
+        const seed = htmlToYdoc(html);
+        Y.applyUpdate(collab.ydoc, Y.encodeStateAsUpdate(seed));
+      } catch {
+        // ignore — fallback editor still available on timeout
+      }
+    };
+
+    if (collab.provider.isSynced) {
+      seedIfEmpty();
+      return;
+    }
+
+    const onSynced = () => seedIfEmpty();
+    collab.provider.on("synced", onSynced);
+    // Also seed after a short delay in case "synced" never fires.
+    const backup = setTimeout(seedIfEmpty, 500);
+    return () => {
+      collab.provider?.off("synced", onSynced);
+      clearTimeout(backup);
+    };
+  }, [doc, useFallbackEditor, collab.status, collab.provider, collab.ydoc]);
 
   useEffect(() => {
     if (useFallbackEditor) return;
@@ -231,8 +275,13 @@ export function DocumentView({ spaceId, docId }: Props) {
     !useFallbackEditor &&
     collab.status === "connected" &&
     Boolean(collab.provider);
-  const showConnecting = showPageEditor && authLoading;
-  const showFallback = showPageEditor && !showCollab && !showConnecting;
+  // Only wait while auth/collab are still connecting — never block on sync forever.
+  const waitingForCollab =
+    showPageEditor &&
+    !useFallbackEditor &&
+    !showCollab &&
+    (authLoading || collab.status === "connecting");
+  const showFallback = showPageEditor && !showCollab && !waitingForCollab;
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const isConnected = showFallback ? true : collab.status === "connected";
 
@@ -424,7 +473,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               documentId={docId}
             />
           </div>
-        ) : showConnecting ? (
+        ) : waitingForCollab ? (
           <Card>
             <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
               <Clock size={18} className="animate-pulse" />

@@ -25,7 +25,9 @@ const IDS = {
   org: "11111111-1111-1111-1111-111111111111",
   admin: "22222222-2222-2222-2222-222222222222",
   member: "44444444-4444-4444-4444-444444444444",
+  viewer: "77777777-7777-7777-7777-777777777777",
   group: "33333333-3333-3333-3333-333333333333",
+  editors: "33333333-3333-3333-3333-333333333334",
   spaces: {
     engineering: "55555555-5555-5555-5555-555555555501",
     product: "55555555-5555-5555-5555-555555555502",
@@ -84,19 +86,40 @@ async function main() {
       status: "active",
       passwordHash: hashPassword(DEV_PASSWORD),
     },
+    {
+      id: IDS.viewer,
+      orgId: IDS.org,
+      email: "viewer@localhost",
+      name: "Test Viewer",
+      role: "viewer",
+      status: "active",
+      passwordHash: hashPassword(DEV_PASSWORD),
+    },
   ]);
 
-  await db.insert(groups).values({
-    id: IDS.group,
-    orgId: IDS.org,
-    name: "Everyone",
-    description: "Default group for all users",
-    isDefault: true,
-  });
+  await db.insert(groups).values([
+    {
+      id: IDS.group,
+      orgId: IDS.org,
+      name: "Everyone",
+      description: "Default group for all users",
+      isDefault: true,
+    },
+    {
+      id: IDS.editors,
+      orgId: IDS.org,
+      name: "Editors",
+      description: "Can create and edit pages in Engineering and Product",
+      isDefault: false,
+    },
+  ]);
 
   await db.insert(groupMemberships).values([
     { userId: IDS.admin, groupId: IDS.group },
     { userId: IDS.member, groupId: IDS.group },
+    { userId: IDS.viewer, groupId: IDS.group },
+    { userId: IDS.admin, groupId: IDS.editors },
+    { userId: IDS.member, groupId: IDS.editors },
   ]);
 
   console.log("Inserting spaces...");
@@ -127,10 +150,13 @@ async function main() {
     },
   ]);
 
+  // Everyone gets view by default; Editors get edit on Eng/Product.
   await db.insert(spacePermissions).values([
-    { spaceId: IDS.spaces.engineering, groupId: IDS.group, accessLevel: "edit" },
-    { spaceId: IDS.spaces.product, groupId: IDS.group, accessLevel: "edit" },
+    { spaceId: IDS.spaces.engineering, groupId: IDS.group, accessLevel: "view" },
+    { spaceId: IDS.spaces.product, groupId: IDS.group, accessLevel: "view" },
     { spaceId: IDS.spaces.hr, groupId: IDS.group, accessLevel: "view" },
+    { spaceId: IDS.spaces.engineering, groupId: IDS.editors, accessLevel: "edit" },
+    { spaceId: IDS.spaces.product, groupId: IDS.editors, accessLevel: "edit" },
   ]);
 
   console.log("Inserting documents...");
@@ -210,8 +236,10 @@ async function main() {
   console.log("Organization: Acme Corp (subdomain: acme)");
   console.log("Admin user:   admin@localhost");
   console.log("Member user:  member@localhost");
-  console.log(`Dev password: ${DEV_PASSWORD} (both users)`);
-  console.log("Spaces:       Engineering, Product, People & HR");
+  console.log("Viewer user:  viewer@localhost");
+  console.log(`Dev password: ${DEV_PASSWORD}`);
+  console.log("Groups:       Everyone (default members), Editors (edit on Eng/Product)");
+  console.log("Spaces:       Engineering, Product, People & HR (Everyone starts with view)");
   console.log("Documents:    5 sample pages");
   console.log(`Collab WS URL:  written to apps/web/.env.local`);
   console.log("\nSign in at http://localhost:3000/login");

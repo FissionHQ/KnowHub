@@ -87,6 +87,7 @@ export function SpaceView({ spaceId }: Props) {
   const visible = flatDocs.slice(0, visibleCount);
   const hasMore = visibleCount < flatDocs.length;
   const remaining = flatDocs.length - visibleCount;
+  const canEdit = space?.accessLevel === "edit";
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -115,37 +116,41 @@ export function SpaceView({ spaceId }: Props) {
             </div>
           </>
         )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.txt,.md"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleImport(file);
-            e.target.value = "";
-          }}
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          className="shrink-0 flex items-center gap-1.5"
-          onPress={() => fileInputRef.current?.click()}
-          isDisabled={importing}
-        >
-          <Upload size={14} />
-          {importing ? "Importing…" : "Import"}
-        </Button>
-        <Link href={`/spaces/${spaceId}/new` as never}>
-          <Button
-            variant="primary"
-            size="sm"
-            className="shrink-0 flex items-center gap-1.5 bg-[#f25011] text-white hover:bg-[#e0470f] active:bg-[#cf400d] transition-colors duration-200"
-          >
-            <Plus size={14} />
-            New Page
-          </Button>
-        </Link>
+        {canEdit && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.md"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImport(file);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shrink-0 flex items-center gap-1.5"
+              onPress={() => fileInputRef.current?.click()}
+              isDisabled={importing}
+            >
+              <Upload size={14} />
+              {importing ? "Importing…" : "Import"}
+            </Button>
+            <Link href={`/spaces/${spaceId}/new` as never}>
+              <Button
+                variant="primary"
+                size="sm"
+                className="shrink-0 flex items-center gap-1.5 bg-[#f25011] text-white hover:bg-[#e0470f] active:bg-[#cf400d] transition-colors duration-200"
+              >
+                <Plus size={14} />
+                New Page
+              </Button>
+            </Link>
+          </>
+        )}
       </div>
 
       <Separator className="mb-6" />
@@ -175,13 +180,17 @@ export function SpaceView({ spaceId }: Props) {
         <Card>
           <CardContent className="py-16 flex flex-col items-center gap-3 text-zinc-400 dark:text-zinc-500 p-5">
             <FileText size={40} className="opacity-30" />
-            <p className="text-sm">No documents yet. Create the first page.</p>
-            <Link href={`/spaces/${spaceId}/new` as never}>
-              <Button variant="secondary" size="sm" className="flex items-center gap-1.5 mt-1">
-                <Plus size={14} />
-                New Page
-              </Button>
-            </Link>
+            <p className="text-sm">
+              {canEdit ? "No documents yet. Create the first page." : "No documents in this space yet."}
+            </p>
+            {canEdit && (
+              <Link href={`/spaces/${spaceId}/new` as never}>
+                <Button variant="secondary" size="sm" className="flex items-center gap-1.5 mt-1">
+                  <Plus size={14} />
+                  New Page
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       ) : (

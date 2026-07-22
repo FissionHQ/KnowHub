@@ -177,20 +177,22 @@ export function GroupsSection() {
                               <Chip size="sm" variant="secondary" className="text-xs capitalize">
                                 {member.userStatus}
                               </Chip>
-                              <button
-                                type="button"
-                                disabled={busyKey === `${group.id}:${member.userId}`}
-                                onClick={() =>
-                                  handleRemoveMember(group.id, member.userId, member.userName)
-                                }
-                                className={clsx(
-                                  "p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors",
-                                  busyKey === `${group.id}:${member.userId}` && "opacity-50",
-                                )}
-                                aria-label={`Remove ${member.userName}`}
-                              >
-                                <X size={14} />
-                              </button>
+                              {!group.isDefault && (
+                                <button
+                                  type="button"
+                                  disabled={busyKey === `${group.id}:${member.userId}`}
+                                  onClick={() =>
+                                    handleRemoveMember(group.id, member.userId, member.userName)
+                                  }
+                                  className={clsx(
+                                    "p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors",
+                                    busyKey === `${group.id}:${member.userId}` && "opacity-50",
+                                  )}
+                                  aria-label={`Remove ${member.userName}`}
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
                             </div>
                           </li>
                         ))}

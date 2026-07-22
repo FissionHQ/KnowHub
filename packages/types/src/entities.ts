@@ -3,6 +3,7 @@ import type {
   AuditAction,
   DocumentStatus,
   DocumentType,
+  DocumentVisibility,
   ScanStatus,
   UserRole,
   UserStatus,
@@ -57,6 +58,8 @@ export interface Space {
   iconEmoji?: string;
   createdBy: string;
   createdAt: Date;
+  /** Effective access for the current user (from space group ACL). */
+  accessLevel?: AccessLevel;
 }
 
 export interface SpacePermission {
@@ -82,6 +85,8 @@ export interface Document {
   updatedAt: Date;
   tags: string[];
   restrictDownload: boolean;
+  /** Access model: "inherit" (additive with space ACL) or "restricted" (whitelist). */
+  visibility: DocumentVisibility;
   trashedAt?: Date;
   /** Present on GET /documents/:id — effective access for the current user */
   accessLevel?: AccessLevel;

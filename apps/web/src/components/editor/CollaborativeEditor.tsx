@@ -63,7 +63,8 @@ export function CollaborativeEditor({
         },
       },
     },
-    [ydoc, provider, readOnly],
+    // Do not remount on readOnly — remounting clears the visible editor while Yjs rebinds.
+    [ydoc, provider],
   );
 
   useEffect(() => {

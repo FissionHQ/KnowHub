@@ -5,9 +5,11 @@ import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
 import { spaces, spacePermissions, groups, documents } from "@wiki/db";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../lib/errors.js";
-import { assertSpaceAccess } from "../access/permissionResolver.js";
+import { resolveSpaceAccess } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
 import { logger } from "../../lib/logger.js";
+import { ensureDefaultGroup } from "../access/defaultGroup.js";
+import type { AccessLevel } from "@wiki/types";
 import type { SQSClient } from "@aws-sdk/client-sqs";
 import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import type { SearchIndexMessage } from "@wiki/types";
@@ -78,17 +80,30 @@ export function createNavigationRouter(db: Db, sqs: SQSClient, indexQueueUrl: st
         .select()
         .from(spaces)
         .where(eq(spaces.orgId, orgId));
-      return res.json({ data: rows });
+      return res.json({
+        data: rows.map((row) => ({ ...row, accessLevel: "edit" as AccessLevel })),
+      });
     }
 
     if (!groupIds.length) return res.json({ data: [] });
 
     const accessible = await db
-      .select({ spaceId: spacePermissions.spaceId })
+      .select({
+        spaceId: spacePermissions.spaceId,
+        accessLevel: spacePermissions.accessLevel,
+      })
       .from(spacePermissions)
       .where(inArray(spacePermissions.groupId, groupIds));
 
-    const spaceIds = [...new Set(accessible.map((r) => r.spaceId))];
+    const levelBySpace = new Map<string, AccessLevel>();
+    for (const row of accessible) {
+      const prev = levelBySpace.get(row.spaceId);
+      if (!prev || (row.accessLevel === "edit" && prev === "view")) {
+        levelBySpace.set(row.spaceId, row.accessLevel);
+      }
+    }
+
+    const spaceIds = [...levelBySpace.keys()];
     if (!spaceIds.length) return res.json({ data: [] });
 
     const rows = await db
@@ -96,7 +111,13 @@ export function createNavigationRouter(db: Db, sqs: SQSClient, indexQueueUrl: st
       .from(spaces)
       .where(and(eq(spaces.orgId, orgId), inArray(spaces.id, spaceIds)));
 
-    res.json({ data: rows });
+    const capView = userRole === "viewer";
+    res.json({
+      data: rows.map((row) => ({
+        ...row,
+        accessLevel: (capView ? "view" : levelBySpace.get(row.id) ?? "view") as AccessLevel,
+      })),
+    });
   });
 
   // POST /spaces
@@ -119,15 +140,19 @@ export function createNavigationRouter(db: Db, sqs: SQSClient, indexQueueUrl: st
       })
       .returning();
 
-    if (body.data.groupPermissions.length) {
-      await db.insert(spacePermissions).values(
-        body.data.groupPermissions.map((p) => ({
-          spaceId,
-          groupId: p.groupId,
-          accessLevel: p.accessLevel,
-        })),
-      );
+    let groupPermissions = body.data.groupPermissions;
+    if (!groupPermissions.length) {
+      const defaultGroupId = await ensureDefaultGroup(db, req.tenant.orgId);
+      groupPermissions = [{ groupId: defaultGroupId, accessLevel: "view" }];
     }
+
+    await db.insert(spacePermissions).values(
+      groupPermissions.map((p) => ({
+        spaceId,
+        groupId: p.groupId,
+        accessLevel: p.accessLevel,
+      })),
+    );
 
     await recordAudit(db, {
       orgId: req.tenant.orgId,
@@ -136,26 +161,26 @@ export function createNavigationRouter(db: Db, sqs: SQSClient, indexQueueUrl: st
       target: {
         spaceId,
         name: body.data.name,
-        groupPermissions: body.data.groupPermissions,
+        groupPermissions,
       },
       req,
     });
 
-    if (body.data.groupPermissions.length) {
-      await recordAudit(db, {
-        orgId: req.tenant.orgId,
-        actorId: req.tenant.userId,
-        action: "space.permission_change",
-        target: {
-          spaceId,
-          groupPermissions: body.data.groupPermissions,
-          operation: "initial",
-        },
-        req,
-      });
-    }
+    await recordAudit(db, {
+      orgId: req.tenant.orgId,
+      actorId: req.tenant.userId,
+      action: "space.permission_change",
+      target: {
+        spaceId,
+        groupPermissions,
+        operation: "initial",
+      },
+      req,
+    });
 
-    res.status(201).json({ data: inserted[0] });
+    res.status(201).json({
+      data: { ...inserted[0], accessLevel: "edit" as AccessLevel },
+    });
   });
 
   // GET /spaces/:spaceId
@@ -163,13 +188,12 @@ export function createNavigationRouter(db: Db, sqs: SQSClient, indexQueueUrl: st
     const { orgId, userRole, userId, groupIds } = req.tenant;
     const { spaceId } = req.params;
 
-    await assertSpaceAccess({
+    const accessLevel = await resolveSpaceAccess({
       db,
       userRole,
       userId,
       groupIds,
       spaceId: spaceId ?? "",
-      required: "view",
     });
 
     const rows = await db
@@ -178,7 +202,7 @@ export function createNavigationRouter(db: Db, sqs: SQSClient, indexQueueUrl: st
       .where(and(eq(spaces.id, spaceId ?? ""), eq(spaces.orgId, orgId)));
 
     if (!rows.length) throw new NotFoundError("Space");
-    res.json({ data: rows[0] });
+    res.json({ data: { ...rows[0], accessLevel } });
   });
 
   // GET /spaces/:spaceId/permissions — space group ACL (admin only)

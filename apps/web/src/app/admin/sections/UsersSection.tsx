@@ -31,6 +31,9 @@ export function UsersSection() {
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
 
   async function toggleUserGroup(userId: string, groupId: string, isMember: boolean) {
+    const group = groups.find((g) => g.id === groupId);
+    if (isMember && group?.isDefault) return;
+
     setBusyUserId(userId);
     try {
       if (isMember) {
@@ -126,11 +129,16 @@ export function UsersSection() {
             </Button>
           </form>
           {groups.length > 0 && (
-            <GroupSelectChips
-              groups={groups}
-              selectedIds={groupIds}
-              onToggle={toggleGroup}
-            />
+            <>
+              <p className="mt-3 text-xs text-zinc-500">
+                Everyone (default) is always included. Optionally add more groups below.
+              </p>
+              <GroupSelectChips
+                groups={groups.filter((g) => !g.isDefault)}
+                selectedIds={groupIds}
+                onToggle={toggleGroup}
+              />
+            </>
           )}
           {lastInviteUrl && (
             <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900">
