@@ -169,8 +169,8 @@ export function AuditLogSection() {
   const [category, setCategory] = useState<Category>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from] = useState("");
+  const [to] = useState("");
 
   const { entries, total, isLoading, allFiltered } = useEntries(category, search, page, from, to);
   const totalPages = Math.ceil(total / PAGE_SIZE);

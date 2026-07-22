@@ -1,6 +1,5 @@
 import type {
   Document,
-  DocumentVersion,
   Comment,
   Space,
   Group,

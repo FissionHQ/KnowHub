@@ -17,7 +17,7 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
-import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
+import { Chip, Skeleton, Card, CardContent } from "@heroui/react";
 import {
   CheckCircle2,
   Clock,
@@ -77,12 +77,6 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
-
-  function refreshDocAndVersions() {
-    void mutate();
-    void globalMutate(`doc-versions:${docId}`);
-    void globalMutate("recently-updated");
-  }
 
   const { data: favData, mutate: mutateFav } = useSWR(
     doc && user ? `fav:${docId}` : null,
