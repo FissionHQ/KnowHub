@@ -40,6 +40,7 @@ export function RichTextEditor({
   readOnly = false,
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDirty = useRef(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -62,18 +63,22 @@ export function RichTextEditor({
       if (readOnly) return;
       const html = editor.getHTML();
       onChange(html);
+      isDirty.current = true;
 
       // Auto-save debounce
       if (onAutoSave) {
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-        autoSaveTimer.current = setTimeout(() => onAutoSave(html), autoSaveMs);
+        autoSaveTimer.current = setTimeout(() => {
+          isDirty.current = false;
+          onAutoSave(html);
+        }, autoSaveMs);
       }
     },
   });
 
-  // Sync external content changes (e.g. version restore)
+  // Sync external content changes (e.g. version restore) — skip if editor has unsaved changes
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    if (editor && !isDirty.current && content !== editor.getHTML()) {
       editor.commands.setContent(content);
     }
   }, [content, editor]);
