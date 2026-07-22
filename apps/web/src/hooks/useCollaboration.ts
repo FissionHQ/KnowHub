@@ -122,6 +122,12 @@ export function useCollaboration({
             setStatus(next === "connected" ? "connected" : "connecting");
           }
         },
+        onAuthenticationFailed: () => {
+          if (cancelled) return;
+          setStatus("disconnected");
+          // Stop retrying against a permanently rejected auth — fallback editor will take over.
+          collabProvider?.disconnect();
+        },
         onSynced: () => {
           if (!cancelled) setSaveStatus("saved");
         },

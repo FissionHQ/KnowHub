@@ -124,19 +124,22 @@ export function DocumentView({ spaceId, docId }: Props) {
       .catch(() => {});
   }, [doc?.id, docId]);
 
+  // If collab never reaches "connected" (port conflict, auth failure, etc.),
+  // drop to the REST editor so contentRef still renders.
   useEffect(() => {
     if (!doc || !isEditableDoc(doc) || useFallbackEditor) return;
+    if (collab.status === "connected") return;
 
     const timer = setTimeout(() => {
       setUseFallbackEditor((prev) => {
         if (prev) return prev;
-        if (collab.status !== "connected" && !collab.provider) return true;
-        return prev;
+        // Capture may be stale; falling back when still not connected is safe.
+        return true;
       });
-    }, 3000);
+    }, 4000);
 
     return () => clearTimeout(timer);
-  }, [doc?.id, doc?.type, useFallbackEditor, collab.status, collab.provider]);
+  }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
 
   useEffect(() => {
     if (useFallbackEditor) return;
@@ -222,7 +225,9 @@ export function DocumentView({ spaceId, docId }: Props) {
   const showPageEditor = isEditableDoc(currentDoc) && Boolean(user);
   const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
-  const isConnected = showFallback ? true : collab.status === "connected";
+  // Fallback editor is always "online". For collab, only treat a true disconnect as
+  // reconnecting — initial "connecting" should not flash the amber warning.
+  const connectionStatus = showFallback ? "connected" : collab.status;
 
   function getPublishPayload(): { title: string; content?: string } {
     const trimmedTitle = title.trim() || currentDoc.title;
@@ -334,7 +339,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               </button>
             )}
             {isEditableDoc(doc) && user && (
-              <SaveIndicator status={activeSaveStatus} connected={isConnected} />
+              <SaveIndicator status={activeSaveStatus} connectionStatus={connectionStatus} />
             )}
             {canEdit && (
               <DocumentActionsMenu
@@ -701,12 +706,13 @@ function EditorCountInline({
 
 function SaveIndicator({
   status,
-  connected,
+  connectionStatus,
 }: {
   status: SaveStatus;
-  connected: boolean;
+  connectionStatus: "connecting" | "connected" | "disconnected";
 }) {
-  if (!connected) {
+  // Only warn after a real drop. Initial handshake used to look "online" — keep that.
+  if (connectionStatus === "disconnected") {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
         <AlertCircle size={11} />

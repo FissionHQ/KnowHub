@@ -74,14 +74,17 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
 
   useEffect(() => {
     if (!doc || !isEditableDoc(doc) || useFallbackEditor) return;
+    if (collab.status === "connected") return;
+
     const timer = setTimeout(() => {
       setUseFallbackEditor((prev) => {
         if (prev) return prev;
-        return collab.status !== "connected" && !collab.provider ? true : prev;
+        return true;
       });
-    }, 3000);
+    }, 4000);
+
     return () => clearTimeout(timer);
-  }, [doc?.id, doc?.type, useFallbackEditor, collab.status, collab.provider]);
+  }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
 
   useEffect(() => {
     if (useFallbackEditor) return;
@@ -138,7 +141,7 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
   const showPageEditor = Boolean(doc && isEditableDoc(doc) && user);
   const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
-  const isConnected = showFallback ? true : collab.status === "connected";
+  const connectionStatus = showFallback ? "connected" : collab.status;
 
   return (
     <>
@@ -168,7 +171,7 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
           </div>
           <div className="flex-1" />
           {doc && isEditableDoc(doc) && user && (
-            <SaveIndicator status={activeSaveStatus} connected={isConnected} />
+            <SaveIndicator status={activeSaveStatus} connectionStatus={connectionStatus} />
           )}
           <Link
             href={`/spaces/${spaceId}/docs/${docId}`}
@@ -261,8 +264,14 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
   );
 }
 
-function SaveIndicator({ status, connected }: { status: SaveStatus; connected: boolean }) {
-  if (!connected) {
+function SaveIndicator({
+  status,
+  connectionStatus,
+}: {
+  status: SaveStatus;
+  connectionStatus: "connecting" | "connected" | "disconnected";
+}) {
+  if (connectionStatus === "disconnected") {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
         <AlertCircle size={11} />
