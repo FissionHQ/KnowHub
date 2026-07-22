@@ -20,22 +20,22 @@ const FileEmbedSchema = Node.create({
     return {
       attachmentId: {
         default: null,
-        parseHTML: (el: Element) => el.getAttribute("data-attachment-id"),
+        parseHTML: (el: { getAttribute: (n: string) => string | null }) => el.getAttribute("data-attachment-id"),
         renderHTML: (attrs: Record<string, unknown>) => ({ "data-attachment-id": attrs["attachmentId"] }),
       },
       fileName: {
         default: "",
-        parseHTML: (el: Element) => el.getAttribute("data-file-name") ?? "",
+        parseHTML: (el: { getAttribute: (n: string) => string | null }) => el.getAttribute("data-file-name") ?? "",
         renderHTML: (attrs: Record<string, unknown>) => ({ "data-file-name": attrs["fileName"] }),
       },
       fileType: {
         default: "",
-        parseHTML: (el: Element) => el.getAttribute("data-file-type") ?? "",
+        parseHTML: (el: { getAttribute: (n: string) => string | null }) => el.getAttribute("data-file-type") ?? "",
         renderHTML: (attrs: Record<string, unknown>) => ({ "data-file-type": attrs["fileType"] }),
       },
       fileSize: {
         default: 0,
-        parseHTML: (el: Element) => Number(el.getAttribute("data-file-size") ?? 0),
+        parseHTML: (el: { getAttribute: (n: string) => string | null }) => Number(el.getAttribute("data-file-size") ?? 0),
         renderHTML: (attrs: Record<string, unknown>) => ({ "data-file-size": String(attrs["fileSize"]) }),
       },
     };
