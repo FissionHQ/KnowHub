@@ -19,6 +19,9 @@ x-app-env: &app-env
   SQS_PDF_QUEUE_URL: http://localstack:4566/000000000000/wiki-pdf-processing
   SQS_INDEX_QUEUE_URL: http://localstack:4566/000000000000/wiki-search-indexing
   BASE_DOMAIN: localhost
+  # Public web URL used in invite links (and similar emails). Must be the URL
+  # users open in the browser — not an internal compose hostname.
+  APP_URL: ${APP_URL:-http://localhost:3000}
   # Required — set in .env (gitignored); see .env.example
   JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
   # mailhog only runs with the "tools" profile; email sending fails without it.

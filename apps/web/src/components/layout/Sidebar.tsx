@@ -24,25 +24,21 @@ export function Sidebar() {
   const { data: recentlyUpdated = [] } = useSWR<Document[]>(user ? "recently-updated" : null, activityApi.getRecentlyUpdated);
   const { data: favDocs = [] } = useSWR<Document[]>(user ? "favorites" : null, activityApi.getFavorites);
 
-  const [showBookmarks, setShowBookmarks] = useState(true);
-  const [showRecentlyViewed, setShowRecentlyViewed] = useState(true);
-  const [showRecentlyUpdated, setShowRecentlyUpdated] = useState(true);
+  const [showBookmarks, setShowBookmarks] = useState(false);
+  const [showRecentlyViewed, setShowRecentlyViewed] = useState(false);
+  const [showRecentlyUpdated, setShowRecentlyUpdated] = useState(false);
   const [spaceMenu, setSpaceMenu] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-  const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadSpaceRef = useRef<string>("");
 
   async function handleFileImport(spaceId: string, file: File) {
-    setImporting(true);
     setSpaceMenu(null);
     try {
       const doc = await importDocumentFile(spaceId, file);
       router.push(`/spaces/${spaceId}/docs/${doc.id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
-    } finally {
-      setImporting(false);
     }
   }
 
@@ -73,7 +69,7 @@ export function Sidebar() {
           <Zap size={15} color="white" strokeWidth={2.5} />
         </div>
         <Link href="/spaces" className="font-bold text-[15px] tracking-tight" style={{ color: "white" }}>
-          FissionDocs
+          KnowHub
         </Link>
       </div>
 

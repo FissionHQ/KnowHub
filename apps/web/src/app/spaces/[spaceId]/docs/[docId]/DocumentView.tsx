@@ -14,10 +14,10 @@ import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
-import { htmlToYdoc, ydocToHtml } from "@wiki/doc-collab";
+import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
-import { Chip, Skeleton, Card, CardContent, Button } from "@heroui/react";
+import { Chip, Skeleton, Card, CardContent } from "@heroui/react";
 import {
   CheckCircle2,
   Clock,
@@ -34,7 +34,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import * as Y from "yjs";
 
 const PdfViewer = dynamic(
   () => import("@/components/pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -42,10 +41,6 @@ const PdfViewer = dynamic(
 );
 
 type SaveStatus = "saved" | "saving" | "unsaved";
-
-function isHtmlEmpty(html: string): boolean {
-  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length === 0;
-}
 
 /** Attachment-backed PDFs have no HTML body; imported PDFs store converted HTML. */
 function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef">): boolean {
@@ -82,13 +77,6 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
-  const collabSeededDocId = useRef<string | null>(null);
-
-  function refreshDocAndVersions() {
-    void mutate();
-    void globalMutate(`doc-versions:${docId}`);
-    void globalMutate("recently-updated");
-  }
 
   const { data: favData, mutate: mutateFav } = useSWR(
     doc && user ? `fav:${docId}` : null,
@@ -117,7 +105,6 @@ export function DocumentView({ spaceId, docId }: Props) {
     if (!doc) return;
     if (loadedDocId.current === doc.id) return;
     loadedDocId.current = doc.id;
-    collabSeededDocId.current = null;
     setContent(doc.contentRef ?? "");
     setTitle(doc.title);
     setUseFallbackEditor(false);
@@ -143,50 +130,13 @@ export function DocumentView({ spaceId, docId }: Props) {
     const timer = setTimeout(() => {
       setUseFallbackEditor((prev) => {
         if (prev) return prev;
-        // Fall back if still connecting, or connected but provider never arrived.
-        if (collab.status !== "connected" || !collab.provider) return true;
+        if (collab.status !== "connected" && !collab.provider) return true;
         return prev;
       });
     }, 3000);
 
     return () => clearTimeout(timer);
   }, [doc?.id, doc?.type, useFallbackEditor, collab.status, collab.provider]);
-
-  /** If Yjs is empty after connect, seed from API HTML so the editor isn't blank. */
-  useEffect(() => {
-    if (!doc || useFallbackEditor) return;
-    if (collab.status !== "connected" || !collab.provider) return;
-    if (collabSeededDocId.current === doc.id) return;
-
-    const seedIfEmpty = () => {
-      if (collabSeededDocId.current === doc.id) return;
-      collabSeededDocId.current = doc.id;
-      try {
-        const current = ydocToHtml(collab.ydoc);
-        if (!isHtmlEmpty(current)) return;
-        const html = doc.contentRef ?? "";
-        if (isHtmlEmpty(html)) return;
-        const seed = htmlToYdoc(html);
-        Y.applyUpdate(collab.ydoc, Y.encodeStateAsUpdate(seed));
-      } catch {
-        // ignore — fallback editor still available on timeout
-      }
-    };
-
-    if (collab.provider.isSynced) {
-      seedIfEmpty();
-      return;
-    }
-
-    const onSynced = () => seedIfEmpty();
-    collab.provider.on("synced", onSynced);
-    // Also seed after a short delay in case "synced" never fires.
-    const backup = setTimeout(seedIfEmpty, 500);
-    return () => {
-      collab.provider?.off("synced", onSynced);
-      clearTimeout(backup);
-    };
-  }, [doc, useFallbackEditor, collab.status, collab.provider, collab.ydoc]);
 
   useEffect(() => {
     if (useFallbackEditor) return;
@@ -270,18 +220,7 @@ export function DocumentView({ spaceId, docId }: Props) {
 
   const currentDoc = doc;
   const showPageEditor = isEditableDoc(currentDoc) && Boolean(user);
-  const showCollab =
-    showPageEditor &&
-    !useFallbackEditor &&
-    collab.status === "connected" &&
-    Boolean(collab.provider);
-  // Only wait while auth/collab are still connecting — never block on sync forever.
-  const waitingForCollab =
-    showPageEditor &&
-    !useFallbackEditor &&
-    !showCollab &&
-    (authLoading || collab.status === "connecting");
-  const showFallback = showPageEditor && !showCollab && !waitingForCollab;
+  const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const isConnected = showFallback ? true : collab.status === "connected";
 
@@ -290,7 +229,7 @@ export function DocumentView({ spaceId, docId }: Props) {
     if (showFallback) {
       return { title: trimmedTitle, content };
     }
-    if (showCollab) {
+    if (collab.provider && collab.ydoc) {
       try {
         return { title: trimmedTitle, content: ydocToHtml(collab.ydoc) };
       } catch {
@@ -464,32 +403,30 @@ export function DocumentView({ spaceId, docId }: Props) {
               </CardContent>
             </Card>
           )
-        ) : showCollab && collab.provider ? (
-          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-            <CollaborativeEditor
-              ydoc={collab.ydoc}
-              provider={collab.provider}
-              readOnly={!canEdit}
-              documentId={docId}
-            />
-          </div>
-        ) : waitingForCollab ? (
-          <Card>
-            <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
-              <Clock size={18} className="animate-pulse" />
-              <span className="text-sm">Loading…</span>
-            </CardContent>
-          </Card>
-        ) : showFallback ? (
-          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-            <RichTextEditor
-              content={content}
-              onChange={setContent}
-              {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
-              readOnly={!canEdit}
-              title={doc.title}
-              documentId={docId}
-            />
+        ) : showPageEditor ? (
+          <div className="relative">
+            {collab.provider && collab.ydoc && !useFallbackEditor ? (
+              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+                <CollaborativeEditor
+                  key={collab.ydoc.clientID}
+                  ydoc={collab.ydoc}
+                  provider={collab.provider}
+                  readOnly={!canEdit}
+                  documentId={docId}
+                />
+              </div>
+            ) : showFallback ? (
+              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+                <RichTextEditor
+                  content={content}
+                  onChange={setContent}
+                  {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
+                  readOnly={!canEdit}
+                  title={doc.title}
+                  documentId={docId}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -509,7 +446,7 @@ export function DocumentView({ spaceId, docId }: Props) {
         <div className="fixed inset-0 z-40" onClick={() => setCommentsOpen(false)} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[48%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-[30%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
           commentsOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

@@ -36,58 +36,43 @@ export function CollaborativeEditor({
   readOnly = false,
   documentId,
 }: Props) {
-  const editor = useEditor(
-    {
-      immediatelyRender: false,
-      extensions: [
-        StarterKit.configure({ codeBlock: false, history: false }),
-        Placeholder.configure({ placeholder }),
-        Underline,
-        Image,
-        Link.configure({ openOnClick: false }),
-        Table.configure({ resizable: true }),
-        TableRow,
-        TableCell,
-        TableHeader,
-        CodeBlockLowlight.configure({ lowlight }),
-        FileEmbedExtension,
-        Collaboration.configure({
-          document: ydoc,
-          field: "default",
-        }),
-      ],
-      editable: !readOnly,
-      editorProps: {
-        attributes: {
-          class: "prose prose-sm max-w-none focus:outline-none",
-        },
-      },
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({ codeBlock: false, history: false }),
+      Placeholder.configure({ placeholder }),
+      Underline,
+      Image,
+      Link.configure({ openOnClick: false }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      CodeBlockLowlight.configure({ lowlight }),
+      FileEmbedExtension,
+      Collaboration.configure({ document: ydoc, field: "default" }),
+    ],
+    editable: !readOnly,
+    editorProps: {
+      attributes: { class: "prose prose-sm max-w-none focus:outline-none" },
     },
-    // Do not remount on readOnly — remounting clears the visible editor while Yjs rebinds.
-    [ydoc, provider],
-  );
+  });
 
   useEffect(() => {
-    if (editor) {
-      editor.setEditable(!readOnly);
-    }
+    if (editor) editor.setEditable(!readOnly);
   }, [editor, readOnly]);
 
-  if (!editor) {
-    return (
-      <div className="flex items-center justify-center py-16 text-sm text-zinc-400">
-        Loading editor…
-      </div>
-    );
-  }
-
-  const handleInsertImage = (src: string) => {
-    editor.chain().focus().setImage({ src }).run();
-  };
+  if (!editor) return null;
 
   return (
     <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
-      {!readOnly && <EditorToolbar editor={editor} onInsertImage={handleInsertImage} documentId={documentId} />}
+      {!readOnly && (
+        <EditorToolbar
+          editor={editor}
+          onInsertImage={(src) => editor.chain().focus().setImage({ src }).run()}
+          documentId={documentId}
+        />
+      )}
       <EditorContent editor={editor} className="prose prose-sm max-w-none" />
     </div>
   );

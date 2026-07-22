@@ -10,6 +10,16 @@ import { Select } from "@/components/ui/Select";
 
 const ROLES: UserRole[] = ["admin", "member", "viewer"];
 
+/** Prefer the host the admin is browsing; API APP_URL may still be localhost. */
+function publicInviteUrl(apiInviteUrl: string): string {
+  try {
+    const path = new URL(apiInviteUrl).pathname;
+    return `${window.location.origin}${path}`;
+  } catch {
+    return apiInviteUrl;
+  }
+}
+
 export function UsersSection() {
   const { data: users = [], mutate } = useSWR("admin:users", usersApi.list);
   const { data: invites = [], mutate: mutateInvites } = useSWR(
@@ -54,7 +64,7 @@ export function UsersSection() {
     setLastInviteUrl(null);
     try {
       const result = await usersApi.invite({ email, name, role, groupIds });
-      setLastInviteUrl(result.inviteUrl);
+      setLastInviteUrl(publicInviteUrl(result.inviteUrl));
       setEmail("");
       setName("");
       setRole("member");
@@ -83,7 +93,7 @@ export function UsersSection() {
 
   async function resendInvite(userId: string) {
     const result = await usersApi.resendInvite(userId);
-    setLastInviteUrl(result.inviteUrl);
+    setLastInviteUrl(publicInviteUrl(result.inviteUrl));
     await mutateInvites();
   }
 
@@ -189,7 +199,7 @@ export function UsersSection() {
                           variant="secondary"
                           size="sm"
                           onPress={() => {
-                            void navigator.clipboard.writeText(invite.inviteUrl);
+                            void navigator.clipboard.writeText(publicInviteUrl(invite.inviteUrl));
                           }}
                         >
                           Copy link
