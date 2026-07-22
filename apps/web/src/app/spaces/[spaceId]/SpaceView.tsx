@@ -10,6 +10,7 @@ import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/re
 import { FileText, Plus, File, ChevronRight, Upload } from "lucide-react";
 import { importDocumentFile } from "@/lib/importDocument";
 import { SearchPanel } from "@/components/search/SearchPanel";
+import { PagePreviewPanel } from "@/components/PagePreviewPanel";
 
 interface Props { spaceId: string }
 
@@ -73,6 +74,7 @@ export function SpaceView({ spaceId }: Props) {
   }
 
   const [searchActive, setSearchActive] = useState(false);
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
 
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceId}`,
@@ -188,7 +190,15 @@ export function SpaceView({ spaceId }: Props) {
         <>
           <div className="flex flex-col gap-0.5">
             {visible.map(({ doc, depth }) => (
-              <Link key={doc.id} href={`/spaces/${spaceId}/docs/${doc.id}`} className="group block" style={{ paddingLeft: depth * 20 }}>
+              <div
+                key={doc.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setPreviewDocId(doc.id)}
+                onKeyDown={(e) => e.key === "Enter" && setPreviewDocId(doc.id)}
+                className="group block cursor-pointer"
+                style={{ paddingLeft: depth * 20 }}
+              >
                 <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                   {depth > 0 && <ChevronRight size={12} className="text-zinc-400 shrink-0" />}
                   <div
@@ -224,7 +234,7 @@ export function SpaceView({ spaceId }: Props) {
                     )}
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
           {hasMore && (
@@ -241,6 +251,15 @@ export function SpaceView({ spaceId }: Props) {
         </>
       )}
         </>
+      )}
+
+      {previewDocId && (
+        <PagePreviewPanel
+          spaceId={spaceId}
+          docId={previewDocId}
+          open={Boolean(previewDocId)}
+          onClose={() => setPreviewDocId(null)}
+        />
       )}
     </div>
   );

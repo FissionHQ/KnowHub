@@ -39,7 +39,7 @@ export default function LoginForm() {
               <Zap size={18} className="text-white" strokeWidth={2.5} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">FissionDocs</h1>
+              <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">KnowHub</h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">Sign in to your organization</p>
             </div>
           </div>

@@ -201,6 +201,9 @@ export interface UpdateOrgSettingsBody {
 export interface AuditLogQuery {
   limit?: number;
   offset?: number;
+  action?: string;
+  from?: string;
+  to?: string;
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────

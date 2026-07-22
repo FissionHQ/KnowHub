@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 import type { Db } from "@wiki/db";
-import { auditLog, organizations } from "@wiki/db";
+import { auditLog, organizations, users } from "@wiki/db";
 import { ForbiddenError, NotFoundError, ValidationError } from "../../lib/errors.js";
 import { recordAudit } from "../../lib/audit.js";
 
@@ -21,6 +21,14 @@ const orgSettingsSchema = z.object({
 
 export function createAdminRouter(db: Db): Router {
   const router = Router();
+
+  // Strip raw UUIDs and internal fields from audit target before sending to client
+  function sanitizeTarget(target: Record<string, unknown>): Record<string, unknown> {
+    const HIDDEN = new Set(["orgId", "actorId", "userId", "ownerId", "groupId", "permissionId", "attachmentId"]);
+    return Object.fromEntries(
+      Object.entries(target).filter(([k]) => !HIDDEN.has(k)),
+    );
+  }
 
   // All admin routes require admin role
   router.use((req, _res, next) => {
@@ -65,14 +73,31 @@ export function createAdminRouter(db: Db): Router {
     }
 
     const rows = await db
-      .select()
+      .select({
+        id: auditLog.id,
+        orgId: auditLog.orgId,
+        actorId: auditLog.actorId,
+        actorName: users.name,
+        actorEmail: users.email,
+        action: auditLog.action,
+        target: auditLog.target,
+        ipAddress: auditLog.ipAddress,
+        timestamp: auditLog.timestamp,
+      })
       .from(auditLog)
+      .leftJoin(users, eq(auditLog.actorId, users.id))
       .where(and(...conditions))
       .orderBy(desc(auditLog.timestamp))
       .limit(limit)
       .offset(offset);
 
-    res.json({ data: rows });
+    // Strip internal IDs from target before sending to client
+    const sanitized = rows.map(({ actorId: _actorId, orgId: _orgId, ...row }) => ({
+      ...row,
+      target: sanitizeTarget(row.target as Record<string, unknown>),
+    }));
+
+    res.json({ data: sanitized });
   });
 
   // PATCH /admin/settings

@@ -1,6 +1,5 @@
 import type {
   Document,
-  DocumentVersion,
   Comment,
   Space,
   Group,
@@ -272,8 +271,11 @@ export const adminApi = {
     const qs = new URLSearchParams();
     if (params.limit !== undefined) qs.set("limit", String(params.limit));
     if (params.offset !== undefined) qs.set("offset", String(params.offset));
+    if (params.action !== undefined) qs.set("action", params.action);
+    if (params.from !== undefined) qs.set("from", params.from);
+    if (params.to !== undefined) qs.set("to", params.to);
     const query = qs.toString();
-    return apiFetch<AuditLogEntry[]>(
+    return apiFetch<(AuditLogEntry & { actorName?: string; actorEmail?: string })[]>(
       `${BASE}/admin/audit-log${query ? `?${query}` : ""}`,
     );
   },

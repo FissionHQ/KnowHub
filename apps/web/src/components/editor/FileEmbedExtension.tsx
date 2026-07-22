@@ -263,10 +263,26 @@ export const FileEmbedExtension = Node.create({
 
   addAttributes() {
     return {
-      attachmentId: { default: null },
-      fileName: { default: "" },
-      fileType: { default: "" },
-      fileSize: { default: 0 },
+      attachmentId: {
+        default: null,
+        parseHTML: (el: Element) => el.getAttribute("data-attachment-id"),
+        renderHTML: (attrs: Record<string, unknown>) => ({ "data-attachment-id": attrs["attachmentId"] }),
+      },
+      fileName: {
+        default: "",
+        parseHTML: (el: Element) => el.getAttribute("data-file-name") ?? "",
+        renderHTML: (attrs: Record<string, unknown>) => ({ "data-file-name": attrs["fileName"] }),
+      },
+      fileType: {
+        default: "",
+        parseHTML: (el: Element) => el.getAttribute("data-file-type") ?? "",
+        renderHTML: (attrs: Record<string, unknown>) => ({ "data-file-type": attrs["fileType"] }),
+      },
+      fileSize: {
+        default: 0,
+        parseHTML: (el: Element) => Number(el.getAttribute("data-file-size") ?? 0),
+        renderHTML: (attrs: Record<string, unknown>) => ({ "data-file-size": String(attrs["fileSize"]) }),
+      },
     };
   },
 

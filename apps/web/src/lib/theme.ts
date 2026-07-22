@@ -1,6 +1,6 @@
 export type Theme = "light" | "dark";
 
-export const THEME_STORAGE_KEY = "fissiondocs-theme";
+export const THEME_STORAGE_KEY = "knowhub-theme";
 
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;

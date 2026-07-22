@@ -9,7 +9,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "FissionDocs",
+  title: "KnowHub",
   description: "Organizational knowledge base",
   icons: {
     icon: "/favicon.svg",
