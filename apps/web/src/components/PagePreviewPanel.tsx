@@ -36,7 +36,7 @@ interface Props {
 
 export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
   const { user, loading: authLoading } = useAuth();
-  const { data: doc, mutate } = useSWR<Document>(`doc:${docId}`, () => documentsApi.get(docId));
+  const { data: doc, mutate } = useSWR<Document>(docId ? `doc:${docId}` : null, () => documentsApi.get(docId));
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [content, setContent] = useState("");
@@ -55,7 +55,7 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
     userId: user?.id ?? "",
     userName: user?.name ?? "You",
     canEdit,
-    enabled: Boolean(user && doc && isEditableDoc(doc) && !useFallbackEditor),
+    enabled: Boolean(docId && user && doc && isEditableDoc(doc) && !useFallbackEditor),
   });
 
   useEffect(() => {
