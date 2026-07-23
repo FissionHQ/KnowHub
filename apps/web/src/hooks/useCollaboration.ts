@@ -23,6 +23,12 @@ interface Options {
   enabled?: boolean;
 }
 
+interface StablePair {
+  ydoc: Y.Doc;
+  provider: HocuspocusProvider;
+  documentId: string;
+}
+
 function countPresence(
   states: Map<number, Record<string, unknown>>,
   self: { userId: string; canEdit: boolean },
@@ -43,10 +49,7 @@ function countPresence(
     else viewers.add(self.userId);
   }
 
-  return {
-    editors: editors.size,
-    viewers: viewers.size,
-  };
+  return { editors: editors.size, viewers: viewers.size };
 }
 
 export function useCollaboration({
@@ -60,28 +63,31 @@ export function useCollaboration({
   const [status, setStatus] = useState<CollabStatus>("connecting");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [presence, setPresence] = useState<PresenceCounts>({ editors: 0, viewers: 1 });
-  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
-  const ydoc = useMemo(() => new Y.Doc(), [documentId]);
+
+  // stable holds the last successfully synced pair — never cleared on navigation,
+  // so the old editor stays visible while the new one is connecting.
+  const [stable, setStable] = useState<StablePair | null>(null);
+
+  const pendingYdoc = useMemo(() => new Y.Doc(), [documentId]);
   const userColor = useMemo(() => colorForUser(userId), [userId]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canEditRef = useRef(canEdit);
 
-  useEffect(() => {
-    canEditRef.current = canEdit;
-  }, [canEdit]);
+  useEffect(() => { canEditRef.current = canEdit; }, [canEdit]);
 
+  // Sync awareness when stable provider or user identity changes
   useEffect(() => {
-    if (!provider) return;
-    provider.setAwarenessField("user", {
+    if (!stable?.provider) return;
+    stable.provider.setAwarenessField("user", {
       id: userId,
       name: userName,
       color: userColor,
       mode: canEdit ? "edit" : "view",
     } satisfies CollabAwarenessUser);
 
-    const states = provider.awareness?.getStates() ?? new Map();
-    setPresence(countPresence(states, { userId, canEdit }, provider.isConnected));
-  }, [provider, userId, userName, userColor, canEdit]);
+    const states = stable.provider.awareness?.getStates() ?? new Map();
+    setPresence(countPresence(states, { userId, canEdit }, stable.provider.isConnected));
+  }, [stable, userId, userName, userColor, canEdit]);
 
   useEffect(() => {
     if (!enabled || !orgId || !documentId || !userId) {
@@ -109,7 +115,7 @@ export function useCollaboration({
       collabProvider = new HocuspocusProvider({
         url: getCollabWsUrl(),
         name: `${orgId}:${documentId}`,
-        document: ydoc,
+        document: pendingYdoc,
         token,
         onConnect: () => {
           if (!cancelled) setStatus("connected");
@@ -118,23 +124,25 @@ export function useCollaboration({
           if (!cancelled) setStatus("disconnected");
         },
         onStatus: ({ status: next }) => {
-          if (!cancelled) {
-            setStatus(next === "connected" ? "connected" : "connecting");
-          }
+          if (!cancelled) setStatus(next === "connected" ? "connected" : "connecting");
         },
         onAuthenticationFailed: () => {
           if (cancelled) return;
           setStatus("disconnected");
-          // Stop retrying against a permanently rejected auth — fallback editor will take over.
           collabProvider?.disconnect();
         },
         onSynced: () => {
-          if (!cancelled) setSaveStatus("saved");
+          if (cancelled || !collabProvider) return;
+          // Atomically promote pending → stable only after sync
+          setStable({ ydoc: pendingYdoc, provider: collabProvider, documentId });
+          setSaveStatus("saved");
         },
       });
 
       markSynced = () => {
-        if (!cancelled) setSaveStatus("saved");
+        if (cancelled || !collabProvider) return;
+        setStable({ ydoc: pendingYdoc, provider: collabProvider, documentId });
+        setSaveStatus("saved");
       };
 
       collabProvider.on("synced", markSynced);
@@ -158,27 +166,28 @@ export function useCollaboration({
         saveTimer.current = setTimeout(() => setSaveStatus("saved"), 4000);
       };
 
-      ydoc.on("update", onDocUpdate);
-      if (!cancelled) setProvider(collabProvider);
+      pendingYdoc.on("update", onDocUpdate);
     })();
 
     return () => {
       cancelled = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (onDocUpdate) ydoc.off("update", onDocUpdate);
+      if (onDocUpdate) pendingYdoc.off("update", onDocUpdate);
       if (collabProvider) {
         if (markSynced) collabProvider.off("synced", markSynced);
         if (refreshPresence) collabProvider.awareness?.off("change", refreshPresence);
         collabProvider.destroy();
       }
-      setProvider(null);
-      setPresence(canEditRef.current ? { editors: 1, viewers: 0 } : { editors: 0, viewers: 1 });
+      // Do NOT clear stable — keep old editor visible during navigation
     };
-  }, [enabled, orgId, documentId, userId, ydoc]);
+  }, [enabled, orgId, documentId, userId, pendingYdoc]);
+
+  // Expose stable pair if it matches current documentId, else null
+  const currentStable = stable?.documentId === documentId ? stable : null;
 
   return {
-    ydoc,
-    provider,
+    ydoc: currentStable?.ydoc ?? null,
+    provider: currentStable?.provider ?? null,
     status,
     saveStatus,
     presence,

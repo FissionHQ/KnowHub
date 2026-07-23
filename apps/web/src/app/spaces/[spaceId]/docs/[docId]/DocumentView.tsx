@@ -118,11 +118,8 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc?.title]);
 
   useEffect(() => {
-    if (!doc) return;
-    activityApi.recordView(docId)
-      .then(() => globalMutate("recent"))
-      .catch(() => {});
-  }, [doc?.id, docId]);
+    activityApi.recordView(docId).catch(() => {});
+  }, [docId]);
 
   // If collab never reaches "connected" (port conflict, auth failure, etc.),
   // drop to the REST editor so contentRef still renders.
@@ -223,7 +220,7 @@ export function DocumentView({ spaceId, docId }: Props) {
 
   const currentDoc = doc;
   const showPageEditor = isEditableDoc(currentDoc) && Boolean(user);
-  const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading));
+  const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading && !collab.status.startsWith("connect")));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   // Fallback editor is always "online". For collab, only treat a true disconnect as
   // reconnecting — initial "connecting" should not flash the amber warning.

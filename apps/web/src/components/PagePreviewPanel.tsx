@@ -139,7 +139,7 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
   }
 
   const showPageEditor = Boolean(doc && isEditableDoc(doc) && user);
-  const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading));
+  const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading && !collab.status.startsWith("connect")));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const connectionStatus = showFallback ? "connected" : collab.status;
 

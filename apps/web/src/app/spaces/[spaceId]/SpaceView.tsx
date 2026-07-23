@@ -94,6 +94,7 @@ export function SpaceView({ spaceId }: Props) {
   const { data: docs = [], isLoading: docsLoading } = useSWR<Document[]>(
     `space:${spaceId}:docs`,
     () => documentsApi.listBySpace(spaceId),
+    { revalidateOnFocus: false },
   );
 
   const flatDocs = useMemo(() => flattenTree(docs), [docs]);
