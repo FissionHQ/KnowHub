@@ -130,24 +130,39 @@ export const documentsApi = {
   listTrash: () => apiFetch<TrashedDocument[]>(`${BASE}/trash`),
   getVersions: (id: string) =>
     apiFetch<DocumentVersionListItem[]>(`${BASE}/documents/${id}/versions`),
-    restoreVersion: async (id: string, versionNumber: number) => {
-      const res = await fetch(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-  
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: { message: "Unknown error" } }));
-        throw new Error((err as { error?: { message?: string } }).error?.message ?? "Request failed");
-      }
-  
-      const json = (await res.json()) as { data: Document; reloadRequired?: boolean };
-      return { document: json.data, reloadRequired: json.reloadRequired ?? false };
-    },
-    listPermissions: (id: string) =>
+  restoreVersion: async (id: string, versionNumber: number) => {
+    const res = await fetch(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: "Unknown error" } }));
+      throw new Error((err as { error?: { message?: string } }).error?.message ?? "Request failed");
+    }
+
+    const json = (await res.json()) as { data: Document; reloadRequired?: boolean };
+    return { document: json.data, reloadRequired: json.reloadRequired ?? false };
+  },
+  discardDraft: async (id: string) => {
+    const res = await fetch(`${BASE}/documents/${id}/discard-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: "Unknown error" } }));
+      throw new Error((err as { error?: { message?: string } }).error?.message ?? "Request failed");
+    }
+
+    const json = (await res.json()) as { data: Document; reloadRequired?: boolean };
+    return { document: json.data, reloadRequired: json.reloadRequired ?? false };
+  },
+  listPermissions: (id: string) =>
     apiFetch<DocumentPermissionsResponse>(`${BASE}/documents/${id}/permissions`),
   setPermission: (id: string, body: SetDocumentPermissionBody) =>
     apiFetch<DocumentPermissionRecord>(`${BASE}/documents/${id}/permissions`, {

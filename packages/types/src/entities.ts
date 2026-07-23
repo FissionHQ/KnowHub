@@ -74,7 +74,9 @@ export interface Document {
   spaceId: string;
   parentId?: string;
   type: DocumentType;
+  /** Published (or never-published working) title. */
   title: string;
+  /** Published (or never-published working) HTML body. */
   contentRef?: string;
   ownerId: string;
   ownerName?: string;
@@ -90,6 +92,14 @@ export interface Document {
   trashedAt?: Date;
   /** Present on GET /documents/:id — effective access for the current user */
   accessLevel?: AccessLevel;
+  /** True when draft_* differs from published (editors only). */
+  hasUnpublishedChanges?: boolean;
+  /**
+   * Editable title/body for editors: draft when present, else published/working.
+   * Viewers receive the same values as title/contentRef (published only).
+   */
+  editableTitle?: string;
+  editableContentRef?: string;
   /** Present on recently-viewed lists */
   viewedAt?: Date;
   /** Present on recently-updated lists */

@@ -20,6 +20,8 @@ import {
   saveDocumentContent,
   publishDocumentVersion,
   appendRestoredDocumentVersion,
+  discardDocumentDraft,
+  hasUnpublishedChanges,
   isTitleChanged,
   isContentChanged,
 } from "@wiki/db";
@@ -79,6 +81,64 @@ type RestorableDocumentStatus = "draft" | "published";
 
 function restorableStatus(status: string): RestorableDocumentStatus {
   return status === "published" ? "published" : "draft";
+}
+
+type DocRowForClient = {
+  id: string;
+  orgId: string;
+  spaceId: string;
+  parentId: string | null;
+  type: string;
+  title: string;
+  contentRef: string | null;
+  ownerId: string;
+  ownerName?: string | null;
+  status: string;
+  version: number;
+  tags: string[];
+  restrictDownload: boolean;
+  visibility: string;
+  createdAt: Date;
+  updatedAt: Date;
+  draftTitle?: string | null;
+  draftContentRef?: string | null;
+  draftUpdatedAt?: Date | null;
+  draftUpdatedBy?: string | null;
+};
+
+function shapeDocumentResponse(
+  doc: DocRowForClient,
+  accessLevel: "view" | "edit",
+) {
+  const unpublished = hasUnpublishedChanges(doc);
+  const canEdit = accessLevel === "edit";
+  // Prefer draft when present so editors always bind to the working copy.
+  const editableTitle = canEdit
+    ? unpublished
+      ? (doc.draftTitle ?? doc.title)
+      : doc.title
+    : doc.title;
+  const editableContentRef = canEdit
+    ? unpublished
+      ? (doc.draftContentRef ?? doc.contentRef)
+      : doc.contentRef
+    : doc.contentRef;
+
+  const {
+    draftTitle: _dt,
+    draftContentRef: _dc,
+    draftUpdatedAt: _da,
+    draftUpdatedBy: _db,
+    ...rest
+  } = doc;
+
+  return {
+    ...rest,
+    accessLevel,
+    hasUnpublishedChanges: canEdit ? unpublished : false,
+    editableTitle,
+    editableContentRef,
+  };
 }
 
 export function createContentRouter(
@@ -245,7 +305,7 @@ export function createContentRouter(
     await enqueueIndex(docId, orgId, "upsert");
     await recordRecentlyUpdated(db, userId, docId);
 
-    res.status(201).json({ data: inserted[0] });
+    res.status(201).json({ data: shapeDocumentResponse(inserted[0]!, "edit") });
   });
 
   // GET /documents/:documentId
@@ -271,6 +331,10 @@ export function createContentRouter(
         visibility: documents.visibility,
         createdAt: documents.createdAt,
         updatedAt: documents.updatedAt,
+        draftTitle: documents.draftTitle,
+        draftContentRef: documents.draftContentRef,
+        draftUpdatedAt: documents.draftUpdatedAt,
+        draftUpdatedBy: documents.draftUpdatedBy,
       })
       .from(documents)
       .leftJoin(users, eq(documents.ownerId, users.id))
@@ -303,7 +367,58 @@ export function createContentRouter(
       visibility: doc.visibility,
     });
 
-    res.json({ data: { ...doc, accessLevel } });
+    res.json({ data: shapeDocumentResponse(doc, accessLevel) });
+  });
+
+  // POST /documents/:documentId/discard-draft — clear unpublished WIP
+  router.post("/documents/:documentId/discard-draft", async (req, res) => {
+    const { orgId, userRole, userId, groupIds } = req.tenant;
+    const { documentId } = req.params;
+
+    const rows = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+    if (!rows.length) throw new NotFoundError("Document");
+    const doc = rows[0]!;
+
+    if (doc.status === "trashed") {
+      throw new ConflictError("Document is in trash");
+    }
+    if (doc.status !== "published") {
+      throw new ConflictError("Only published documents have an unpublished draft");
+    }
+    if (!hasUnpublishedChanges(doc)) {
+      res.json({ data: shapeDocumentResponse({ ...doc, ownerName: null }, "edit") });
+      return;
+    }
+
+    await assertCanMutateDocumentContent({
+      db, userRole, userId, groupIds,
+      documentId: doc.id,
+      spaceId: doc.spaceId,
+      ownerId: doc.ownerId,
+    });
+
+    await db.transaction(async (tx) => {
+      await setTenantContext(tx, orgId);
+      await discardDocumentDraft(tx, { id: doc.id, orgId: doc.orgId });
+    });
+
+    if (doc.type === "page" || doc.contentRef) {
+      await resetCollabStateAfterContentChange(orgId, documentId ?? "", doc.contentRef ?? "");
+    }
+
+    const refreshed = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+    res.json({
+      data: shapeDocumentResponse({ ...refreshed[0]!, ownerName: null }, "edit"),
+      reloadRequired: true,
+    });
   });
 
   // PATCH /documents/:documentId
@@ -335,20 +450,31 @@ export function createContentRouter(
 
     const hasTitle = body.data.title !== undefined;
     const hasContent = body.data.content !== undefined;
+    const unpublishing =
+      body.data.status === "draft" &&
+      doc.status === "published" &&
+      body.data.publish !== true;
     const hasMetadata =
       body.data.tags !== undefined ||
       body.data.status !== undefined ||
       body.data.restrictDownload !== undefined ||
       body.data.visibility !== undefined;
 
+    // Compare against editable base (draft if present) so re-saving identical draft is a no-op.
+    const hasDraft = hasUnpublishedChanges(doc);
+    const baseTitle = hasDraft ? (doc.draftTitle ?? doc.title) : doc.title;
+    const baseContent = hasDraft
+      ? (doc.draftContentRef ?? doc.contentRef)
+      : doc.contentRef;
+
     const titleWillChange =
-      hasTitle && isTitleChanged(doc.title, body.data.title!);
+      hasTitle && isTitleChanged(baseTitle, body.data.title!);
     const contentWillChange =
-      hasContent && isContentChanged(doc.contentRef, body.data.content!);
+      hasContent && isContentChanged(baseContent, body.data.content!);
     const publishing = body.data.publish === true;
 
     if (!publishing && !titleWillChange && !contentWillChange && !hasMetadata) {
-      res.json({ data: doc });
+      res.json({ data: shapeDocumentResponse(doc, "edit") });
       return;
     }
 
@@ -366,7 +492,8 @@ export function createContentRouter(
     if (body.data.visibility !== undefined) {
       metadataUpdates.visibility = body.data.visibility;
     }
-    if (body.data.status !== undefined && !publishing) {
+    // Unpublish is handled below (promote draft → live); don't set status twice.
+    if (body.data.status !== undefined && !publishing && !unpublishing) {
       metadataUpdates.status = body.data.status;
     }
 
@@ -379,6 +506,9 @@ export function createContentRouter(
         version: doc.version,
         title: doc.title,
         contentRef: doc.contentRef,
+        status: doc.status,
+        draftTitle: doc.draftTitle,
+        draftContentRef: doc.draftContentRef,
       };
 
       if (publishing) {
@@ -388,10 +518,43 @@ export function createContentRouter(
           ...(hasContent ? { contentRef: body.data.content } : {}),
           ...(hasTitle ? { title: body.data.title } : {}),
         });
+      } else if (unpublishing) {
+        const liveTitle = hasTitle
+          ? body.data.title!.trim()
+          : hasDraft
+            ? (doc.draftTitle ?? doc.title)
+            : doc.title;
+        const liveContent = hasContent
+          ? body.data.content!
+          : hasDraft
+            ? (doc.draftContentRef ?? doc.contentRef)
+            : doc.contentRef;
+        await tx
+          .update(documents)
+          .set({
+            title: liveTitle,
+            contentRef: liveContent,
+            status: "draft",
+            draftTitle: null,
+            draftContentRef: null,
+            draftUpdatedAt: null,
+            draftUpdatedBy: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+        if (Object.keys(metadataUpdates).length > 0) {
+          metadataUpdates.updatedAt = new Date();
+          await tx
+            .update(documents)
+            .set(metadataUpdates)
+            .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+        }
       } else {
         if (titleWillChange || contentWillChange) {
           await saveDocumentContent(tx, {
             doc: docRow,
+            editedBy: userId,
             ...(hasTitle ? { nextTitle: body.data.title } : {}),
             ...(hasContent ? { nextContent: body.data.content } : {}),
           });
@@ -418,14 +581,17 @@ export function createContentRouter(
     const draftEditOnPublished =
       doc.status === "published" &&
       !publishing &&
+      !unpublishing &&
       (titleWillChange || contentWillChange);
 
     if (contentOrMetadataChanged && !draftEditOnPublished) {
       await enqueueIndex(documentId ?? "", orgId, "upsert");
       await recordRecentlyUpdated(db, userId, documentId ?? "");
+    } else if (titleWillChange || contentWillChange) {
+      await recordRecentlyUpdated(db, userId, documentId ?? "");
     }
 
-    res.json({ data: updated });
+    res.json({ data: shapeDocumentResponse(updated, "edit") });
   });
 
   // DELETE /documents/:documentId — soft delete (trash)
@@ -664,6 +830,9 @@ export function createContentRouter(
           version: doc.version,
           title: doc.title,
           contentRef: doc.contentRef,
+          status: doc.status,
+          draftTitle: doc.draftTitle,
+          draftContentRef: doc.draftContentRef,
         },
         contentSnapshot: restoredContent,
         titleSnapshot: restoredTitle,
@@ -676,13 +845,14 @@ export function createContentRouter(
       return rows[0]!;
     });
 
-    const newVersion = updated.version;
-
-    if (doc.type === "page" || doc.contentRef) {
+    if (doc.type === "page" || doc.contentRef || restoredContent) {
       await resetCollabStateAfterContentChange(orgId, documentId ?? "", restoredContent);
     }
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    // Published restore lands in draft_* — search still serves the published body.
+    if (doc.status !== "published") {
+      await enqueueIndex(documentId ?? "", orgId, "upsert");
+    }
     await recordRecentlyUpdated(db, userId, documentId ?? "");
 
     await recordAudit(db, {
@@ -692,14 +862,18 @@ export function createContentRouter(
       target: {
         documentId,
         fromVersion: versionNumber,
-        toVersion: newVersion,
+        intoDraft: doc.status === "published",
+        publishedVersion: doc.version,
         title: restoredTitle,
         spaceId: doc.spaceId,
       },
       req,
     });
 
-    res.json({ data: updated, reloadRequired: true });
+    res.json({
+      data: shapeDocumentResponse(updated, "edit"),
+      reloadRequired: true,
+    });
   });
 
   // GET /documents/:documentId/permissions

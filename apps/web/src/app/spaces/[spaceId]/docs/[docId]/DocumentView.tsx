@@ -43,12 +43,22 @@ const PdfViewer = dynamic(
 type SaveStatus = "saved" | "saving" | "unsaved";
 
 /** Attachment-backed PDFs have no HTML body; imported PDFs store converted HTML. */
-function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef">): boolean {
-  return doc.type === "pdf" && !doc.contentRef;
+function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef" | "editableContentRef">): boolean {
+  const body = doc.editableContentRef ?? doc.contentRef;
+  return doc.type === "pdf" && !body;
 }
 
-function isEditableDoc(doc: Pick<Document, "type" | "contentRef">): boolean {
-  return doc.type === "page" || (doc.type === "pdf" && Boolean(doc.contentRef));
+function isEditableDoc(doc: Pick<Document, "type" | "contentRef" | "editableContentRef">): boolean {
+  const body = doc.editableContentRef ?? doc.contentRef;
+  return doc.type === "page" || (doc.type === "pdf" && Boolean(body));
+}
+
+function editorTitle(doc: Document): string {
+  return doc.editableTitle ?? doc.title;
+}
+
+function editorContent(doc: Document): string {
+  return doc.editableContentRef ?? doc.contentRef ?? "";
 }
 
 interface Props {
@@ -98,15 +108,16 @@ export function DocumentView({ spaceId, docId }: Props) {
     userId: user?.id ?? "",
     userName: user?.name ?? "You",
     canEdit,
-    enabled: Boolean(user && doc && isEditableDoc(doc) && !useFallbackEditor),
+    // Viewers must not join the shared draft room — they see published HTML only.
+    enabled: Boolean(user && doc && isEditableDoc(doc) && canEdit && !useFallbackEditor),
   });
 
   useEffect(() => {
     if (!doc) return;
     if (loadedDocId.current === doc.id) return;
     loadedDocId.current = doc.id;
-    setContent(doc.contentRef ?? "");
-    setTitle(doc.title);
+    setContent(editorContent(doc));
+    setTitle(editorTitle(doc));
     setUseFallbackEditor(false);
   }, [doc]);
 
@@ -114,8 +125,8 @@ export function DocumentView({ spaceId, docId }: Props) {
   useEffect(() => {
     if (!doc) return;
     if (titleFocused.current) return;
-    setTitle(doc.title);
-  }, [doc?.title]);
+    setTitle(editorTitle(doc));
+  }, [doc?.editableTitle, doc?.title]);
 
   useEffect(() => {
     activityApi.recordView(docId).catch(() => {});
@@ -219,7 +230,8 @@ export function DocumentView({ spaceId, docId }: Props) {
   }
 
   const currentDoc = doc;
-  const showPageEditor = isEditableDoc(currentDoc) && Boolean(user);
+  const showPageEditor = isEditableDoc(currentDoc) && Boolean(user) && canEdit;
+  const showPublishedReadonly = isEditableDoc(currentDoc) && Boolean(user) && !canEdit;
   const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading && !collab.status.startsWith("connect")));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   // Fallback editor is always "online". For collab, only treat a true disconnect as
@@ -227,7 +239,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   const connectionStatus = showFallback ? "connected" : collab.status;
 
   function getPublishPayload(): { title: string; content?: string } {
-    const trimmedTitle = title.trim() || currentDoc.title;
+    const trimmedTitle = title.trim() || editorTitle(currentDoc);
     if (showFallback) {
       return { title: trimmedTitle, content };
     }
@@ -244,7 +256,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   async function handleTitleBlur() {
     if (!canEdit) return;
     const trimmed = title.trim();
-    if (!trimmed || trimmed === currentDoc.title) return;
+    if (!trimmed || trimmed === editorTitle(currentDoc)) return;
     setSaveStatus("saving");
     try {
       const updated = await documentsApi.update(docId, { title: trimmed });
@@ -255,6 +267,19 @@ export function DocumentView({ spaceId, docId }: Props) {
       setSaveStatus("saved");
     } catch {
       setSaveStatus("unsaved");
+    }
+  }
+
+  async function handleDiscardDraft() {
+    if (!doc?.hasUnpublishedChanges) return;
+    try {
+      const result = await documentsApi.discardDraft(docId);
+      mutate(result.document, false);
+      if (result.reloadRequired) {
+        window.setTimeout(() => window.location.reload(), 400);
+      }
+    } catch {
+      // keep banner; user can retry
     }
   }
 
@@ -291,7 +316,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             </>
           )}
           <span className="text-zinc-700 dark:text-zinc-200 font-medium truncate max-w-[240px]">
-            {doc.title}
+            {canEdit ? title || doc.title : doc.title}
           </span>
         </nav>
 
@@ -335,7 +360,7 @@ export function DocumentView({ spaceId, docId }: Props) {
                 {isFavorited ? "Bookmarked" : "Bookmark"}
               </button>
             )}
-            {isEditableDoc(doc) && user && (
+            {isEditableDoc(doc) && user && canEdit && (
               <SaveIndicator status={activeSaveStatus} connectionStatus={connectionStatus} />
             )}
             {canEdit && (
@@ -354,6 +379,24 @@ export function DocumentView({ spaceId, docId }: Props) {
             )}
           </div>
         </div>
+
+        {canEdit && doc.hasUnpublishedChanges && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+            <span className="flex items-center gap-2 min-w-0">
+              <PenLine size={14} className="shrink-0" />
+              <span className="truncate">
+                Unpublished changes — readers still see the published version until you publish.
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleDiscardDraft()}
+              className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
+            >
+              Discard
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           {doc.tags.length > 0 &&
@@ -385,7 +428,7 @@ export function DocumentView({ spaceId, docId }: Props) {
               <span>Permissions</span>
             </button>
           )}
-          {isEditableDoc(doc) && user && (
+          {isEditableDoc(doc) && user && canEdit && (
             <EditorCountInline presence={collab.presence} status={collab.status} canEdit={canEdit} />
           )}
         </div>
@@ -424,11 +467,21 @@ export function DocumentView({ spaceId, docId }: Props) {
                   onChange={setContent}
                   {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
                   readOnly={!canEdit}
-                  title={doc.title}
+                  title={editorTitle(doc)}
                   documentId={docId}
                 />
               </div>
             ) : null}
+          </div>
+        ) : showPublishedReadonly ? (
+          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+            <RichTextEditor
+              content={doc.contentRef ?? ""}
+              onChange={() => {}}
+              readOnly
+              title={doc.title}
+              documentId={docId}
+            />
           </div>
         ) : null}
       </div>
@@ -635,7 +688,7 @@ function DocumentActionsMenu({
               className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <Globe size={14} />
-              {publishing ? "…" : isPublished ? "Publish new version" : "Publish"}
+              {publishing ? "…" : "Publish"}
             </button>
             {isPublished && (
               <button
