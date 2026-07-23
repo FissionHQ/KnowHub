@@ -12,7 +12,7 @@ import TableHeader from "@tiptap/extension-table-header";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import { useEffect, useRef, useCallback } from "react";
-import { EditorToolbar } from "./EditorToolbar";
+import { BlockMenu } from "./BlockMenu";
 import Underline from "@tiptap/extension-underline";
 import { FileEmbedExtension } from "./FileEmbedExtension";
 
@@ -95,6 +95,7 @@ export function RichTextEditor({
     };
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleInsertImage = useCallback((src: string) => {
     editor?.chain().focus().setImage({ src }).run();
   }, [editor]);
@@ -108,11 +109,11 @@ export function RichTextEditor({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      {!readOnly && <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} documentId={documentId} />}
+    <>
+      {!readOnly && <BlockMenu editor={editor} title={title} documentId={documentId} />}
       <EditorContent
         editor={editor}
-        className="prose prose-sm max-w-none"
+        className="prose prose-sm max-w-none focus:outline-none"
         onMouseDown={(e) => {
           if (!(e.metaKey || e.ctrlKey)) return;
           const target = (e.target as HTMLElement).closest("a");
@@ -122,6 +123,6 @@ export function RichTextEditor({
           }
         }}
       />
-    </div>
+    </>
   );
 }

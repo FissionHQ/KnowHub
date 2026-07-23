@@ -408,18 +408,15 @@ export function DocumentView({ spaceId, docId }: Props) {
         ) : showPageEditor ? (
           <div className="relative">
             {collab.provider && collab.ydoc && !useFallbackEditor ? (
-              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-                <CollaborativeEditor
+              <CollaborativeEditor
                   key={collab.ydoc.clientID}
                   ydoc={collab.ydoc}
                   provider={collab.provider}
                   readOnly={!canEdit}
                   documentId={docId}
                 />
-              </div>
             ) : showFallback ? (
-              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-                <RichTextEditor
+              <RichTextEditor
                   content={content}
                   onChange={setContent}
                   {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
@@ -427,7 +424,6 @@ export function DocumentView({ spaceId, docId }: Props) {
                   title={doc.title}
                   documentId={docId}
                 />
-              </div>
             ) : null}
           </div>
         ) : null}

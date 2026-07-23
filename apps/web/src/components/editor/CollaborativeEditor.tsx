@@ -16,7 +16,7 @@ import { common, createLowlight } from "lowlight";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type * as Y from "yjs";
 import { useEffect } from "react";
-import { EditorToolbar } from "./EditorToolbar";
+import { BlockMenu } from "./BlockMenu";
 import { FileEmbedExtension } from "./FileEmbedExtension";
 
 const lowlight = createLowlight(common);
@@ -65,15 +65,9 @@ export function CollaborativeEditor({
   if (!editor) return null;
 
   return (
-    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
-      {!readOnly && (
-        <EditorToolbar
-          editor={editor}
-          onInsertImage={(src) => editor.chain().focus().setImage({ src }).run()}
-          documentId={documentId}
-        />
-      )}
-      <EditorContent editor={editor} className="prose prose-sm max-w-none" />
-    </div>
+    <>
+      {!readOnly && <BlockMenu editor={editor} documentId={documentId} />}
+      <EditorContent editor={editor} className="prose prose-sm max-w-none focus:outline-none" />
+    </>
   );
 }
