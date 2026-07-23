@@ -261,6 +261,7 @@ export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
   const { data: docs = [], mutate } = useSWR<Document[]>(
     `space:${spaceId}:docs`,
     () => documentsApi.listBySpace(spaceId),
+    { revalidateOnFocus: false },
   );
 
   const idSet = new Set(docs.map((d) => d.id));

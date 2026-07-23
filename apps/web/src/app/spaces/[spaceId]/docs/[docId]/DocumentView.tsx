@@ -118,11 +118,8 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc?.title]);
 
   useEffect(() => {
-    if (!doc) return;
-    activityApi.recordView(docId)
-      .then(() => globalMutate("recent"))
-      .catch(() => {});
-  }, [doc?.id, docId]);
+    activityApi.recordView(docId).catch(() => {});
+  }, [docId]);
 
   // If collab never reaches "connected" (port conflict, auth failure, etc.),
   // drop to the REST editor so contentRef still renders.
