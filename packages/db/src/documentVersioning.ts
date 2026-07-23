@@ -13,6 +13,9 @@ export type VersionedDocRow = {
   version: number;
   title: string;
   contentRef: string | null;
+  status: string;
+  draftTitle?: string | null;
+  draftContentRef?: string | null;
 };
 
 export function isTitleChanged(current: string, next: string): boolean {
@@ -24,33 +27,78 @@ export function isContentChanged(current: string | null, next: string): boolean 
   return contentHash(next) !== previousDigest;
 }
 
-export type BumpVersionInput = {
-  doc: VersionedDocRow;
-  nextTitle?: string | undefined;
-  nextContent?: string | undefined;
-  editedBy: string;
-};
-
-export type BumpVersionResult =
-  | { bumped: false }
-  | { bumped: true; newVersion: number; contentRef: string; title: string };
+export function hasUnpublishedChanges(doc: {
+  draftTitle?: string | null;
+  draftContentRef?: string | null;
+}): boolean {
+  return doc.draftContentRef != null || doc.draftTitle != null;
+}
 
 export type SaveDocumentContentInput = {
   doc: VersionedDocRow;
   nextTitle?: string | undefined;
   nextContent?: string | undefined;
+  editedBy?: string | undefined;
 };
 
 export type SaveDocumentContentResult =
   | { saved: false }
-  | { saved: true; contentRef: string; title: string };
+  | {
+      saved: true;
+      contentRef: string;
+      title: string;
+      /** True when the write landed in draft_* (published page WIP). */
+      wroteDraft: boolean;
+    };
 
-/** Persists title/content without bumping documents.version or creating a snapshot. */
+/**
+ * Persists title/content without bumping documents.version.
+ * - Never-published (status=draft): updates live title/content_ref.
+ * - Published: writes draft_* only; first change seeds draft from published.
+ */
 export async function saveDocumentContent(
   tx: DbOrTx,
   input: SaveDocumentContentInput,
 ): Promise<SaveDocumentContentResult> {
   const { doc } = input;
+  const now = new Date();
+
+  if (doc.status === "published") {
+    const currentDraftTitle = doc.draftTitle ?? null;
+    const currentDraftContent = doc.draftContentRef ?? null;
+    const hasDraft = currentDraftTitle != null || currentDraftContent != null;
+
+    const baseTitle = hasDraft ? (currentDraftTitle ?? doc.title) : doc.title;
+    const baseContent = hasDraft
+      ? (currentDraftContent ?? doc.contentRef ?? "")
+      : (doc.contentRef ?? "");
+
+    const titleUpdates =
+      input.nextTitle !== undefined && isTitleChanged(baseTitle, input.nextTitle);
+    const contentUpdates =
+      input.nextContent !== undefined && isContentChanged(baseContent, input.nextContent);
+
+    if (!titleUpdates && !contentUpdates) {
+      return { saved: false };
+    }
+
+    const draftTitle = input.nextTitle !== undefined ? input.nextTitle.trim() : baseTitle;
+    const draftContentRef =
+      input.nextContent !== undefined ? input.nextContent : baseContent;
+
+    await tx
+      .update(documents)
+      .set({
+        draftTitle,
+        draftContentRef,
+        draftUpdatedAt: now,
+        ...(input.editedBy ? { draftUpdatedBy: input.editedBy } : {}),
+        updatedAt: now,
+      })
+      .where(and(eq(documents.id, doc.id), eq(documents.orgId, doc.orgId)));
+
+    return { saved: true, contentRef: draftContentRef, title: draftTitle, wroteDraft: true };
+  }
 
   const titleUpdates =
     input.nextTitle !== undefined && isTitleChanged(doc.title, input.nextTitle);
@@ -70,11 +118,11 @@ export async function saveDocumentContent(
     .set({
       ...(titleUpdates ? { title } : {}),
       ...(contentUpdates ? { contentRef } : {}),
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .where(and(eq(documents.id, doc.id), eq(documents.orgId, doc.orgId)));
 
-  return { saved: true, contentRef, title };
+  return { saved: true, contentRef, title, wroteDraft: false };
 }
 
 export type PublishDocumentVersionInput = {
@@ -90,14 +138,20 @@ export type PublishDocumentVersionResult = {
   title: string;
 };
 
-/** Creates a new published snapshot (draft edits do not call this). */
+/** Promotes draft (or provided body) to published current + history snapshot; clears draft_*. */
 export async function publishDocumentVersion(
   tx: DbOrTx,
   input: PublishDocumentVersionInput,
 ): Promise<PublishDocumentVersionResult> {
   const { doc, editedBy } = input;
-  const contentRef = input.contentRef ?? doc.contentRef ?? "";
-  const title = (input.title ?? doc.title).trim();
+  const hasDraft = hasUnpublishedChanges(doc);
+
+  const contentRef =
+    input.contentRef ??
+    (hasDraft ? (doc.draftContentRef ?? doc.contentRef ?? "") : (doc.contentRef ?? ""));
+  const title = (
+    input.title ?? (hasDraft ? (doc.draftTitle ?? doc.title) : doc.title)
+  ).trim();
   const now = new Date();
 
   const existing = await tx
@@ -116,6 +170,10 @@ export async function publishDocumentVersion(
       title,
       version: newVersion,
       status: "published",
+      draftTitle: null,
+      draftContentRef: null,
+      draftUpdatedAt: null,
+      draftUpdatedBy: null,
       updatedAt: now,
     })
     .where(and(eq(documents.id, doc.id), eq(documents.orgId, doc.orgId)));
@@ -132,52 +190,6 @@ export async function publishDocumentVersion(
   return { newVersion, contentRef, title };
 }
 
-/**
- * @deprecated Use saveDocumentContent for edits and publishDocumentVersion on publish.
- * Increments documents.version and inserts document_versions when title or content changed.
- */
-export async function bumpVersionIfContentOrTitleChanged(
-  tx: DbOrTx,
-  input: BumpVersionInput,
-): Promise<BumpVersionResult> {
-  const { doc, editedBy } = input;
-
-  const titleUpdates =
-    input.nextTitle !== undefined && isTitleChanged(doc.title, input.nextTitle);
-  const contentUpdates =
-    input.nextContent !== undefined && isContentChanged(doc.contentRef, input.nextContent);
-
-  if (!titleUpdates && !contentUpdates) {
-    return { bumped: false };
-  }
-
-  const title = input.nextTitle !== undefined ? input.nextTitle.trim() : doc.title;
-  const contentRef = input.nextContent !== undefined ? input.nextContent : (doc.contentRef ?? "");
-  const newVersion = doc.version + 1;
-  const now = new Date();
-
-  await tx
-    .update(documents)
-    .set({
-      ...(titleUpdates ? { title } : {}),
-      ...(contentUpdates ? { contentRef } : {}),
-      version: newVersion,
-      updatedAt: now,
-    })
-    .where(and(eq(documents.id, doc.id), eq(documents.orgId, doc.orgId)));
-
-  await tx.insert(documentVersions).values({
-    id: randomUUID(),
-    documentId: doc.id,
-    versionNumber: newVersion,
-    contentSnapshot: contentRef,
-    titleSnapshot: title,
-    editedBy,
-  });
-
-  return { bumped: true, newVersion, contentRef, title };
-}
-
 export type RestoreVersionInput = {
   doc: VersionedDocRow;
   contentSnapshot: string;
@@ -186,38 +198,102 @@ export type RestoreVersionInput = {
 };
 
 export type RestoreVersionResult = {
-  newVersion: number;
+  /** Always false for published restore-into-draft; true only for never-published live restore. */
+  publishedImmediately: boolean;
   contentRef: string;
   title: string;
+  newVersion?: number;
 };
 
-/** Restore snapshot title + content as a new forward revision (history preserved). */
+/**
+ * Restore a historical snapshot.
+ * - Published: load into draft_* only (readers unchanged until Publish).
+ * - Never-published: write into live title/content_ref (no version bump).
+ */
 export async function appendRestoredDocumentVersion(
   tx: DbOrTx,
   input: RestoreVersionInput,
 ): Promise<RestoreVersionResult> {
   const { doc, contentSnapshot, titleSnapshot, editedBy } = input;
-  const newVersion = doc.version + 1;
   const now = new Date();
+
+  if (doc.status === "published") {
+    await tx
+      .update(documents)
+      .set({
+        draftTitle: titleSnapshot,
+        draftContentRef: contentSnapshot,
+        draftUpdatedAt: now,
+        draftUpdatedBy: editedBy,
+        updatedAt: now,
+      })
+      .where(and(eq(documents.id, doc.id), eq(documents.orgId, doc.orgId)));
+
+    return {
+      publishedImmediately: false,
+      contentRef: contentSnapshot,
+      title: titleSnapshot,
+    };
+  }
 
   await tx
     .update(documents)
     .set({
       title: titleSnapshot,
       contentRef: contentSnapshot,
-      version: newVersion,
       updatedAt: now,
     })
     .where(and(eq(documents.id, doc.id), eq(documents.orgId, doc.orgId)));
 
-  await tx.insert(documentVersions).values({
-    id: randomUUID(),
-    documentId: doc.id,
-    versionNumber: newVersion,
-    contentSnapshot,
-    titleSnapshot,
-    editedBy,
-  });
+  return {
+    publishedImmediately: false,
+    contentRef: contentSnapshot,
+    title: titleSnapshot,
+  };
+}
 
-  return { newVersion, contentRef: contentSnapshot, title: titleSnapshot };
+/** Clears unpublished draft_* and leaves published title/content_ref intact. */
+export async function discardDocumentDraft(
+  tx: DbOrTx,
+  doc: Pick<VersionedDocRow, "id" | "orgId">,
+): Promise<void> {
+  await tx
+    .update(documents)
+    .set({
+      draftTitle: null,
+      draftContentRef: null,
+      draftUpdatedAt: null,
+      draftUpdatedBy: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(documents.id, doc.id), eq(documents.orgId, doc.orgId)));
+}
+
+/**
+ * @deprecated Use saveDocumentContent for edits and publishDocumentVersion on publish.
+ */
+export async function bumpVersionIfContentOrTitleChanged(
+  tx: DbOrTx,
+  input: {
+    doc: VersionedDocRow;
+    nextTitle?: string | undefined;
+    nextContent?: string | undefined;
+    editedBy: string;
+  },
+): Promise<
+  | { bumped: false }
+  | { bumped: true; newVersion: number; contentRef: string; title: string }
+> {
+  const published = await publishDocumentVersion(tx, {
+    doc: input.doc,
+    editedBy: input.editedBy,
+    ...(input.nextTitle !== undefined ? { title: input.nextTitle } : {}),
+    ...(input.nextContent !== undefined ? { contentRef: input.nextContent } : {}),
+  });
+  return {
+    bumped: true,
+    newVersion: published.newVersion,
+    contentRef: published.contentRef,
+    title: published.title,
+  };
 }

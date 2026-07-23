@@ -48,11 +48,16 @@ async function seedFromHtml(
   ydoc: Y.Doc,
 ): Promise<boolean> {
   const docRows = await db
-    .select({ contentRef: documents.contentRef })
+    .select({
+      contentRef: documents.contentRef,
+      draftContentRef: documents.draftContentRef,
+    })
     .from(documents)
     .where(and(eq(documents.id, documentId), eq(documents.orgId, orgId)));
 
-  const html = docRows[0]?.contentRef;
+  const row = docRows[0];
+  // Prefer unpublished WIP so editors resume the shared draft; readers do not join collab.
+  const html = row?.draftContentRef ?? row?.contentRef;
   if (!html || isHtmlEmpty(html)) {
     return false;
   }
@@ -164,6 +169,8 @@ async function persistHtmlAndIndex(
         title: documents.title,
         ownerId: documents.ownerId,
         status: documents.status,
+        draftTitle: documents.draftTitle,
+        draftContentRef: documents.draftContentRef,
       })
       .from(documents)
       .where(and(eq(documents.id, documentId), eq(documents.orgId, orgId)))
@@ -179,8 +186,12 @@ async function persistHtmlAndIndex(
         version: doc.version,
         title: doc.title,
         contentRef: doc.contentRef,
+        status: doc.status,
+        draftTitle: doc.draftTitle,
+        draftContentRef: doc.draftContentRef,
       },
       nextContent: html,
+      ...(editedBy ? { editedBy } : {}),
     });
 
     return result.saved ? doc.status : null;

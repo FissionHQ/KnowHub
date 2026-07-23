@@ -26,9 +26,17 @@ export function VersionHistoryPanel({ documentId, onRestore }: Props) {
   async function handleRestore(v: DocumentVersionListItem) {
     setRestoring(v.id);
     try {
-      await documentsApi.restoreVersion(documentId, v.versionNumber);
+      const result = await documentsApi.restoreVersion(documentId, v.versionNumber);
       onRestore(v.contentSnapshot);
-      toast(`Restored version ${v.versionNumber}`, "success");
+      toast(
+        result.document.hasUnpublishedChanges
+          ? `Version ${v.versionNumber} loaded into draft — publish when ready`
+          : `Restored version ${v.versionNumber}`,
+        "success",
+      );
+      if (result.reloadRequired) {
+        window.setTimeout(() => window.location.reload(), 600);
+      }
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to restore version", "error");
     } finally {

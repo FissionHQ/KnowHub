@@ -64,7 +64,12 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
     try {
       const result = await documentsApi.restoreVersion(documentId, version.versionNumber);
       await mutate();
-      toast(`Restored version ${version.versionNumber}`, "success");
+      toast(
+        result.document.hasUnpublishedChanges
+          ? `Version ${version.versionNumber} loaded into draft — publish when ready`
+          : `Restored version ${version.versionNumber}`,
+        "success",
+      );
       if (result.reloadRequired) {
         window.setTimeout(() => window.location.reload(), 600);
       }

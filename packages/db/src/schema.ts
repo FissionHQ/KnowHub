@@ -169,6 +169,14 @@ export const documents = pgTable(
      * - restricted: whitelist — only doc overrides (+ owner + admin); space inheritance ignored.
      */
     visibility: documentVisibilityEnum("visibility").notNull().default("inherit"),
+    /**
+     * Unpublished WIP for the next publish (Confluence-style).
+     * Null when there are no unpublished changes. Readers always see title/content_ref.
+     */
+    draftTitle: text("draft_title"),
+    draftContentRef: text("draft_content_ref"),
+    draftUpdatedAt: timestamp("draft_updated_at", { withTimezone: true }),
+    draftUpdatedBy: uuid("draft_updated_by").references(() => users.id),
     trashedAt: timestamp("trashed_at", { withTimezone: true }),
     /** draft | published — preserved when moved to trash for restore */
     statusBeforeTrash: documentStatusEnum("status_before_trash"),

@@ -20,11 +20,19 @@ const PdfViewer = dynamic(
 
 type SaveStatus = "saved" | "saving" | "unsaved";
 
-function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef">) {
-  return doc.type === "pdf" && !doc.contentRef;
+function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef" | "editableContentRef">) {
+  const body = doc.editableContentRef ?? doc.contentRef;
+  return doc.type === "pdf" && !body;
 }
-function isEditableDoc(doc: Pick<Document, "type" | "contentRef">) {
-  return doc.type === "page" || (doc.type === "pdf" && Boolean(doc.contentRef));
+function isEditableDoc(doc: Pick<Document, "type" | "contentRef" | "editableContentRef">) {
+  const body = doc.editableContentRef ?? doc.contentRef;
+  return doc.type === "page" || (doc.type === "pdf" && Boolean(body));
+}
+function editorTitle(doc: Document): string {
+  return doc.editableTitle ?? doc.title;
+}
+function editorContent(doc: Document): string {
+  return doc.editableContentRef ?? doc.contentRef ?? "";
 }
 
 interface Props {
@@ -55,22 +63,22 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
     userId: user?.id ?? "",
     userName: user?.name ?? "You",
     canEdit,
-    enabled: Boolean(docId && user && doc && isEditableDoc(doc) && !useFallbackEditor),
+    enabled: Boolean(docId && user && doc && isEditableDoc(doc) && canEdit && !useFallbackEditor),
   });
 
   useEffect(() => {
     if (!doc) return;
     if (loadedDocId.current === doc.id) return;
     loadedDocId.current = doc.id;
-    setContent(doc.contentRef ?? "");
-    setTitle(doc.title);
+    setContent(editorContent(doc));
+    setTitle(editorTitle(doc));
     setUseFallbackEditor(false);
   }, [doc]);
 
   useEffect(() => {
     if (!doc || titleFocused.current) return;
-    setTitle(doc.title);
-  }, [doc?.title]);
+    setTitle(editorTitle(doc));
+  }, [doc?.editableTitle, doc?.title]);
 
   useEffect(() => {
     if (!doc || !isEditableDoc(doc) || useFallbackEditor) return;
@@ -124,7 +132,7 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
   async function handleTitleBlur() {
     if (!canEdit || !doc) return;
     const trimmed = title.trim();
-    if (!trimmed || trimmed === doc.title) return;
+    if (!trimmed || trimmed === editorTitle(doc)) return;
     setSaveStatus("saving");
     try {
       const updated = await documentsApi.update(docId, { title: trimmed });
@@ -138,7 +146,8 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
     }
   }
 
-  const showPageEditor = Boolean(doc && isEditableDoc(doc) && user);
+  const showPageEditor = Boolean(doc && isEditableDoc(doc) && user && canEdit);
+  const showPublishedReadonly = Boolean(doc && isEditableDoc(doc) && user && !canEdit);
   const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading && !collab.status.startsWith("connect")));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   const connectionStatus = showFallback ? "connected" : collab.status;
@@ -170,7 +179,7 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
             )}
           </div>
           <div className="flex-1" />
-          {doc && isEditableDoc(doc) && user && (
+          {doc && isEditableDoc(doc) && user && canEdit && (
             <SaveIndicator status={activeSaveStatus} connectionStatus={connectionStatus} />
           )}
           <Link
@@ -241,7 +250,7 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
                         onChange={setContent}
                         {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
                         readOnly={!canEdit}
-                        title={doc.title}
+                        title={editorTitle(doc)}
                         documentId={docId}
                       />
                     </div>
@@ -254,6 +263,16 @@ export function PagePreviewPanel({ spaceId, docId, open, onClose }: Props) {
                       </div>
                     </div>
                   )}
+                </div>
+              ) : showPublishedReadonly ? (
+                <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
+                  <RichTextEditor
+                    content={doc.contentRef ?? ""}
+                    onChange={() => {}}
+                    readOnly
+                    title={doc.title}
+                    documentId={docId}
+                  />
                 </div>
               ) : null}
             </>
