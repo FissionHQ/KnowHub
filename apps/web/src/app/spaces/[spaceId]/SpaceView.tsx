@@ -75,6 +75,17 @@ export function SpaceView({ spaceId }: Props) {
 
   const [searchActive, setSearchActive] = useState(false);
   const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  function openPreview(docId: string) {
+    setPreviewDocId(docId);
+    setPreviewOpen(false);
+    requestAnimationFrame(() => setPreviewOpen(true));
+  }
+
+  function closePreview() {
+    setPreviewOpen(false);
+  }
 
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceId}`,
@@ -92,7 +103,7 @@ export function SpaceView({ spaceId }: Props) {
   const canEdit = space?.accessLevel === "edit";
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         {spaceLoading ? (
@@ -203,8 +214,8 @@ export function SpaceView({ spaceId }: Props) {
                 key={doc.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => setPreviewDocId(doc.id)}
-                onKeyDown={(e) => e.key === "Enter" && setPreviewDocId(doc.id)}
+                onClick={() => openPreview(doc.id)}
+                onKeyDown={(e) => e.key === "Enter" && openPreview(doc.id)}
                 className="group block cursor-pointer"
                 style={{ paddingLeft: depth * 20 }}
               >
@@ -262,14 +273,12 @@ export function SpaceView({ spaceId }: Props) {
         </>
       )}
 
-      {previewDocId && (
-        <PagePreviewPanel
-          spaceId={spaceId}
-          docId={previewDocId}
-          open={Boolean(previewDocId)}
-          onClose={() => setPreviewDocId(null)}
-        />
-      )}
+      <PagePreviewPanel
+        spaceId={spaceId}
+        docId={previewDocId ?? ""}
+        open={previewOpen}
+        onClose={closePreview}
+      />
     </div>
   );
 }

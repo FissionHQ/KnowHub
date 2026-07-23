@@ -78,10 +78,6 @@ export default function LoginForm() {
               {submitting ? "Signing in…" : "Sign in"}
             </Button>
           </form>
-
-          <p className="text-xs text-zinc-400 mt-6 text-center">
-            Dev seed: admin@localhost / password123
-          </p>
         </CardContent>
       </Card>
     </div>
