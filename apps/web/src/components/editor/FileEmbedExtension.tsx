@@ -164,6 +164,7 @@ function FileEmbedComponent({ node, deleteNode }: { node: { attrs: FileEmbedAttr
   }, [attachmentId]);
 
   useEffect(() => {
+    if (status !== "pending") return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -179,7 +180,7 @@ function FileEmbedComponent({ node, deleteNode }: { node: { attrs: FileEmbedAttr
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [pollStatus]);
+  }, [pollStatus, status]);
 
   function handleDelete() {
     if (window.confirm("Remove this attachment from the page?")) {

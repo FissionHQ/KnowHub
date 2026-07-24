@@ -7,17 +7,16 @@ import { useRouter } from "next/navigation";
 import { documentsApi, attachmentsApi, spacesApi, commentsApi, activityApi } from "@/lib/api";
 import type { Document, Space, Comment } from "@wiki/types";
 import { DocumentPermissionsPanel } from "@/components/DocumentPermissionsPanel";
-import { DocumentVersionHistory } from "@/components/DocumentVersionHistory";
 import { TrashConfirmDialog } from "@/components/TrashConfirmDialog";
+import { DocumentVersionHistory } from "@/components/DocumentVersionHistory";
 import { CollaborativeEditor } from "@/components/editor/CollaborativeEditor";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
-import { PageMetadataPanel } from "@/components/editor/PageMetadataPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
-import { Chip, Skeleton, Card, CardContent } from "@heroui/react";
+import {Chip, Skeleton, Card, CardContent } from "@heroui/react";
 import {
   CheckCircle2,
   Clock,
@@ -30,7 +29,11 @@ import {
   Trash2,
   MoreVertical,
   Users,
+  History,
   Shield,
+  Tag,
+  X,
+  Plus,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -84,6 +87,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   const titleFocused = useRef(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
@@ -231,16 +235,10 @@ export function DocumentView({ spaceId, docId }: Props) {
 
   if (!doc) {
     return (
-      <div className="flex gap-6 p-8 max-w-6xl mx-auto">
-        <div className="flex-1 space-y-4">
-          <Skeleton className="w-1/3 h-4 rounded-md" />
-          <Skeleton className="w-2/3 h-8 rounded-xl" />
-          <Skeleton className="w-full h-96 rounded-xl" />
-        </div>
-        <div className="w-64 space-y-3 shrink-0">
-          <Skeleton className="w-full h-10 rounded-xl" />
-          <Skeleton className="w-full h-10 rounded-xl" />
-        </div>
+      <div className="p-8 max-w-6xl mx-auto space-y-4">
+        <Skeleton className="w-1/3 h-4 rounded-md" />
+        <Skeleton className="w-2/3 h-8 rounded-xl" />
+        <Skeleton className="w-full h-96 rounded-xl" />
       </div>
     );
   }
@@ -308,8 +306,8 @@ export function DocumentView({ spaceId, docId }: Props) {
     (currentDoc.hasUnpublishedChanges || localUnpublished);
 
   return (
-    <div className="flex gap-6 p-8 max-w-6xl mx-auto items-start">
-      <div className="flex-1 min-w-0">
+    <div className="p-8 max-w-8xl mx-auto">
+      <div>
         <nav
           aria-label="Breadcrumb"
           className="text-xs text-zinc-400 mb-5 flex items-center gap-1.5 flex-wrap"
@@ -344,7 +342,25 @@ export function DocumentView({ spaceId, docId }: Props) {
           </span>
         </nav>
 
-        <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+        {canEdit && doc.hasUnpublishedChanges && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+            <span className="flex items-center gap-2 min-w-0">
+              <PenLine size={14} className="shrink-0" />
+              <span className="truncate">
+                Unpublished changes — readers still see the published version until you publish.
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleDiscardDraft()}
+              className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
+            >
+              Discard
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-start justify-between gap-4 mb-1 flex-wrap">
           {canEdit ? (
             <input
               value={title}
@@ -380,17 +396,13 @@ export function DocumentView({ spaceId, docId }: Props) {
                   void globalMutate("favorites");
                 }}
                 title={isFavorited ? "Remove from bookmarks" : "Bookmark this page"}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
                   isFavorited
-                    ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-amber-500"
+                    ? "text-amber-500"
+                    : "text-zinc-400 hover:text-amber-500"
                 }`}
               >
-                <Star
-                  size={14}
-                  className={isFavorited ? "fill-amber-500 text-amber-500" : ""}
-                />
-                {isFavorited ? "Bookmarked" : "Bookmark"}
+                <Star size={15} className={isFavorited ? "fill-amber-500" : ""} />
               </button>
             )}
             {isEditableDoc(doc) && user && canEdit && (
@@ -410,40 +422,30 @@ export function DocumentView({ spaceId, docId }: Props) {
                   }
                 }}
                 onMoveToTrash={handleMoveToTrash}
+                onOpenVersions={() => setVersionsOpen(true)}
               />
             )}
           </div>
         </div>
-
-        {showDraftBanner && (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
-            <span className="flex items-center gap-2 min-w-0">
-              <PenLine size={14} className="shrink-0" />
-              <span className="truncate">
-                Unpublished changes — readers still see the published version until you publish.
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => void handleDiscardDraft()}
-              className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
-            >
-              Discard
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-3 mb-5 flex-wrap">
-          {doc.tags.length > 0 &&
-            doc.tags.map((tag) => (
-              <Chip key={tag} size="sm" variant="secondary" className="text-xs">
-                {tag}
-              </Chip>
-            ))}
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">
+            {doc.lastEditedByName ?? doc.ownerName ?? "Someone"} updated {formatRelativeTime(doc.updatedAt)}
+          </span>
+          {doc.tags.length > 0 && (
+            <>
+              <span className="text-zinc-200 dark:text-zinc-700">·</span>
+              {doc.tags.map((tag) => (
+                <span key={tag} className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md">
+                  {tag}
+                </span>
+              ))}
+            </>
+          )}
+          <span className="text-zinc-200 dark:text-zinc-700">·</span>
           <button
             type="button"
             onClick={() => setCommentsOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1 rounded-full transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors"
           >
             <MessageSquare size={12} />
             <span>Comments</span>
@@ -457,7 +459,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             <button
               type="button"
               onClick={() => setPermissionsOpen(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-50 dark:hover:bg-orange-950/30 px-2.5 py-1 rounded-full transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors"
             >
               <Shield size={12} />
               <span>Permissions</span>
@@ -486,18 +488,15 @@ export function DocumentView({ spaceId, docId }: Props) {
         ) : showPageEditor ? (
           <div className="relative">
             {collab.provider && collab.ydoc && !useFallbackEditor ? (
-              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-                <CollaborativeEditor
+              <CollaborativeEditor
                   key={collab.ydoc.clientID}
                   ydoc={collab.ydoc}
                   provider={collab.provider}
                   readOnly={!canEdit}
                   documentId={docId}
                 />
-              </div>
             ) : showFallback ? (
-              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-                <RichTextEditor
+              <RichTextEditor
                   content={content}
                   onChange={setContent}
                   {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
@@ -505,7 +504,6 @@ export function DocumentView({ spaceId, docId }: Props) {
                   title={editorTitle(doc)}
                   documentId={docId}
                 />
-              </div>
             ) : null}
           </div>
         ) : showPublishedReadonly ? (
@@ -519,17 +517,6 @@ export function DocumentView({ spaceId, docId }: Props) {
             />
           </div>
         ) : null}
-      </div>
-
-      <div className="w-64 shrink-0 flex flex-col sticky top-18">
-        <PageMetadataPanel doc={doc} onUpdate={(updated) => mutate(updated, false)} />
-        {isEditableDoc(doc) && user && canEdit && (
-          <DocumentVersionHistory
-            documentId={docId}
-            currentVersion={doc.version}
-            canEdit
-          />
-        )}
       </div>
 
       {commentsOpen && (
@@ -600,8 +587,51 @@ export function DocumentView({ spaceId, docId }: Props) {
           <DocumentPermissionsPanel documentId={docId} />
         </div>
       </div>
+      {versionsOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setVersionsOpen(false)} />
+      )}
+      <div
+        className={`fixed top-0 right-0 h-full w-[30%] min-w-[320px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+          versionsOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
+          <button
+            type="button"
+            onClick={() => setVersionsOpen(false)}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <ChevronRight size={18} />
+          </button>
+          <div className="flex items-center gap-2">
+            <History size={15} className="text-[#f25011]" />
+            <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">Version history</span>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <DocumentVersionHistory
+            documentId={docId}
+            currentVersion={doc.version}
+            canEdit={canEdit}
+            defaultOpen
+          />
+        </div>
+      </div>
     </div>
   );
+}
+
+function formatRelativeTime(dateStr: string | Date): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const months = Math.floor(days / 30);
+  return `${months} month${months === 1 ? "" : "s"} ago`;
 }
 
 function DocumentActionsMenu({
@@ -610,16 +640,20 @@ function DocumentActionsMenu({
   getPublishPayload,
   onUpdate,
   onMoveToTrash,
+  onOpenVersions,
 }: {
   doc: Document;
   deleting: boolean;
   getPublishPayload?: () => { title: string; content?: string };
   onUpdate: (updated: Document, opts?: { published?: boolean }) => void;
   onMoveToTrash: () => void | Promise<void>;
+  onOpenVersions: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [savingTag, setSavingTag] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
@@ -646,6 +680,29 @@ function DocumentActionsMenu({
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [trashConfirmOpen, deleting]);
+
+  async function addTag() {
+    const tag = tagInput.trim();
+    if (!tag || doc.tags.includes(tag)) { setTagInput(""); return; }
+    setSavingTag(true);
+    try {
+      const updated = await documentsApi.update(doc.id, { tags: [...doc.tags, tag] });
+      onUpdate(updated);
+      setTagInput("");
+    } finally {
+      setSavingTag(false);
+    }
+  }
+
+  async function removeTag(tag: string) {
+    setSavingTag(true);
+    try {
+      const updated = await documentsApi.update(doc.id, { tags: doc.tags.filter((t) => t !== tag) });
+      onUpdate(updated);
+    } finally {
+      setSavingTag(false);
+    }
+  }
 
   async function handlePublish() {
     setPublishing(true);
@@ -686,7 +743,7 @@ function DocumentActionsMenu({
         onClick={(e) => {
           e.stopPropagation();
           const rect = btnRef.current!.getBoundingClientRect();
-          setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 });
+          setMenuPos({ top: rect.bottom + 4, left: rect.right - 220 });
           setOpen((v) => !v);
         }}
         title="More options"
@@ -701,7 +758,7 @@ function DocumentActionsMenu({
           <div
             ref={menuRef}
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-[9999] w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
+            className="fixed z-[9999] w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
           >
             <button
               type="button"
@@ -712,6 +769,60 @@ function DocumentActionsMenu({
               <Globe size={14} />
               {publishing ? "…" : "Publish"}
             </button>
+
+            <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onOpenVersions(); }}
+              className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2"
+            >
+              <History size={14} />
+              Version history
+            </button>
+
+            <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+
+            {/* Tags section */}
+            <div className="px-3 py-2">
+              <div className="flex items-center gap-1.5 mb-2 text-zinc-400 dark:text-zinc-500">
+                <Tag size={12} />
+                <span className="text-[11px] font-semibold uppercase tracking-wider">Tags</span>
+              </div>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {doc.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-md"
+                  >
+                    {tag}
+                    <button type="button" onClick={() => removeTag(tag)} disabled={savingTag} className="hover:text-red-500">
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addTag()}
+                  placeholder="Add tag…"
+                  className="flex-1 text-xs border border-zinc-200 dark:border-zinc-600 rounded-md px-2 py-1 bg-transparent outline-none focus:border-[#f25011] dark:text-zinc-200"
+                />
+                <button
+                  type="button"
+                  onClick={addTag}
+                  disabled={savingTag || !tagInput.trim()}
+                  className="text-[#f25011] hover:text-[#e0470f] disabled:opacity-40"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+
             <button
               type="button"
               disabled={deleting}
@@ -753,7 +864,7 @@ function EditorCountInline({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${
+      className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${
         status === "disconnected"
           ? "text-amber-600 bg-amber-50 dark:bg-amber-950/30"
           : "text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800"
@@ -775,7 +886,7 @@ function SaveIndicator({
   // Only warn after a real drop. Initial handshake used to look "online" — keep that.
   if (connectionStatus === "disconnected") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
+      <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
         <AlertCircle size={11} />
         Reconnecting…
       </span>
@@ -783,23 +894,22 @@ function SaveIndicator({
   }
   if (status === "saving") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1 rounded-full animate-pulse shrink-0">
+      <span className="inline-flex items-center gap-1 text-xs text-zinc-400 bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1 rounded-full animate-pulse shrink-0">
         Saving…
       </span>
     );
   }
   if (status === "unsaved") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
+      <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full shrink-0">
         <AlertCircle size={11} />
         Unsaved
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full shrink-0">
-      <CheckCircle2 size={11} />
-      Saved
+    <span className="inline-flex items-center gap-1 text-xs text-emerald-600 rounded-full shrink-0">
+      <CheckCircle2 size={13} />
     </span>
   );
 }
