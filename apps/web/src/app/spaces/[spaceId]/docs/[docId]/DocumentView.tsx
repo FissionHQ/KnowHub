@@ -282,7 +282,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-8 max-w-8xl mx-auto">
       <div>
         <nav
           aria-label="Breadcrumb"
@@ -317,6 +317,24 @@ export function DocumentView({ spaceId, docId }: Props) {
             {canEdit ? title || doc.title : doc.title}
           </span>
         </nav>
+
+        {canEdit && doc.hasUnpublishedChanges && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+            <span className="flex items-center gap-2 min-w-0">
+              <PenLine size={14} className="shrink-0" />
+              <span className="truncate">
+                Unpublished changes — readers still see the published version until you publish.
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleDiscardDraft()}
+              className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
+            >
+              Discard
+            </button>
+          </div>
+        )}
 
         <div className="flex items-start justify-between gap-4 mb-1 flex-wrap">
           {canEdit ? (
@@ -374,19 +392,21 @@ export function DocumentView({ spaceId, docId }: Props) {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3 mb-2 flex-wrap">
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
           <span className="text-xs text-zinc-400 dark:text-zinc-500">
             {doc.lastEditedByName ?? doc.ownerName ?? "Someone"} updated {formatRelativeTime(doc.updatedAt)}
           </span>
+          {doc.tags.length > 0 && (
+            <>
+              <span className="text-zinc-200 dark:text-zinc-700">·</span>
+              {doc.tags.map((tag) => (
+                <span key={tag} className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md">
+                  {tag}
+                </span>
+              ))}
+            </>
+          )}
           <span className="text-zinc-200 dark:text-zinc-700">·</span>
-        </div>
-        <div className="flex items-center gap-3 mb-5 flex-wrap">
-          {doc.tags.length > 0 &&
-            doc.tags.map((tag) => (
-              <Chip key={tag} size="sm" variant="secondary" className="text-xs">
-                {tag}
-              </Chip>
-            ))}
           <button
             type="button"
             onClick={() => setCommentsOpen(true)}
@@ -414,24 +434,6 @@ export function DocumentView({ spaceId, docId }: Props) {
             <EditorCountInline presence={collab.presence} status={collab.status} canEdit={canEdit} />
           )}
         </div>
-
-        {canEdit && doc.hasUnpublishedChanges && (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
-            <span className="flex items-center gap-2 min-w-0">
-              <PenLine size={14} className="shrink-0" />
-              <span className="truncate">
-                Unpublished changes — readers still see the published version until you publish.
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => void handleDiscardDraft()}
-              className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
-            >
-              Discard
-            </button>
-          </div>
-        )}
 
         {isPdfViewerDoc(doc) ? (
           pdfUrl ? (
