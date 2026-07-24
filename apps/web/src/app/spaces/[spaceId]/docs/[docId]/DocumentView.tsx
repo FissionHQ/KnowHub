@@ -16,7 +16,7 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
-import {Chip, Skeleton, Card, CardContent } from "@heroui/react";
+import { Skeleton, Card, CardContent } from "@heroui/react";
 import {
   CheckCircle2,
   Clock,
@@ -91,9 +91,10 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
-  /** Optimistic: show banner before server confirms draft_* write. */
-  const [localUnpublished, setLocalUnpublished] = useState(false);
-  const publishedBaselineTitle = useRef<string>("");
+  const [discarding, setDiscarding] = useState(false);
+  /** Optimistic draft UI — Discard always resets collab + reloads, so this is safe. */
+  const [localDraft, setLocalDraft] = useState(false);
+  const suppressDraftBanner = useRef(false);
 
   const { data: favData, mutate: mutateFav } = useSWR(
     doc && user ? `fav:${docId}` : null,
@@ -126,13 +127,12 @@ export function DocumentView({ spaceId, docId }: Props) {
     setContent(editorContent(doc));
     setTitle(editorTitle(doc));
     setUseFallbackEditor(false);
-    setLocalUnpublished(Boolean(doc.hasUnpublishedChanges));
-    publishedBaselineTitle.current = doc.title;
+    suppressDraftBanner.current = false;
+    setLocalDraft(Boolean(doc.hasUnpublishedChanges));
   }, [doc]);
 
-  // Server confirmed draft — keep banner even if local flag was cleared.
   useEffect(() => {
-    if (doc?.hasUnpublishedChanges) setLocalUnpublished(true);
+    if (doc?.hasUnpublishedChanges) setLocalDraft(true);
   }, [doc?.hasUnpublishedChanges]);
 
   // Sync title from external changes (e.g. sidebar rename) when input is not focused
@@ -164,19 +164,30 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
 
   useEffect(() => {
-    if (useFallbackEditor) return;
+    if (useFallbackEditor || suppressDraftBanner.current) return;
 
     const prev = prevCollabSaveStatus.current;
     prevCollabSaveStatus.current = collab.saveStatus;
+    let followUp: ReturnType<typeof setTimeout> | undefined;
 
-    // Show banner immediately on first local edit — don't wait for persist + refetch.
+    // Banner early; Discard stays hidden until the server has a real draft.
     if (collab.saveStatus === "saving" && doc?.status === "published") {
-      setLocalUnpublished(true);
+      setLocalDraft(true);
     }
 
+    // Refetch after persist window so Discard can appear — never clear the banner here
+    // (persist races with "saved" and was wiping the optimistic flag).
     if (prev === "saving" && collab.saveStatus === "saved") {
       void mutate();
+      // Second pass after collab debounce write lands in DB.
+      followUp = setTimeout(() => {
+        if (!suppressDraftBanner.current) void mutate();
+      }, 1500);
     }
+
+    return () => {
+      if (followUp) clearTimeout(followUp);
+    };
   }, [collab.saveStatus, useFallbackEditor, docId, mutate, doc?.status]);
 
   const loadPdfUrl = useCallback(async () => {
@@ -209,12 +220,16 @@ export function DocumentView({ spaceId, docId }: Props) {
   const handleAutoSave = useCallback(
     async (html: string) => {
       if (!doc) return;
-      if (doc.status === "published") setLocalUnpublished(true);
+      if (doc.status === "published" && !suppressDraftBanner.current) {
+        setLocalDraft(true);
+      }
       setSaveStatus("saving");
       try {
-        await documentsApi.update(docId, { content: html });
+        const updated = await documentsApi.update(docId, { content: html });
         setSaveStatus("saved");
-        void mutate();
+        mutate(updated, false);
+        // Keep banner while saving; only drop if server confirms no draft.
+        if (updated.hasUnpublishedChanges) setLocalDraft(true);
       } catch {
         setSaveStatus("unsaved");
       }
@@ -271,11 +286,12 @@ export function DocumentView({ spaceId, docId }: Props) {
     if (!canEdit) return;
     const trimmed = title.trim();
     if (!trimmed || trimmed === editorTitle(currentDoc)) return;
-    if (currentDoc.status === "published") setLocalUnpublished(true);
+    if (currentDoc.status === "published") setLocalDraft(true);
     setSaveStatus("saving");
     try {
       const updated = await documentsApi.update(docId, { title: trimmed });
       mutate(updated, false);
+      if (updated.hasUnpublishedChanges) setLocalDraft(true);
       void globalMutate(`space:${spaceId}:docs`);
       void globalMutate("favorites");
       void globalMutate("recently-updated");
@@ -286,24 +302,29 @@ export function DocumentView({ spaceId, docId }: Props) {
   }
 
   async function handleDiscardDraft() {
-    if (!currentDoc.hasUnpublishedChanges && !localUnpublished) return;
-    const hadLocalOnly = localUnpublished && !currentDoc.hasUnpublishedChanges;
+    // Only when the server has a draft — button is hidden until then.
+    if (!currentDoc.hasUnpublishedChanges || discarding) return;
+    suppressDraftBanner.current = true;
+    setLocalDraft(false);
+    setDiscarding(true);
     try {
       const result = await documentsApi.discardDraft(docId);
-      setLocalUnpublished(false);
       mutate(result.document, false);
-      if (result.reloadRequired || hadLocalOnly) {
-        window.setTimeout(() => window.location.reload(), 400);
-      }
+      setTitle(result.document.title);
+      window.setTimeout(() => window.location.reload(), 400);
     } catch {
-      // keep banner; user can retry
+      suppressDraftBanner.current = false;
+      setDiscarding(false);
+      setLocalDraft(true);
     }
   }
 
   const showDraftBanner =
     canEdit &&
     currentDoc.status === "published" &&
-    (currentDoc.hasUnpublishedChanges || localUnpublished);
+    (Boolean(currentDoc.hasUnpublishedChanges) || localDraft);
+
+  const canDiscardDraft = Boolean(currentDoc.hasUnpublishedChanges);
 
   return (
     <div className="p-8 max-w-8xl mx-auto">
@@ -342,21 +363,25 @@ export function DocumentView({ spaceId, docId }: Props) {
           </span>
         </nav>
 
-        {canEdit && doc.hasUnpublishedChanges && (
+        {showDraftBanner && (
           <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
             <span className="flex items-center gap-2 min-w-0">
               <PenLine size={14} className="shrink-0" />
               <span className="truncate">
                 Unpublished changes — readers still see the published version until you publish.
+                  
               </span>
             </span>
-            <button
-              type="button"
-              onClick={() => void handleDiscardDraft()}
-              className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
-            >
-              Discard
-            </button>
+            {canDiscardDraft && (
+              <button
+                type="button"
+                disabled={discarding}
+                onClick={() => void handleDiscardDraft()}
+                className="shrink-0 text-xs font-medium underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                {discarding ? "Discarding…" : "Discard"}
+              </button>
+            )}
           </div>
         )}
 
@@ -364,16 +389,7 @@ export function DocumentView({ spaceId, docId }: Props) {
           {canEdit ? (
             <input
               value={title}
-              onChange={(e) => {
-                const next = e.target.value;
-                setTitle(next);
-                if (
-                  doc.status === "published" &&
-                  next.trim() !== publishedBaselineTitle.current.trim()
-                ) {
-                  setLocalUnpublished(true);
-                }
-              }}
+              onChange={(e) => setTitle(e.target.value)}
               onFocus={() => { titleFocused.current = true; }}
               onBlur={() => { titleFocused.current = false; handleTitleBlur(); }}
               onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
@@ -416,8 +432,7 @@ export function DocumentView({ spaceId, docId }: Props) {
                 onUpdate={(updated, opts) => {
                   mutate(updated, false);
                   if (opts?.published) {
-                    setLocalUnpublished(false);
-                    publishedBaselineTitle.current = updated.title;
+                    setLocalDraft(false);
                     void globalMutate(`doc-versions:${docId}`);
                   }
                 }}

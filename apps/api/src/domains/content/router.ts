@@ -389,7 +389,14 @@ export function createContentRouter(
       throw new ConflictError("Only published documents have an unpublished draft");
     }
     if (!hasUnpublishedChanges(doc)) {
-      res.json({ data: shapeDocumentResponse({ ...doc, ownerName: null }, "edit") });
+      // Client may still have unsaved typing in the live Yjs room — reset to published HTML.
+      if (doc.type === "page" || doc.contentRef !== null) {
+        await resetCollabStateAfterContentChange(orgId, documentId ?? "", doc.contentRef ?? "");
+      }
+      res.json({
+        data: shapeDocumentResponse({ ...doc, ownerName: null }, "edit"),
+        reloadRequired: true,
+      });
       return;
     }
 
