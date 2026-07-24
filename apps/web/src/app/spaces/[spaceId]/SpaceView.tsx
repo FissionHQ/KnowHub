@@ -6,8 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
-import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
-import { FileText, Plus, File, ChevronRight, Upload } from "lucide-react";
+import { Button, Card, CardContent, Skeleton, Separator, Chip } from "@heroui/react";
+import { FileText, Plus, File, ChevronRight, Upload} from "lucide-react";
 import clsx from "clsx";
 import { importDocumentFile } from "@/lib/importDocument";
 import { SearchPanel } from "@/components/search/SearchPanel";
@@ -49,7 +49,11 @@ export function SpaceView({ spaceId }: Props) {
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }

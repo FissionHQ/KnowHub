@@ -16,7 +16,7 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
-import {Chip, Skeleton, Card, CardContent } from "@heroui/react";
+import { Skeleton, Card, CardContent } from "@heroui/react";
 import {
   CheckCircle2,
   Clock,

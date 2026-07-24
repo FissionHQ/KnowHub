@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { SearchPanel } from "@/components/search/SearchPanel";
-import { Search } from "lucide-react";
 
 export function SearchView() {
   const [searched, setSearched] = useState(false);
