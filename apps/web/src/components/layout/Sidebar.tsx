@@ -15,6 +15,57 @@ import { importDocumentFile } from "@/lib/importDocument";
 import { ThemeToggle } from "./ThemeToggle";
 import { SpaceDocTree } from "./SpaceDocTree";
 
+function SpaceRow({
+  space,
+  isActive,
+  onMenuOpen,
+}: {
+  space: Space;
+  isActive: boolean;
+  onMenuOpen: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div>
+      <div className="group/space flex items-center gap-0.5 rounded-lg pr-1 hover:bg-white/10 transition-colors">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="shrink-0 w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-zinc-200 ml-1"
+        >
+          <ChevronRight size={12} className={clsx("transition-transform", open && "rotate-90")} />
+        </button>
+        <Link href={`/spaces/${space.id}`} className="flex-1 min-w-0">
+          <div
+            className={clsx(
+              "flex items-center gap-2.5 px-2 py-2 text-sm transition-colors cursor-pointer",
+              isActive ? "font-semibold" : "text-zinc-300",
+            )}
+            style={isActive ? { color: "#f25011" } : {}}
+          >
+            <span className="truncate">{space.name}</span>
+          </div>
+        </Link>
+        <button
+          type="button"
+          onClick={onMenuOpen}
+          className={clsx(
+            "shrink-0 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded",
+            space.accessLevel === "edit" ? "opacity-0 group-hover/space:opacity-100" : "hidden",
+          )}
+          title="More options"
+        >
+          <MoreHorizontal size={12} />
+        </button>
+      </div>
+      {open && (
+        <SpaceDocTree spaceId={space.id} canEdit={space.accessLevel === "edit"} />
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -88,7 +139,6 @@ export function Sidebar() {
           >
             <Search size={14} />
             <span className="flex-1">Search</span>
-            <span className="text-xs bg-white/10 text-zinc-400 px-1.5 py-0.5 rounded font-mono">⌘K</span>
           </div>
         </Link>
       </div>
@@ -102,52 +152,19 @@ export function Sidebar() {
           {spaces.map((space) => {
             const isActive = activeSpaceId === space.id;
             return (
-              <div key={space.id}>
-                <div className="group/space flex items-center gap-0.5 rounded-lg pr-1 hover:bg-white/10 transition-colors">
-                  <Link href={`/spaces/${space.id}`} className="flex-1 min-w-0">
-                    <div
-                      className={clsx(
-                        "flex items-center gap-2.5 px-3 py-2 text-sm transition-colors cursor-pointer",
-                        isActive
-                          ? "font-semibold"
-                          : "text-zinc-300",
-                      )}
-                      style={isActive ? { color: "#f25011" } : {}}
-                    >
-                      <span className="text-base leading-none">{space.iconEmoji ?? "📄"}</span>
-                      <span className="truncate">{space.name}</span>
-                    </div>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (space.accessLevel !== "edit") return;
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setMenuPos({ top: rect.bottom + 4, left: rect.left });
-                      setSpaceMenu(spaceMenu === space.id ? null : space.id);
-                    }}
-                    className={clsx(
-                      "shrink-0 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded",
-                      space.accessLevel === "edit"
-                        ? "opacity-0 group-hover/space:opacity-100"
-                        : "hidden",
-                    )}
-                    title="More options"
-                  >
-                    <MoreHorizontal size={12} />
-                  </button>
-                </div>
-
-                {/* Doc tree — only for the active space */}
-                {isActive && (
-                  <SpaceDocTree
-                    spaceId={space.id}
-                    canEdit={space.accessLevel === "edit"}
-                  />
-                )}
-              </div>
+              <SpaceRow
+                key={space.id}
+                space={space}
+                isActive={isActive}
+                onMenuOpen={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (space.accessLevel !== "edit") return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setMenuPos({ top: rect.bottom + 4, left: rect.left });
+                  setSpaceMenu(spaceMenu === space.id ? null : space.id);
+                }}
+              />
             );
           })}
           {spaces.length === 0 && (

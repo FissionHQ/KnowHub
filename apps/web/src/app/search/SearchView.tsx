@@ -1,29 +1,37 @@
 "use client";
 
-import useSWR from "swr";
-import { spacesApi } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
-import type { Space } from "@wiki/types";
+import { useState } from "react";
 import { SearchPanel } from "@/components/search/SearchPanel";
+import { Search } from "lucide-react";
 
 export function SearchView() {
-  const { user } = useAuth();
-  const { data: spaces = [] } = useSWR<Space[]>(
-    user ? ["search:spaces", user.id] : null,
-    spacesApi.list,
-  );
+  const [searched, setSearched] = useState(false);
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-1">Search</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-          {spaces.length
-            ? "Find pages and PDFs in your spaces"
-            : "You do not have access to any spaces yet"}
-        </p>
+    <div
+      className={`transition-all duration-500 ease-in-out ${
+        searched
+          ? "pt-8 w-full"
+          : "flex-1 flex flex-col items-center justify-center pb-24 w-full"
+      }`}
+    >
+      {!searched && (
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+            Search KnowHub
+          </h1>
+        </div>
+      )}
+
+      {searched && (
+        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-6">
+          Search
+        </h1>
+      )}
+
+      <div className={searched ? "w-full" : "w-full max-w-2xl"}>
+        <SearchPanel onSearchedChange={setSearched} />
       </div>
-      <SearchPanel />
     </div>
   );
 }

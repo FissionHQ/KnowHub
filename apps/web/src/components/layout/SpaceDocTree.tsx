@@ -24,7 +24,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -117,7 +117,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
     <div>
       <div
         className="group flex items-center gap-1 rounded-md pr-1 hover:bg-white/10 transition-colors"
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
+        style={{ paddingLeft: `${16 + depth * 16}px` }}
       >
         {/* expand/collapse toggle */}
         <button
@@ -295,7 +295,8 @@ export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
         <button
           type="button"
           onClick={handleNewRootPage}
-          className="flex items-center gap-1.5 px-3 py-1.5 mt-0.5 w-full text-left text-[12px] text-zinc-500 hover:text-[#f25011] hover:bg-white/10 rounded-md transition-colors"
+          className="flex items-center gap-1.5 py-1.5 mt-0.5 w-full text-left text-[12px] text-zinc-500 hover:text-[#f25011] hover:bg-white/10 rounded-md transition-colors"
+          style={{ paddingLeft: "20px" }}
         >
           <Plus size={11} />
           New page

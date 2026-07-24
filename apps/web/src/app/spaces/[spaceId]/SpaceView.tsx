@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,13 +8,11 @@ import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
 import { Button, Chip, Card, CardContent, Skeleton, Separator } from "@heroui/react";
 import { FileText, Plus, File, ChevronRight, Upload } from "lucide-react";
+import clsx from "clsx";
 import { importDocumentFile } from "@/lib/importDocument";
 import { SearchPanel } from "@/components/search/SearchPanel";
-import { PagePreviewPanel } from "@/components/PagePreviewPanel";
 
 interface Props { spaceId: string }
-
-const PAGE_SIZE = 20;
 
 function formatDateTime(date: Date) {
   const d = new Date(date);
@@ -28,36 +26,8 @@ function formatDateTime(date: Date) {
   });
 }
 
-interface FlatDoc {
-  doc: Document;
-  depth: number;
-}
-
-function flattenTree(docs: Document[]): FlatDoc[] {
-  const idSet = new Set(docs.map((d) => d.id));
-  const childrenMap = new Map<string, Document[]>();
-  childrenMap.set("__root__", []);
-  for (const doc of docs) {
-    // treat as root if parentId is missing or points to a doc not in this list
-    const key = doc.parentId && idSet.has(doc.parentId) ? doc.parentId : "__root__";
-    if (!childrenMap.has(key)) childrenMap.set(key, []);
-    childrenMap.get(key)!.push(doc);
-  }
-
-  const result: FlatDoc[] = [];
-  function walk(parentId: string, depth: number) {
-    for (const doc of childrenMap.get(parentId) ?? []) {
-      result.push({ doc, depth });
-      walk(doc.id, depth + 1);
-    }
-  }
-  walk("__root__", 0);
-  return result;
-}
-
 export function SpaceView({ spaceId }: Props) {
   const router = useRouter();
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,17 +44,14 @@ export function SpaceView({ spaceId }: Props) {
   }
 
   const [searchActive, setSearchActive] = useState(false);
-  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  function openPreview(docId: string) {
-    setPreviewDocId(docId);
-    setPreviewOpen(false);
-    requestAnimationFrame(() => setPreviewOpen(true));
-  }
-
-  function closePreview() {
-    setPreviewOpen(false);
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
 
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
@@ -97,14 +64,83 @@ export function SpaceView({ spaceId }: Props) {
     { revalidateOnFocus: false },
   );
 
-  const flatDocs = useMemo(() => flattenTree(docs), [docs]);
-  const visible = flatDocs.slice(0, visibleCount);
-  const hasMore = visibleCount < flatDocs.length;
-  const remaining = flatDocs.length - visibleCount;
+  const idSet = new Set(docs.map((d) => d.id));
+  const rootDocs = docs.filter((d) => !d.parentId || !idSet.has(d.parentId));
   const canEdit = space?.accessLevel === "edit";
 
+  function getChildren(parentId: string): Document[] {
+    return docs.filter((d) => d.parentId === parentId);
+  }
+
+  function renderRows(items: Document[], depth: number): React.ReactNode {
+    return items.map((doc) => {
+      const children = getChildren(doc.id);
+      const isExpanded = expandedIds.has(doc.id);
+      return (
+        <div key={doc.id}>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => router.push(`/spaces/${spaceId}/docs/${doc.id}`)}
+            onKeyDown={(e) => e.key === "Enter" && router.push(`/spaces/${spaceId}/docs/${doc.id}`)}
+            className="group block cursor-pointer"
+            style={{ paddingLeft: depth * 20 }}
+          >
+            <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); toggleExpand(doc.id); }}
+                className="shrink-0 w-4 h-4 flex items-center justify-center text-zinc-400 hover:text-zinc-600"
+              >
+                {children.length > 0 ? (
+                  <ChevronRight size={12} className={clsx("transition-transform", isExpanded && "rotate-90")} />
+                ) : (
+                  <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600 block" />
+                )}
+              </button>
+              <div
+                className={
+                  doc.type === "pdf"
+                    ? "p-1 rounded-md bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
+                    : "p-1 rounded-md bg-orange-50 dark:bg-orange-950/40 text-[#f25011] shrink-0"
+                }
+              >
+                {doc.type === "pdf" ? <File size={14} color="#f25011" /> : <FileText size={14} color="#f25011" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate group-hover:text-[#f25011] transition-colors">
+                  {doc.title}
+                </p>
+              </div>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 hidden sm:inline">
+                {doc.ownerName ?? "Unknown"}
+              </span>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 whitespace-nowrap">
+                {formatDateTime(doc.updatedAt)}
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {doc.tags.slice(0, 2).map((tag) => (
+                  <Chip key={tag} size="sm" variant="secondary" className="text-xs">
+                    {tag}
+                  </Chip>
+                ))}
+                {doc.status === "draft" && (
+                  <Chip size="sm" color="warning" variant="soft" className="text-xs">
+                    Draft
+                  </Chip>
+                )}
+              </div>
+            </div>
+          </div>
+          {isExpanded && children.length > 0 && renderRows(children, depth + 1)}
+        </div>
+      );
+    });
+  }
+
+
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-8 max-w-8xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         {spaceLoading ? (
@@ -169,8 +205,8 @@ export function SpaceView({ spaceId }: Props) {
 
       <Separator className="mb-6" />
       {/* Document count */}
-      {!docsLoading && flatDocs.length > 0 && (
-        <p className="text-xs text-zinc-400 mb-3">{flatDocs.length} document{flatDocs.length !== 1 ? "s" : ""}</p>
+      {!docsLoading && docs.length > 0 && (
+        <p className="text-xs text-zinc-400 mb-3">{docs.length} document{docs.length !== 1 ? "s" : ""}</p>
       )}
 
       <div className="mb-6">
@@ -208,78 +244,13 @@ export function SpaceView({ spaceId }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <>
           <div className="flex flex-col gap-0.5">
-            {visible.map(({ doc, depth }) => (
-              <div
-                key={doc.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openPreview(doc.id)}
-                onKeyDown={(e) => e.key === "Enter" && openPreview(doc.id)}
-                className="group block cursor-pointer"
-                style={{ paddingLeft: depth * 20 }}
-              >
-                <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  {depth > 0 && <ChevronRight size={12} className="text-zinc-400 shrink-0" />}
-                  <div
-                    className={
-                      doc.type === "pdf"
-                        ? "p-1 rounded-md bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
-                        : "p-1 rounded-md bg-orange-50 dark:bg-orange-950/40 text-[#f25011] shrink-0"
-                    }
-                  >
-                    {doc.type === "pdf" ? <File size={14} color="#f25011"/> : <FileText size={14} color="#f25011"/>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate group-hover:text-[#f25011] transition-colors">
-                      {doc.title}
-                    </p>
-                  </div>
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 hidden sm:inline">
-                    {doc.ownerName ?? "Unknown"}
-                  </span>
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 whitespace-nowrap">
-                    {formatDateTime(doc.updatedAt)}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {doc.tags.slice(0, 2).map((tag) => (
-                      <Chip key={tag} size="sm" variant="secondary" className="text-xs">
-                        {tag}
-                      </Chip>
-                    ))}
-                    {doc.status === "draft" && (
-                      <Chip size="sm" color="warning" variant="soft" className="text-xs">
-                        Draft
-                      </Chip>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {renderRows(rootDocs, 0)}
           </div>
-          {hasMore && (
-            <div className="flex justify-center mt-4 pb-4">
-              <button
-                type="button"
-                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
-              >
-                Show more ({remaining} remaining)
-              </button>
-            </div>
-          )}
-        </>
       )}
         </>
       )}
 
-      <PagePreviewPanel
-        spaceId={spaceId}
-        docId={previewDocId ?? ""}
-        open={previewOpen}
-        onClose={closePreview}
-      />
     </div>
   );
 }
