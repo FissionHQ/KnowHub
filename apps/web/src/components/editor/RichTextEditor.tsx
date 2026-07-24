@@ -110,7 +110,7 @@ export function RichTextEditor({
 
   return (
     <>
-      {!readOnly && <BlockMenu editor={editor} title={title} documentId={documentId} />}
+      {!readOnly && <BlockMenu editor={editor} title={title} {...(documentId !== undefined && { documentId })} />}
       <EditorContent
         editor={editor}
         className="prose prose-sm max-w-none focus:outline-none"
