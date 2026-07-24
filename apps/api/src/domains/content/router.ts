@@ -23,9 +23,8 @@ import {
   discardDocumentDraft,
   hasUnpublishedChanges,
   isTitleChanged,
-  isContentChanged,
 } from "@wiki/db";
-import { encodeHtmlAsYjsStateBase64 } from "@wiki/doc-collab";
+import { encodeHtmlAsYjsStateBase64, isHtmlContentChanged } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
 import {
   assertDocumentAccess,
@@ -470,7 +469,7 @@ export function createContentRouter(
     const titleWillChange =
       hasTitle && isTitleChanged(baseTitle, body.data.title!);
     const contentWillChange =
-      hasContent && isContentChanged(baseContent, body.data.content!);
+      hasContent && isHtmlContentChanged(baseContent, body.data.content!);
     const publishing = body.data.publish === true;
 
     if (!publishing && !titleWillChange && !contentWillChange && !hasMetadata) {
@@ -589,6 +588,15 @@ export function createContentRouter(
       await recordRecentlyUpdated(db, userId, documentId ?? "");
     } else if (titleWillChange || contentWillChange) {
       await recordRecentlyUpdated(db, userId, documentId ?? "");
+    }
+
+    // Align collab Yjs with newly published body so reconnect doesn't recreate a draft.
+    if (publishing && (updated.type === "page" || updated.contentRef)) {
+      await resetCollabStateAfterContentChange(
+        orgId,
+        documentId ?? "",
+        updated.contentRef ?? "",
+      );
     }
 
     res.json({ data: shapeDocumentResponse(updated, "edit") });

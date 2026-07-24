@@ -55,6 +55,9 @@ export type SaveDocumentContentResult =
  * Persists title/content without bumping documents.version.
  * - Never-published (status=draft): updates live title/content_ref.
  * - Published: writes draft_* only; first change seeds draft from published.
+ *
+ * Callers that round-trip through TipTap/Yjs should pre-check with
+ * `@wiki/doc-collab` `isHtmlContentChanged` so serialize noise does not create drafts.
  */
 export async function saveDocumentContent(
   tx: DbOrTx,

@@ -87,6 +87,9 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
+  /** Optimistic: show banner before server confirms draft_* write. */
+  const [localUnpublished, setLocalUnpublished] = useState(false);
+  const publishedBaselineTitle = useRef<string>("");
 
   const { data: favData, mutate: mutateFav } = useSWR(
     doc && user ? `fav:${docId}` : null,
@@ -119,7 +122,14 @@ export function DocumentView({ spaceId, docId }: Props) {
     setContent(editorContent(doc));
     setTitle(editorTitle(doc));
     setUseFallbackEditor(false);
+    setLocalUnpublished(Boolean(doc.hasUnpublishedChanges));
+    publishedBaselineTitle.current = doc.title;
   }, [doc]);
+
+  // Server confirmed draft — keep banner even if local flag was cleared.
+  useEffect(() => {
+    if (doc?.hasUnpublishedChanges) setLocalUnpublished(true);
+  }, [doc?.hasUnpublishedChanges]);
 
   // Sync title from external changes (e.g. sidebar rename) when input is not focused
   useEffect(() => {
@@ -155,10 +165,15 @@ export function DocumentView({ spaceId, docId }: Props) {
     const prev = prevCollabSaveStatus.current;
     prevCollabSaveStatus.current = collab.saveStatus;
 
+    // Show banner immediately on first local edit — don't wait for persist + refetch.
+    if (collab.saveStatus === "saving" && doc?.status === "published") {
+      setLocalUnpublished(true);
+    }
+
     if (prev === "saving" && collab.saveStatus === "saved") {
       void mutate();
     }
-  }, [collab.saveStatus, useFallbackEditor, docId, mutate]);
+  }, [collab.saveStatus, useFallbackEditor, docId, mutate, doc?.status]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
@@ -190,6 +205,7 @@ export function DocumentView({ spaceId, docId }: Props) {
   const handleAutoSave = useCallback(
     async (html: string) => {
       if (!doc) return;
+      if (doc.status === "published") setLocalUnpublished(true);
       setSaveStatus("saving");
       try {
         await documentsApi.update(docId, { content: html });
@@ -199,7 +215,7 @@ export function DocumentView({ spaceId, docId }: Props) {
         setSaveStatus("unsaved");
       }
     },
-    [doc, docId],
+    [doc, docId, mutate],
   );
 
   async function handleMoveToTrash() {
@@ -257,6 +273,7 @@ export function DocumentView({ spaceId, docId }: Props) {
     if (!canEdit) return;
     const trimmed = title.trim();
     if (!trimmed || trimmed === editorTitle(currentDoc)) return;
+    if (currentDoc.status === "published") setLocalUnpublished(true);
     setSaveStatus("saving");
     try {
       const updated = await documentsApi.update(docId, { title: trimmed });
@@ -271,17 +288,24 @@ export function DocumentView({ spaceId, docId }: Props) {
   }
 
   async function handleDiscardDraft() {
-    if (!doc?.hasUnpublishedChanges) return;
+    if (!currentDoc.hasUnpublishedChanges && !localUnpublished) return;
+    const hadLocalOnly = localUnpublished && !currentDoc.hasUnpublishedChanges;
     try {
       const result = await documentsApi.discardDraft(docId);
+      setLocalUnpublished(false);
       mutate(result.document, false);
-      if (result.reloadRequired) {
+      if (result.reloadRequired || hadLocalOnly) {
         window.setTimeout(() => window.location.reload(), 400);
       }
     } catch {
       // keep banner; user can retry
     }
   }
+
+  const showDraftBanner =
+    canEdit &&
+    currentDoc.status === "published" &&
+    (currentDoc.hasUnpublishedChanges || localUnpublished);
 
   return (
     <div className="flex gap-6 p-8 max-w-6xl mx-auto items-start">
@@ -324,7 +348,16 @@ export function DocumentView({ spaceId, docId }: Props) {
           {canEdit ? (
             <input
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setTitle(next);
+                if (
+                  doc.status === "published" &&
+                  next.trim() !== publishedBaselineTitle.current.trim()
+                ) {
+                  setLocalUnpublished(true);
+                }
+              }}
               onFocus={() => { titleFocused.current = true; }}
               onBlur={() => { titleFocused.current = false; handleTitleBlur(); }}
               onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
@@ -371,6 +404,8 @@ export function DocumentView({ spaceId, docId }: Props) {
                 onUpdate={(updated, opts) => {
                   mutate(updated, false);
                   if (opts?.published) {
+                    setLocalUnpublished(false);
+                    publishedBaselineTitle.current = updated.title;
                     void globalMutate(`doc-versions:${docId}`);
                   }
                 }}
@@ -380,7 +415,7 @@ export function DocumentView({ spaceId, docId }: Props) {
           </div>
         </div>
 
-        {canEdit && doc.hasUnpublishedChanges && (
+        {showDraftBanner && (
           <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
             <span className="flex items-center gap-2 min-w-0">
               <PenLine size={14} className="shrink-0" />
@@ -589,8 +624,6 @@ function DocumentActionsMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
 
-  const isPublished = doc.status === "published";
-
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
@@ -630,17 +663,6 @@ function DocumentActionsMenu({
           : {}),
       });
       onUpdate(updated, { published: true });
-    } finally {
-      setPublishing(false);
-    }
-  }
-
-  async function handleUnpublish() {
-    setPublishing(true);
-    setOpen(false);
-    try {
-      const updated = await documentsApi.update(doc.id, { status: "draft" });
-      onUpdate(updated, { published: false });
     } finally {
       setPublishing(false);
     }
@@ -690,17 +712,6 @@ function DocumentActionsMenu({
               <Globe size={14} />
               {publishing ? "…" : "Publish"}
             </button>
-            {isPublished && (
-              <button
-                type="button"
-                disabled={publishing}
-                onClick={handleUnpublish}
-                className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                <PenLine size={14} />
-                Unpublish
-              </button>
-            )}
             <button
               type="button"
               disabled={deleting}

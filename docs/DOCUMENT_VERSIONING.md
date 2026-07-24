@@ -31,17 +31,20 @@ Working body lives in `title` / `content_ref`. No `draft_*` until after the firs
 ```
 Create document              → status=draft, version=1, no snapshot
 Autosave / collab (draft)    → live title/content_ref, no version
-Autosave / collab (published)→ draft_* only, no version
-Publish                      → version++ + snapshot; copy draft→live; clear draft_*
+Autosave / collab (published)→ draft_* only after a real editor change (lastEditor set)
+                               and TipTap-normalized HTML differs; reconnect alone does not
+Publish                      → version++ + snapshot; copy draft→live; clear draft_*;
+                               reset collab Yjs to published HTML
 Restore (published)          → load snapshot into draft_* only (no version)
 Restore (never published)    → overwrite live title/content_ref (no version)
-Discard unpublished changes  → clear draft_*
-Unpublish                    → status=draft; promote draft into live if present; clear draft_*
+Discard unpublished changes  → clear draft_*; reset collab to published HTML
 ```
+
+Product UI is **Publish** + **Discard unpublished changes** only. Reverting `status` to `draft` via API is not exposed in the editor menu.
 
 **Not versioned:** tags, permissions, attachments (except via publish of HTML).
 
-Shared logic: `packages/db/src/documentVersioning.ts`.
+Shared logic: `packages/db/src/documentVersioning.ts`. TipTap-aware content equality: `@wiki/doc-collab` `isHtmlContentChanged`.
 
 ---
 

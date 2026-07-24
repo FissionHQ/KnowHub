@@ -163,7 +163,8 @@ export function useCollaboration({
         if (origin === collabProvider) return;
         setSaveStatus("saving");
         if (saveTimer.current) clearTimeout(saveTimer.current);
-        saveTimer.current = setTimeout(() => setSaveStatus("saved"), 4000);
+        // Align with collab persist debounce (~3s) so "saved" + refetch aren't delayed extra.
+        saveTimer.current = setTimeout(() => setSaveStatus("saved"), 3200);
       };
 
       pendingYdoc.on("update", onDocUpdate);
