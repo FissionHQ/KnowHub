@@ -163,7 +163,8 @@ export function useCollaboration({
         if (origin === collabProvider) return;
         setSaveStatus("saving");
         if (saveTimer.current) clearTimeout(saveTimer.current);
-        saveTimer.current = setTimeout(() => setSaveStatus("saved"), 4000);
+        // Match collab persist debounce so "saved" lines up with draft_* write.
+        saveTimer.current = setTimeout(() => setSaveStatus("saved"), 3000);
       };
 
       pendingYdoc.on("update", onDocUpdate);

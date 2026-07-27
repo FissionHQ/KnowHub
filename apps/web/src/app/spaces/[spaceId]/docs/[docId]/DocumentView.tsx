@@ -91,6 +91,10 @@ export function DocumentView({ spaceId, docId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
+  const [discarding, setDiscarding] = useState(false);
+  /** Optimistic draft UI — Discard always resets collab + reloads, so this is safe. */
+  const [localDraft, setLocalDraft] = useState(false);
+  const suppressDraftBanner = useRef(false);
 
   const { data: favData, mutate: mutateFav } = useSWR(
     doc && user ? `fav:${docId}` : null,
@@ -123,7 +127,13 @@ export function DocumentView({ spaceId, docId }: Props) {
     setContent(editorContent(doc));
     setTitle(editorTitle(doc));
     setUseFallbackEditor(false);
+    suppressDraftBanner.current = false;
+    setLocalDraft(Boolean(doc.hasUnpublishedChanges));
   }, [doc]);
+
+  useEffect(() => {
+    if (doc?.hasUnpublishedChanges) setLocalDraft(true);
+  }, [doc?.hasUnpublishedChanges]);
 
   // Sync title from external changes (e.g. sidebar rename) when input is not focused
   useEffect(() => {
@@ -154,15 +164,31 @@ export function DocumentView({ spaceId, docId }: Props) {
   }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
 
   useEffect(() => {
-    if (useFallbackEditor) return;
+    if (useFallbackEditor || suppressDraftBanner.current) return;
 
     const prev = prevCollabSaveStatus.current;
     prevCollabSaveStatus.current = collab.saveStatus;
+    let followUp: ReturnType<typeof setTimeout> | undefined;
 
+    // Banner early; Discard stays hidden until the server has a real draft.
+    if (collab.saveStatus === "saving" && doc?.status === "published") {
+      setLocalDraft(true);
+    }
+
+    // Refetch after persist window so Discard can appear — never clear the banner here
+    // (persist races with "saved" and was wiping the optimistic flag).
     if (prev === "saving" && collab.saveStatus === "saved") {
       void mutate();
+      // Second pass after collab debounce write lands in DB.
+      followUp = setTimeout(() => {
+        if (!suppressDraftBanner.current) void mutate();
+      }, 1500);
     }
-  }, [collab.saveStatus, useFallbackEditor, docId, mutate]);
+
+    return () => {
+      if (followUp) clearTimeout(followUp);
+    };
+  }, [collab.saveStatus, useFallbackEditor, docId, mutate, doc?.status]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
@@ -194,16 +220,21 @@ export function DocumentView({ spaceId, docId }: Props) {
   const handleAutoSave = useCallback(
     async (html: string) => {
       if (!doc) return;
+      if (doc.status === "published" && !suppressDraftBanner.current) {
+        setLocalDraft(true);
+      }
       setSaveStatus("saving");
       try {
-        await documentsApi.update(docId, { content: html });
+        const updated = await documentsApi.update(docId, { content: html });
         setSaveStatus("saved");
-        void mutate();
+        mutate(updated, false);
+        // Keep banner while saving; only drop if server confirms no draft.
+        if (updated.hasUnpublishedChanges) setLocalDraft(true);
       } catch {
         setSaveStatus("unsaved");
       }
     },
-    [doc, docId],
+    [doc, docId, mutate],
   );
 
   async function handleMoveToTrash() {
@@ -255,10 +286,12 @@ export function DocumentView({ spaceId, docId }: Props) {
     if (!canEdit) return;
     const trimmed = title.trim();
     if (!trimmed || trimmed === editorTitle(currentDoc)) return;
+    if (currentDoc.status === "published") setLocalDraft(true);
     setSaveStatus("saving");
     try {
       const updated = await documentsApi.update(docId, { title: trimmed });
       mutate(updated, false);
+      if (updated.hasUnpublishedChanges) setLocalDraft(true);
       void globalMutate(`space:${spaceId}:docs`);
       void globalMutate("favorites");
       void globalMutate("recently-updated");
@@ -269,17 +302,29 @@ export function DocumentView({ spaceId, docId }: Props) {
   }
 
   async function handleDiscardDraft() {
-    if (!doc?.hasUnpublishedChanges) return;
+    // Only when the server has a draft — button is hidden until then.
+    if (!currentDoc.hasUnpublishedChanges || discarding) return;
+    suppressDraftBanner.current = true;
+    setLocalDraft(false);
+    setDiscarding(true);
     try {
       const result = await documentsApi.discardDraft(docId);
       mutate(result.document, false);
-      if (result.reloadRequired) {
-        window.setTimeout(() => window.location.reload(), 400);
-      }
+      setTitle(result.document.title);
+      window.setTimeout(() => window.location.reload(), 400);
     } catch {
-      // keep banner; user can retry
+      suppressDraftBanner.current = false;
+      setDiscarding(false);
+      setLocalDraft(true);
     }
   }
+
+  const showDraftBanner =
+    canEdit &&
+    currentDoc.status === "published" &&
+    (Boolean(currentDoc.hasUnpublishedChanges) || localDraft);
+
+  const canDiscardDraft = Boolean(currentDoc.hasUnpublishedChanges);
 
   return (
     <div className="p-8 max-w-8xl mx-auto">
@@ -318,21 +363,25 @@ export function DocumentView({ spaceId, docId }: Props) {
           </span>
         </nav>
 
-        {canEdit && doc.hasUnpublishedChanges && (
+        {showDraftBanner && (
           <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
             <span className="flex items-center gap-2 min-w-0">
               <PenLine size={14} className="shrink-0" />
               <span className="truncate">
                 Unpublished changes — readers still see the published version until you publish.
+                  
               </span>
             </span>
-            <button
-              type="button"
-              onClick={() => void handleDiscardDraft()}
-              className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
-            >
-              Discard
-            </button>
+            {canDiscardDraft && (
+              <button
+                type="button"
+                disabled={discarding}
+                onClick={() => void handleDiscardDraft()}
+                className="shrink-0 text-xs font-medium underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                {discarding ? "Discarding…" : "Discard"}
+              </button>
+            )}
           </div>
         )}
 
@@ -383,6 +432,7 @@ export function DocumentView({ spaceId, docId }: Props) {
                 onUpdate={(updated, opts) => {
                   mutate(updated, false);
                   if (opts?.published) {
+                    setLocalDraft(false);
                     void globalMutate(`doc-versions:${docId}`);
                   }
                 }}
@@ -623,8 +673,6 @@ function DocumentActionsMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
 
-  const isPublished = doc.status === "published";
-
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
@@ -692,17 +740,6 @@ function DocumentActionsMenu({
     }
   }
 
-  async function handleUnpublish() {
-    setPublishing(true);
-    setOpen(false);
-    try {
-      const updated = await documentsApi.update(doc.id, { status: "draft" });
-      onUpdate(updated, { published: false });
-    } finally {
-      setPublishing(false);
-    }
-  }
-
   function handleTrashClick() {
     setOpen(false);
     setTrashConfirmOpen(true);
@@ -747,17 +784,6 @@ function DocumentActionsMenu({
               <Globe size={14} />
               {publishing ? "…" : "Publish"}
             </button>
-            {isPublished && (
-              <button
-                type="button"
-                disabled={publishing}
-                onClick={handleUnpublish}
-                className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                <PenLine size={14} />
-                Unpublish
-              </button>
-            )}
 
             <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
 

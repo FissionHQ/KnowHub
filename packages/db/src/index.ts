@@ -7,3 +7,6 @@ export * from "./audit.js";
 export * from "./purgeAuditLog.js";
 export * from "./purgeExpiredTrash.js";
 export * from "./searchIndexContent.js";
+export * from "./htmlToPlainText.js";
+export * from "./resolveIndexAcl.js";
+export * from "./syncDocumentSearchIndex.js";

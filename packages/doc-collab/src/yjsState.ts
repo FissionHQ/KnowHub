@@ -19,3 +19,22 @@ export function encodeHtmlAsYjsStateBase64(html: string): string {
   const ydoc = htmlToYdoc(html);
   return Buffer.from(Y.encodeStateAsUpdate(ydoc)).toString("base64");
 }
+
+/**
+ * Normalize HTML through one TipTap parse→serialize cycle so attribute order /
+ * empty-paragraph quirks don't look like content edits.
+ * Safe for browser bundles (no node:crypto).
+ */
+export function canonicalizeHtml(html: string): string {
+  if (!html) return "";
+  try {
+    return ydocToHtml(htmlToYdoc(html));
+  } catch {
+    return html;
+  }
+}
+
+/** True when TipTap-normalized bodies differ (ignores serialize noise). */
+export function isHtmlContentChanged(current: string | null, next: string): boolean {
+  return canonicalizeHtml(current ?? "") !== canonicalizeHtml(next);
+}

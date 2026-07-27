@@ -16,8 +16,8 @@ import type { FileEmbedAttributes } from "./FileEmbedExtension";
 
 interface BlockMenuProps {
   editor: Editor;
-  title?: string;
-  documentId?: string;
+  title?: string | undefined;
+  documentId?: string | undefined;
 }
 
 export function BlockMenu({ editor, title = "document", documentId }: BlockMenuProps) {

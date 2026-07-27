@@ -1,12 +1,11 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@wiki/db";
-import { spacePermissions, documentPermissions } from "@wiki/db";
+import type { Db } from "./client.js";
+import { spacePermissions, documentPermissions } from "./schema.js";
 
 /**
  * Denormalized search ACL. Must mirror resolveDocumentAccess so search results match page access.
  * - visibility "inherit" (default): union of space groups + document-override groups/users (+ owner).
- * - visibility "restricted": only document-override groups/users (+ owner) — hidden from other
- *   space members.
+ * - visibility "restricted": only document-override groups/users (+ owner).
  */
 export async function resolveIndexAcl(
   db: Db,

@@ -18,6 +18,7 @@ import { createCommentsRouter } from "./domains/content/commentsRouter.js";
 import { createStorageRouter } from "./domains/storage/router.js";
 import { createAdminRouter } from "./domains/admin/router.js";
 import { createAuthRouter } from "./domains/auth/router.js";
+import { createSearchRouter } from "./domains/search/router.js";
 import type { ApiEnv } from "@wiki/config";
 import type { Db } from "@wiki/db";
 import type { Redis } from "ioredis";
@@ -78,10 +79,11 @@ export function createApp(
 
   api.use(createIdentityRouter(db, redis, ses, env));
   api.use(createAccessRouter(db, redis));
-  api.use(createNavigationRouter(db, sqs, env.SQS_INDEX_QUEUE_URL));
+  api.use(createNavigationRouter(db));
   api.use(createUserActivityRouter(db));
-  api.use(createContentRouter(db, sqs, env.SQS_INDEX_QUEUE_URL, redis));
+  api.use(createContentRouter(db, redis));
   api.use(createCommentsRouter(db));
+  api.use(createSearchRouter(db));
   api.use(
     createStorageRouter(db, s3, sqs, {
       quarantineBucket: env.S3_QUARANTINE_BUCKET,

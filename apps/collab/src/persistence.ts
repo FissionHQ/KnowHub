@@ -1,8 +1,5 @@
 import * as Y from "yjs";
 import { eq, and } from "drizzle-orm";
-import { TiptapTransformer } from "@hocuspocus/transformer";
-import { generateHTML, generateJSON } from "@tiptap/html";
-import { SendMessageCommand, type SQSClient } from "@aws-sdk/client-sqs";
 import type { Db } from "@wiki/db";
 import {
   documents,
@@ -10,24 +7,19 @@ import {
   setTenantContext,
   recordRecentlyUpdated,
   saveDocumentContent,
+  hasUnpublishedChanges,
+  syncDocumentSearchIndex,
 } from "@wiki/db";
-import type { SearchIndexMessage } from "@wiki/types";
-import { COLLAB_FIELD, collabTiptapExtensions } from "@wiki/doc-collab";
-import { getLastEditor } from "./lastEditor.js";
+import {
+  htmlToYdoc,
+  ydocToHtml,
+  isHtmlContentChanged,
+} from "@wiki/doc-collab";
+import { clearLastEditor, getLastEditor } from "./lastEditor.js";
 import { logger } from "./logger.js";
 
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const PERSIST_DEBOUNCE_MS = 3000;
-
-function htmlToYdoc(html: string): Y.Doc {
-  const json = generateJSON(html, collabTiptapExtensions);
-  return TiptapTransformer.toYdoc(json, COLLAB_FIELD, collabTiptapExtensions);
-}
-
-function ydocToHtml(ydoc: Y.Doc): string {
-  const json = TiptapTransformer.fromYdoc(ydoc, COLLAB_FIELD);
-  return generateHTML(json, collabTiptapExtensions);
-}
 
 function isHtmlEmpty(html: string): boolean {
   return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length === 0;
@@ -73,6 +65,9 @@ export async function loadCollabDocument(
   documentId: string,
   ydoc: Y.Doc,
 ): Promise<void> {
+  // No editor yet — reconnect/load must not create a draft from serialize noise.
+  clearLastEditor(orgId, documentId);
+
   await setTenantContext(db, orgId);
 
   const stateRows = await db
@@ -119,8 +114,6 @@ export async function storeCollabYjsState(
 
 export function scheduleHtmlPersist(
   db: Db,
-  sqs: SQSClient,
-  indexQueueUrl: string,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -133,7 +126,7 @@ export function scheduleHtmlPersist(
     key,
     setTimeout(() => {
       persistTimers.delete(key);
-      void persistHtmlAndIndex(db, sqs, indexQueueUrl, orgId, documentId, ydoc).catch((err) => {
+      void persistHtmlAndIndex(db, orgId, documentId, ydoc).catch((err) => {
         logger.error("Failed to persist collaborative document", {
           documentId,
           orgId,
@@ -146,8 +139,6 @@ export function scheduleHtmlPersist(
 
 async function persistHtmlAndIndex(
   db: Db,
-  sqs: SQSClient,
-  indexQueueUrl: string,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -178,6 +169,26 @@ async function persistHtmlAndIndex(
 
     const doc = docRows[0];
     if (!doc) return null;
+
+    // Published pages: only write draft_* after a real editor onChange (lastEditor set).
+    // Reconnect/store without typing must not create false unpublished drafts.
+    if (doc.status === "published" && !editedBy) {
+      logger.debug("Skipped draft persist — no editor change since load", {
+        documentId,
+        orgId,
+      });
+      return null;
+    }
+
+    const hasDraft = hasUnpublishedChanges(doc);
+    const baseContent = hasDraft
+      ? (doc.draftContentRef ?? doc.contentRef)
+      : doc.contentRef;
+
+    // TipTap roundtrip can change byte-exact HTML without a user edit.
+    if (!isHtmlContentChanged(baseContent, html)) {
+      return null;
+    }
 
     const result = await saveDocumentContent(tx, {
       doc: {
@@ -214,18 +225,7 @@ async function persistHtmlAndIndex(
     return;
   }
 
-  const msg: SearchIndexMessage = {
-    type: "SEARCH_INDEX",
-    documentId,
-    orgId,
-    operation: "upsert",
-  };
-  await sqs.send(
-    new SendMessageCommand({
-      QueueUrl: indexQueueUrl,
-      MessageBody: JSON.stringify(msg),
-    }),
-  );
+  await syncDocumentSearchIndex(db, documentId, orgId, "upsert");
 
   logger.debug("Persisted collaborative HTML (no version bump)", {
     documentId,

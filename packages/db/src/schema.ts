@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -12,6 +13,12 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+
+const tsvector = customType<{ data: string | null }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 // ─── Enums ────────────────────────────────────────────────────────────────
 
@@ -180,6 +187,16 @@ export const documents = pgTable(
     trashedAt: timestamp("trashed_at", { withTimezone: true }),
     /** draft | published — preserved when moved to trash for restore */
     statusBeforeTrash: documentStatusEnum("status_before_trash"),
+    /** Denormalized published title for full-text search. */
+    searchTitle: text("search_title"),
+    /** Plain-text published body for full-text search. */
+    searchBody: text("search_body"),
+    searchPreview: text("search_preview"),
+    searchUpdatedAt: timestamp("search_updated_at", { withTimezone: true }),
+    searchIsEditable: boolean("search_is_editable").notNull().default(true),
+    searchAclGroupIds: uuid("search_acl_group_ids").array().notNull().default([]),
+    searchAclUserIds: uuid("search_acl_user_ids").array().notNull().default([]),
+    searchVector: tsvector("search_vector"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

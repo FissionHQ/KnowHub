@@ -453,14 +453,14 @@ export function SearchPanel({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
-                          className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm group-hover:text-[#f25011] transition-colors"
+                          className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm group-hover:text-[#f25011] transition-colors [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:px-0.5 [&_mark]:rounded [&_mark]:text-inherit"
                           dangerouslySetInnerHTML={{
                             __html: hit.highlight.title?.[0] ?? hit.title,
                           }}
                         />
                         {hit.highlight.body?.[0] ? (
                           <p
-                            className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed [&>mark]:bg-yellow-200 [&>mark]:dark:bg-yellow-800/50 [&>mark]:px-0.5 [&>mark]:rounded"
+                            className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:px-0.5 [&_mark]:rounded"
                             dangerouslySetInnerHTML={{
                               __html: hit.highlight.body[0],
                             }}
