@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
 import { Button, Card, CardContent, Skeleton, Separator, Chip } from "@heroui/react";
-import { FileText, Plus, File, ChevronRight, Upload} from "lucide-react";
+import { FileText, Plus, File, ChevronRight} from "lucide-react";
 import clsx from "clsx";
 import { importDocumentFile } from "@/lib/importDocument";
 import { SearchPanel } from "@/components/search/SearchPanel";
@@ -28,7 +28,7 @@ function formatDateTime(date: Date) {
 
 export function SpaceView({ spaceId }: Props) {
   const router = useRouter();
-  const [importing, setImporting] = useState(false);
+  const [, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleImport(file: File) {
