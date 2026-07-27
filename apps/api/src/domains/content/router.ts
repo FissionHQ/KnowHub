@@ -23,6 +23,7 @@ import {
   discardDocumentDraft,
   hasUnpublishedChanges,
   isTitleChanged,
+  syncDocumentSearchIndex,
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64, isHtmlContentChanged } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
@@ -38,9 +39,6 @@ import {
 import { recordAudit } from "../../lib/audit.js";
 import { notifyCollabDocumentReset } from "../../lib/collabReset.js";
 import { logger } from "../../lib/logger.js";
-import type { SQSClient } from "@aws-sdk/client-sqs";
-import { SendMessageCommand } from "@aws-sdk/client-sqs";
-import type { SearchIndexMessage } from "@wiki/types";
 import type { Redis } from "ioredis";
 
 const createDocSchema = z.object({
@@ -142,23 +140,15 @@ function shapeDocumentResponse(
 
 export function createContentRouter(
   db: Db,
-  sqs: SQSClient,
-  indexQueueUrl: string,
   redis: Redis,
 ): Router {
   const router = Router();
 
-  async function enqueueIndex(documentId: string, orgId: string, operation: "upsert" | "delete") {
-    const msg: SearchIndexMessage = { type: "SEARCH_INDEX", documentId, orgId, operation };
+  async function syncSearchIndex(documentId: string, orgId: string, operation: "upsert" | "delete") {
     try {
-      await sqs.send(
-        new SendMessageCommand({
-          QueueUrl: indexQueueUrl,
-          MessageBody: JSON.stringify(msg),
-        }),
-      );
+      await syncDocumentSearchIndex(db, documentId, orgId, operation);
     } catch (err) {
-      logger.warn("Failed to enqueue search index message", { err, documentId, orgId, operation });
+      logger.warn("Failed to sync document search index", { err, documentId, orgId, operation });
     }
   }
 
@@ -301,7 +291,7 @@ export function createContentRouter(
       })
       .returning();
 
-    await enqueueIndex(docId, orgId, "upsert");
+    await syncSearchIndex(docId, orgId, "upsert");
     await recordRecentlyUpdated(db, userId, docId);
 
     res.status(201).json({ data: shapeDocumentResponse(inserted[0]!, "edit") });
@@ -591,7 +581,7 @@ export function createContentRouter(
       (titleWillChange || contentWillChange);
 
     if (contentOrMetadataChanged && !draftEditOnPublished) {
-      await enqueueIndex(documentId ?? "", orgId, "upsert");
+      await syncSearchIndex(documentId ?? "", orgId, "upsert");
       await recordRecentlyUpdated(db, userId, documentId ?? "");
     } else if (titleWillChange || contentWillChange) {
       await recordRecentlyUpdated(db, userId, documentId ?? "");
@@ -645,7 +635,7 @@ export function createContentRouter(
       })
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
 
-    await enqueueIndex(documentId ?? "", orgId, "delete");
+    await syncSearchIndex(documentId ?? "", orgId, "delete");
 
     await recordAudit(db, {
       orgId,
@@ -706,7 +696,7 @@ export function createContentRouter(
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)))
       .returning();
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await syncSearchIndex(documentId ?? "", orgId, "upsert");
 
     await recordAudit(db, {
       orgId,
@@ -866,7 +856,7 @@ export function createContentRouter(
 
     // Published restore lands in draft_* — search still serves the published body.
     if (doc.status !== "published") {
-      await enqueueIndex(documentId ?? "", orgId, "upsert");
+      await syncSearchIndex(documentId ?? "", orgId, "upsert");
     }
     await recordRecentlyUpdated(db, userId, documentId ?? "");
 
@@ -1026,7 +1016,7 @@ export function createContentRouter(
       });
     }
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await syncSearchIndex(documentId ?? "", orgId, "upsert");
 
     await recordAudit(db, {
       orgId,
@@ -1105,7 +1095,7 @@ export function createContentRouter(
       .set({ accessLevel: body.data.accessLevel })
       .where(eq(documentPermissions.id, permissionId ?? ""));
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await syncSearchIndex(documentId ?? "", orgId, "upsert");
 
     await recordAudit(db, {
       orgId,
@@ -1176,7 +1166,7 @@ export function createContentRouter(
 
     await db.delete(documentPermissions).where(eq(documentPermissions.id, permissionId ?? ""));
 
-    await enqueueIndex(documentId ?? "", orgId, "upsert");
+    await syncSearchIndex(documentId ?? "", orgId, "upsert");
 
     await recordAudit(db, {
       orgId,

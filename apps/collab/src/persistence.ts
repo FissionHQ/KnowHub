@@ -1,6 +1,5 @@
 import * as Y from "yjs";
 import { eq, and } from "drizzle-orm";
-import { SendMessageCommand, type SQSClient } from "@aws-sdk/client-sqs";
 import type { Db } from "@wiki/db";
 import {
   documents,
@@ -9,8 +8,8 @@ import {
   recordRecentlyUpdated,
   saveDocumentContent,
   hasUnpublishedChanges,
+  syncDocumentSearchIndex,
 } from "@wiki/db";
-import type { SearchIndexMessage } from "@wiki/types";
 import {
   htmlToYdoc,
   ydocToHtml,
@@ -115,8 +114,6 @@ export async function storeCollabYjsState(
 
 export function scheduleHtmlPersist(
   db: Db,
-  sqs: SQSClient,
-  indexQueueUrl: string,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -129,7 +126,7 @@ export function scheduleHtmlPersist(
     key,
     setTimeout(() => {
       persistTimers.delete(key);
-      void persistHtmlAndIndex(db, sqs, indexQueueUrl, orgId, documentId, ydoc).catch((err) => {
+      void persistHtmlAndIndex(db, orgId, documentId, ydoc).catch((err) => {
         logger.error("Failed to persist collaborative document", {
           documentId,
           orgId,
@@ -142,8 +139,6 @@ export function scheduleHtmlPersist(
 
 async function persistHtmlAndIndex(
   db: Db,
-  sqs: SQSClient,
-  indexQueueUrl: string,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -230,18 +225,7 @@ async function persistHtmlAndIndex(
     return;
   }
 
-  const msg: SearchIndexMessage = {
-    type: "SEARCH_INDEX",
-    documentId,
-    orgId,
-    operation: "upsert",
-  };
-  await sqs.send(
-    new SendMessageCommand({
-      QueueUrl: indexQueueUrl,
-      MessageBody: JSON.stringify(msg),
-    }),
-  );
+  await syncDocumentSearchIndex(db, documentId, orgId, "upsert");
 
   logger.debug("Persisted collaborative HTML (no version bump)", {
     documentId,

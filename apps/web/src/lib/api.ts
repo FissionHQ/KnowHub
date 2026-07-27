@@ -32,7 +32,7 @@ import type {
 } from "@wiki/types";
 
 const BASE = "/api";
-const SEARCH_BASE = "/search";
+const SEARCH_BASE = "/api";
 
 async function apiFetch<T>(
   path: string,

@@ -8,17 +8,21 @@ import {
   SQSClient,
   ReceiveMessageCommand,
   DeleteMessageCommand,
-  ChangeMessageVisibilityCommand,
 } from "@aws-sdk/client-sqs";
 import { S3Client } from "@aws-sdk/client-s3";
 import { SESClient } from "@aws-sdk/client-ses";
 import { parseWorkerEnv } from "@wiki/config";
-import { getDb, setTenantContext, purgeExpiredAuditLogs, purgeExpiredTrash, recordAudit } from "@wiki/db";
-import { createOpenSearchClient, ensureIndex, INDEX_NAME } from "./opensearch.js";
+import {
+  getDb,
+  setTenantContext,
+  purgeExpiredAuditLogs,
+  purgeExpiredTrash,
+  recordAudit,
+  syncDocumentSearchIndex,
+} from "@wiki/db";
 import { PdfProcessor } from "./pdfProcessor.js";
-import { Indexer } from "./indexer.js";
 import { logger } from "./logger.js";
-import type { PdfProcessingMessage, SearchIndexMessage } from "@wiki/types";
+import type { PdfProcessingMessage } from "@wiki/types";
 
 const env = parseWorkerEnv();
 
@@ -35,17 +39,15 @@ const awsBase = {
 const sqs = new SQSClient({ ...awsBase, ...(env.SQS_ENDPOINT ? { endpoint: env.SQS_ENDPOINT } : {}) });
 const s3 = new S3Client({ ...awsBase, ...(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT, forcePathStyle: true } : {}) });
 const ses = new SESClient({ ...awsBase, ...(env.SES_ENDPOINT ? { endpoint: env.SES_ENDPOINT } : {}) });
-const os = createOpenSearchClient(env.OPENSEARCH_URL);
 const db = getDb(env.DATABASE_URL);
 
-const pdfProcessor = new PdfProcessor(db, s3, os, ses, {
+const pdfProcessor = new PdfProcessor(db, s3, ses, {
   quarantineBucket: env.S3_QUARANTINE_BUCKET,
   servedBucket: env.S3_SERVED_BUCKET,
   sesFromAddress: env.SES_FROM_ADDRESS,
   clamavHost: env.CLAMAV_HOST,
   clamavPort: env.CLAMAV_PORT,
 });
-const indexer = new Indexer(db, os);
 
 let running = true;
 
@@ -56,8 +58,8 @@ async function pollQueue(queueUrl: string): Promise<void> {
         new ReceiveMessageCommand({
           QueueUrl: queueUrl,
           MaxNumberOfMessages: 5,
-          WaitTimeSeconds: 20, // long polling
-          VisibilityTimeout: 300, // 5 min processing window
+          WaitTimeSeconds: 20,
+          VisibilityTimeout: 300,
         }),
       );
 
@@ -74,15 +76,10 @@ async function pollQueue(queueUrl: string): Promise<void> {
               const data = payload as PdfProcessingMessage;
               await setTenantContext(db, data.orgId);
               await pdfProcessor.process(data);
-            } else if (payload.type === "SEARCH_INDEX") {
-              const data = payload as SearchIndexMessage;
-              await setTenantContext(db, data.orgId);
-              await indexer.handle(data);
             } else {
               logger.warn("Unknown message type", { type: payload.type });
             }
 
-            // Delete message on success
             await sqs.send(
               new DeleteMessageCommand({
                 QueueUrl: queueUrl,
@@ -91,7 +88,6 @@ async function pollQueue(queueUrl: string): Promise<void> {
             );
           } catch (err) {
             logger.error("Message processing failed — will retry", { err, msgId: msg.MessageId });
-            // Message will become visible again after VisibilityTimeout
           }
         }),
       );
@@ -107,10 +103,8 @@ function sleep(ms: number) {
 }
 
 async function main() {
-  await ensureIndex(os);
-  logger.info("Worker started, polling queues...");
+  logger.info("Worker started, polling PDF queue...");
 
-  // Purge expired audit logs every 24 hours
   const purgeAudit = async () => {
     try {
       await purgeExpiredAuditLogs(db);
@@ -128,7 +122,7 @@ async function main() {
       for (const doc of purged) {
         try {
           await setTenantContext(db, doc.orgId);
-          await os.delete({ index: INDEX_NAME, id: doc.documentId, refresh: "wait_for" });
+          await syncDocumentSearchIndex(db, doc.documentId, doc.orgId, "delete");
         } catch (err) {
           logger.warn("Failed to remove purged document from search index", {
             documentId: doc.documentId,
@@ -160,11 +154,7 @@ async function main() {
   await purgeTrash();
   setInterval(purgeTrash, 24 * 60 * 60 * 1000);
 
-  // Poll both queues concurrently
-  await Promise.all([
-    pollQueue(env.SQS_PDF_QUEUE_URL),
-    pollQueue(env.SQS_INDEX_QUEUE_URL),
-  ]);
+  await pollQueue(env.SQS_PDF_QUEUE_URL);
 }
 
 process.on("SIGTERM", () => { running = false; });

@@ -11,10 +11,8 @@ const baseSchema = z.object({
   S3_ENDPOINT: z.string().url().optional(),
   S3_QUARANTINE_BUCKET: z.string(),
   S3_SERVED_BUCKET: z.string(),
-  OPENSEARCH_URL: z.string().url(),
   SQS_ENDPOINT: z.string().url().optional(),
   SQS_PDF_QUEUE_URL: z.string().url(),
-  SQS_INDEX_QUEUE_URL: z.string().url(),
   BASE_DOMAIN: z.string(),
   JWT_SECRET: z.string().min(32),
   SES_ENDPOINT: z.string().url().optional(),
@@ -23,10 +21,6 @@ const baseSchema = z.object({
 
 const apiSchema = baseSchema.extend({
   API_PORT: z.coerce.number().default(3001),
-});
-
-const searchSchema = baseSchema.extend({
-  SEARCH_PORT: z.coerce.number().default(3002),
 });
 
 const collabSchema = baseSchema.extend({
@@ -40,15 +34,6 @@ const workerSchema = baseSchema.extend({
 
 export function parseApiEnv(env: NodeJS.ProcessEnv = process.env) {
   const result = apiSchema.safeParse(env);
-  if (!result.success) {
-    console.error("Invalid environment variables:", result.error.flatten().fieldErrors);
-    process.exit(1);
-  }
-  return result.data;
-}
-
-export function parseSearchEnv(env: NodeJS.ProcessEnv = process.env) {
-  const result = searchSchema.safeParse(env);
   if (!result.success) {
     console.error("Invalid environment variables:", result.error.flatten().fieldErrors);
     process.exit(1);
@@ -75,6 +60,5 @@ export function parseCollabEnv(env: NodeJS.ProcessEnv = process.env) {
 }
 
 export type ApiEnv = ReturnType<typeof parseApiEnv>;
-export type SearchEnv = ReturnType<typeof parseSearchEnv>;
 export type WorkerEnv = ReturnType<typeof parseWorkerEnv>;
 export type CollabEnv = ReturnType<typeof parseCollabEnv>;
