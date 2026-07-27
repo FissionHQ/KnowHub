@@ -201,7 +201,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenameValue(doc.title); setRenaming(true); }}
-              className="w-full text-left px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full text-left px-3 py-1.5 text-zinc-700 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-[#f25011] transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <PenIcon size={10} />
               Rename
@@ -210,7 +210,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
               type="button"
               disabled={deleting}
               onClick={handleTrashClick}
-              className="w-full text-left px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full text-left px-3 py-1.5 text-zinc-700 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-[#f25011] transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <Trash2 size={10} />
               Move to trash

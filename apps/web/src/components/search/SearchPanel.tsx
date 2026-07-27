@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, useId } from "react";
 import { useRouter } from "next/navigation";
 import { searchApi, spacesApi, usersApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -14,6 +14,63 @@ export interface SearchPanelProps {
   lockedSpaceId?: string;
   placeholder?: string;
   onSearchedChange?: (searched: boolean) => void;
+}
+
+function FilterSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const selected = options.find((o) => o.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative" id={id}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 flex items-center justify-between gap-2 cursor-pointer transition-colors"
+      >
+        <span className="truncate">{selected?.label}</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}>
+          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onMouseDown={() => { onChange(opt.value); setOpen(false); }}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                opt.value === value
+                  ? "bg-[#f25011] text-white"
+                  : "text-zinc-700 dark:text-zinc-300 hover:bg-[#f25011] hover:text-white"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SearchPanel({
@@ -265,36 +322,22 @@ export function SearchPanel({
                 <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
                   Space
                 </label>
-                <select
+                <FilterSelect
                   value={spaceId}
-                  onChange={(e) => setSpaceId(e.target.value)}
-                  className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-                >
-                  <option value="">All spaces</option>
-                  {spaces.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSpaceId}
+                  options={[{ value: "", label: "All spaces" }, ...spaces.map((s) => ({ value: s.id, label: s.name }))]}
+                />
               </div>
             )}
             <div>
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
                 Author
               </label>
-              <select
+              <FilterSelect
                 value={authorId}
-                onChange={(e) => setAuthorId(e.target.value)}
-                className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-              >
-                <option value="">All authors</option>
-                {orgAuthors.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email}
-                  </option>
-                ))}
-              </select>
+                onChange={setAuthorId}
+                options={[{ value: "", label: "All authors" }, ...orgAuthors.map((u) => ({ value: u.id, label: u.name || u.email }))]}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
@@ -312,15 +355,15 @@ export function SearchPanel({
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
                 File type
               </label>
-              <select
+              <FilterSelect
                 value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
-              >
-                <option value="">All types</option>
-                <option value="page">Page</option>
-                <option value="pdf">PDF</option>
-              </select>
+                onChange={setType}
+                options={[
+                  { value: "", label: "All types" },
+                  { value: "page", label: "Page" },
+                  { value: "pdf", label: "PDF" },
+                ]}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
