@@ -250,7 +250,7 @@ export function DocumentView({ spaceId, docId }: Props) {
 
   if (!doc) {
     return (
-      <div className="p-8 max-w-6xl mx-auto space-y-4">
+      <div className="p-8 max-w-8xl mx-auto space-y-4">
         <Skeleton className="w-1/3 h-4 rounded-md" />
         <Skeleton className="w-2/3 h-8 rounded-xl" />
         <Skeleton className="w-full h-96 rounded-xl" />

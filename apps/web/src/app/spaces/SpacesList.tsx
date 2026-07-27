@@ -150,7 +150,6 @@ export function SpacesList() {
               <Card className="h-full transition-all duration-200 hover:shadow-md hover:border-[#f25011]/30 cursor-pointer">
                 <CardContent className="p-5 flex flex-col gap-3 h-full">
                   <div className="flex items-start justify-between">
-                    <span className="text-3xl">{space.iconEmoji ?? "📄"}</span>
                     <ArrowRight
                       size={16}
                       className="text-zinc-300 group-hover:text-[#f25011] group-hover:translate-x-0.5 transition-all mt-1"

@@ -31,7 +31,7 @@ interface Props {
 
 export function CollaborativeEditor({
   ydoc,
-  provider,
+  provider: _provider,
   placeholder = "Start writing...",
   readOnly = false,
   documentId,
@@ -66,7 +66,7 @@ export function CollaborativeEditor({
 
   return (
     <>
-      {!readOnly && <BlockMenu editor={editor} documentId={documentId} />}
+      {!readOnly && <BlockMenu editor={editor} {...(documentId !== undefined && { documentId })} />}
       <EditorContent editor={editor} className="prose prose-sm max-w-none focus:outline-none" />
     </>
   );

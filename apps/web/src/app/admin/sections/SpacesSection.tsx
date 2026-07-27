@@ -195,7 +195,6 @@ function SpaceRow({
     <div className="px-4 py-4">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-2xl">{space.iconEmoji ?? "📄"}</span>
           <div className="min-w-0">
             <Link
               href={`/spaces/${space.id}`}
