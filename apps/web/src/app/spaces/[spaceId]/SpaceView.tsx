@@ -149,7 +149,6 @@ export function SpaceView({ spaceId }: Props) {
       <div className="flex items-center gap-4 mb-6">
         {spaceLoading ? (
           <>
-            <Skeleton className="w-12 h-12 rounded-xl" />
             <div className="flex flex-col gap-2 flex-1">
               <Skeleton className="w-40 h-5 rounded-md" />
               <Skeleton className="w-64 h-3.5 rounded-md" />
@@ -157,9 +156,6 @@ export function SpaceView({ spaceId }: Props) {
           </>
         ) : (
           <>
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-2xl shrink-0">
-              {space?.iconEmoji ?? "📄"}
-            </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
                 {space?.name ?? "Space"}
@@ -183,7 +179,7 @@ export function SpaceView({ spaceId }: Props) {
                 e.target.value = "";
               }}
             />
-            <Button
+            {/* <Button
               variant="secondary"
               size="sm"
               className="shrink-0 flex items-center gap-1.5"
@@ -202,7 +198,7 @@ export function SpaceView({ spaceId }: Props) {
                 <Plus size={14} />
                 New Page
               </Button>
-            </Link>
+            </Link> */}
           </>
         )}
       </div>

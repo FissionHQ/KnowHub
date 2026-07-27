@@ -189,7 +189,7 @@ export function Sidebar() {
             <div className="flex flex-col gap-0.5 mb-1">
               {favDocs.slice(0, 5).map((doc) => (
                 <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                  <div className="flex items-center gap-2 pl-6 pr-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
                     <Star size={11} className="text-amber-400 fill-amber-400 shrink-0" />
                     <span className="truncate">{doc.title}</span>
                   </div>
@@ -218,7 +218,7 @@ export function Sidebar() {
             <div className="flex flex-col gap-0.5 mb-1">
               {recentDocs.slice(0, 5).map((doc) => (
                 <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                  <div className="flex items-center gap-2 pl-6 pr-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
                     <Clock size={11} className="text-zinc-500 shrink-0" />
                     <span className="truncate">{doc.title}</span>
                   </div>
@@ -247,7 +247,7 @@ export function Sidebar() {
             <div className="flex flex-col gap-0.5 mb-1">
               {recentlyUpdated.slice(0, 5).map((doc) => (
                 <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
+                  <div className="flex items-center gap-2 pl-6 pr-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
                     <RefreshCw size={11} className="text-zinc-500 shrink-0" />
                     <span className="truncate">{doc.title}</span>
                   </div>

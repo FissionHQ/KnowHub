@@ -15,8 +15,8 @@ export function SearchView() {
       }`}
     >
       {!searched && (
-        <div className="flex flex-col items-center gap-3 mb-8">
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+        <div className="flex flex-col items-center gap-3 mb-6">
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
             Search KnowHub
           </h1>
         </div>
