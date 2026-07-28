@@ -47,6 +47,12 @@ a:hover {
   line-height: 1.75;
 }
 
+.ProseMirror[contenteditable="false"] {
+  min-height: unset;
+  padding: 0;
+  cursor: default;
+}
+
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: #a1a1aa;
