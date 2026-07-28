@@ -39,11 +39,11 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
   }
 
   return (
-    <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden mb-4">
+    <div className="border border-border rounded-xl overflow-hidden mb-4">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-muted text-sm font-medium text-foreground/80 hover:bg-accent transition-colors"
       >
         <span className="flex items-center gap-2">
           <Tag size={14} />
@@ -53,19 +53,19 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
       </button>
 
       {open && (
-        <div className="px-4 py-3 space-y-3 bg-white dark:bg-zinc-900 text-sm">
+        <div className="px-4 py-3 space-y-3 bg-card text-sm">
           {/* Owner */}
-          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <User size={13} className="shrink-0" />
-            <span className="text-zinc-400">Owner:</span>
-            <span className="text-zinc-700 dark:text-zinc-200">{doc.ownerName ?? doc.ownerId}</span>
+            <span className="text-muted-foreground">Owner:</span>
+            <span className="text-foreground/80">{doc.ownerName ?? doc.ownerId}</span>
           </div>
 
           {/* Last edited */}
-          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Clock size={13} className="shrink-0" />
-            <span className="text-zinc-400">Last edited:</span>
-            <span className="text-zinc-700 dark:text-zinc-200">
+            <span className="text-muted-foreground">Last edited:</span>
+            <span className="text-foreground/80">
               {new Date(doc.updatedAt).toLocaleString()}
               {doc.lastEditedByName && ` by ${doc.lastEditedByName}`}
             </span>
@@ -73,12 +73,12 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
 
           {/* Tags */}
           <div className="flex items-start gap-2">
-            <Tag size={13} className="shrink-0 mt-1 text-zinc-400" />
+            <Tag size={13} className="shrink-0 mt-1 text-muted-foreground" />
             <div className="flex flex-wrap gap-1.5 flex-1">
               {doc.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-md"
+                  className="inline-flex items-center gap-1 text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-md"
                 >
                   {tag}
                   <button
@@ -97,13 +97,13 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTag()}
                   placeholder="Add tag…"
-                  className="text-xs border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-0.5 bg-transparent outline-none focus:border-[#f25011] w-24"
+                  className="text-xs border border-border rounded-md px-2 py-0.5 bg-transparent outline-none focus:border-primary w-24"
                 />
                 <button
                   type="button"
                   onClick={addTag}
                   disabled={saving || !tagInput.trim()}
-                  className="text-[#f25011] hover:text-[#e0470f] disabled:opacity-40"
+                  className="text-primary hover:text-[#e0470f] disabled:opacity-40"
                 >
                   <Plus size={13} />
                 </button>
@@ -113,9 +113,9 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
 
           {/* Restrict Download (PDF-6) */}
           {doc.type === "pdf" && (
-            <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center gap-2 text-muted-foreground">
               <ShieldAlert size={13} className="shrink-0" />
-              <span className="text-zinc-400 flex-1">Restrict download/print:</span>
+              <span className="text-muted-foreground flex-1">Restrict download/print:</span>
               <button
                 type="button"
                 disabled={saving}
@@ -131,7 +131,7 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
                 className={`text-xs px-2 py-0.5 rounded-md font-medium transition-colors ${
                   doc.restrictDownload
                     ? "bg-red-100 dark:bg-red-950/40 text-red-600"
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 {doc.restrictDownload ? "Restricted" : "Allowed"}

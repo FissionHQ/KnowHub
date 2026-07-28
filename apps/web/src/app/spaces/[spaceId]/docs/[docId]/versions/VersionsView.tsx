@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import type { Document } from "@wiki/types";
 import { DocumentVersionHistory } from "@/components/DocumentVersionHistory";
 import { History, ChevronLeft } from "lucide-react";
-import { Skeleton } from "@heroui/react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
   spaceId: string;
@@ -23,15 +23,15 @@ export function VersionsView({ spaceId, docId }: Props) {
     <div className="p-8 max-w-2xl mx-auto">
       <Link
         href={`/spaces/${spaceId}/docs/${docId}`}
-        className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-[#f25011] transition-colors mb-6"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
       >
         <ChevronLeft size={14} />
         Back to document
       </Link>
 
       <div className="flex items-center gap-2 mb-6">
-        <History size={18} className="text-[#f25011]" />
-        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Version history</h1>
+        <History size={18} className="text-primary" />
+        <h1 className="text-xl font-bold text-foreground">Version history</h1>
       </div>
 
       {!doc ? (
@@ -41,7 +41,7 @@ export function VersionsView({ spaceId, docId }: Props) {
           ))}
         </div>
       ) : (
-        <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden">
+        <div className="border border-border rounded-xl overflow-hidden">
           <DocumentVersionHistory
             documentId={docId}
             currentVersion={doc.version}

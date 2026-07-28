@@ -9,7 +9,7 @@ import {
   MessageSquare, ChevronDown, ChevronUp, Send, Reply,
   CheckCheck, Trash2, CornerDownRight,
 } from "lucide-react";
-import { Spinner } from "@heroui/react";
+import { Spinner } from "@/components/ui/spinner";
 import clsx from "clsx";
 
 interface Props { documentId: string; defaultOpen?: boolean }
@@ -20,10 +20,10 @@ interface Props { documentId: string; defaultOpen?: boolean }
 function RenderBody({ body }: { body: string }) {
   const parts = body.split(/(@\w[\w\s]*?\b)/g);
   return (
-    <p className="mt-1.5 ml-8 text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words">
+    <p className="mt-1.5 ml-8 text-sm text-foreground/80 whitespace-pre-wrap break-words">
       {parts.map((part, i) =>
         part.startsWith("@") ? (
-          <span key={i} className="text-[#f25011] font-semibold">{part}</span>
+          <span key={i} className="text-primary font-semibold">{part}</span>
         ) : (
           part
         ),
@@ -143,16 +143,16 @@ function MentionComposer({
             onKeyDown={handleKeyDown}
             placeholder={placeholder ?? "Add a comment… (type @ to mention)"}
             rows={2}
-            className="w-full text-sm px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 outline-none focus:border-[#f25011] resize-none placeholder:text-zinc-400 transition-colors"
+            className="w-full text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground outline-none focus:border-primary resize-none placeholder:text-muted-foreground transition-colors"
           />
 
           {/* Mention dropdown */}
           {mentionQuery !== null && filteredUsers.length > 0 && (
             <div
               ref={dropdownRef}
-              className="absolute bottom-full mb-1 left-0 w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 z-50"
+              className="absolute bottom-full mb-1 left-0 w-56 bg-card border border-border rounded-lg shadow-lg py-1 z-50"
             >
-              <p className="text-[10px] text-zinc-400 px-3 pt-1 pb-0.5 uppercase tracking-wide font-semibold">Mention</p>
+              <p className="text-[10px] text-muted-foreground px-3 pt-1 pb-0.5 uppercase tracking-wide font-semibold">Mention</p>
               {filteredUsers.map((u, i) => (
                 <button
                   key={u.id}
@@ -161,21 +161,21 @@ function MentionComposer({
                   className={clsx(
                     "w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors",
                     i === selectedIdx
-                      ? "bg-[#f25011]/10 text-[#f25011]"
-                      : "text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700",
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground/80 hover:bg-muted dark:hover:bg-accent",
                   )}
                 >
-                  <div className="w-5 h-5 rounded-full bg-[#f25011] flex items-center justify-center text-white text-[9px] font-bold shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-white text-[9px] font-bold shrink-0">
                     {u.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 text-left">
                     <p className="font-medium truncate text-xs">{u.name}</p>
-                    <p className="text-[10px] text-zinc-400 truncate">{u.email}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>
                   </div>
                 </button>
               ))}
               {filteredUsers.length === 0 && mentionQuery.length > 0 && (
-                <p className="text-xs text-zinc-400 px-3 py-2">No users found</p>
+                <p className="text-xs text-muted-foreground px-3 py-2">No users found</p>
               )}
             </div>
           )}
@@ -186,13 +186,13 @@ function MentionComposer({
             type="button"
             onClick={doSubmit}
             disabled={submitting || !body.trim()}
-            className="p-2 rounded-lg bg-[#f25011] text-white hover:bg-[#e0470f] disabled:opacity-40 transition-colors"
+            className="p-2 rounded-lg bg-primary text-white hover:bg-[#e0470f] disabled:opacity-40 transition-colors"
             title="Send (⌘↵)"
           >
-            {submitting ? <Spinner size="sm" /> : <Send size={14} />}
+            {submitting ? <Spinner size={14} /> : <Send size={14} />}
           </button>
           {onCancel && (
-            <button type="button" onClick={onCancel} className="text-[11px] text-zinc-400 hover:text-zinc-600 text-center">
+            <button type="button" onClick={onCancel} className="text-[11px] text-muted-foreground hover:text-muted-foreground text-center">
               Cancel
             </button>
           )}
@@ -200,7 +200,7 @@ function MentionComposer({
       </div>
 
       {body.length === 0 && (
-        <p className="text-[10px] text-zinc-400 mt-1">Type <kbd className="bg-zinc-100 dark:bg-zinc-700 px-1 rounded">@</kbd> to mention · <kbd className="bg-zinc-100 dark:bg-zinc-700 px-1 rounded">⌘↵</kbd> to send</p>
+        <p className="text-[10px] text-muted-foreground mt-1">Type <kbd className="bg-muted px-1 rounded">@</kbd> to mention · <kbd className="bg-muted px-1 rounded">⌘↵</kbd> to send</p>
       )}
     </div>
   );
@@ -238,11 +238,11 @@ function CommentItem({
     <div className="px-4 py-3 group">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          <div className="w-6 h-6 rounded-full bg-[#f25011] flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[10px] font-bold shrink-0">
             {comment.authorName.charAt(0).toUpperCase()}
           </div>
-          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200 truncate">{comment.authorName}</span>
-          <span className="text-[11px] text-zinc-400 shrink-0">
+          <span className="text-xs font-semibold text-foreground/80 truncate">{comment.authorName}</span>
+          <span className="text-[11px] text-muted-foreground shrink-0">
             {new Date(comment.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           </span>
           {comment.resolved && (
@@ -252,19 +252,19 @@ function CommentItem({
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           {onReply && (
-            <button type="button" onClick={onReply} title="Reply" className="p-1 rounded text-zinc-400 hover:text-[#f25011]">
+            <button type="button" onClick={onReply} title="Reply" className="p-1 rounded text-muted-foreground hover:text-primary">
               <Reply size={12} />
             </button>
           )}
           {isTopLevel && (
-            <button type="button" onClick={handleResolve} disabled={loading} title={comment.resolved ? "Unresolve" : "Resolve"} className="p-1 rounded text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400">
+            <button type="button" onClick={handleResolve} disabled={loading} title={comment.resolved ? "Unresolve" : "Resolve"} className="p-1 rounded text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400">
               <CheckCheck size={12} />
             </button>
           )}
           {isAuthor && (
             <>
-              <button type="button" onClick={() => setEditing((v) => !v)} className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 text-[11px] font-medium">Edit</button>
-              <button type="button" onClick={handleDelete} className="p-1 rounded text-zinc-400 hover:text-red-500"><Trash2 size={12} /></button>
+              <button type="button" onClick={() => setEditing((v) => !v)} className="p-1 rounded text-muted-foreground hover:text-foreground text-[11px] font-medium">Edit</button>
+              <button type="button" onClick={handleDelete} className="p-1 rounded text-muted-foreground hover:text-red-500"><Trash2 size={12} /></button>
             </>
           )}
         </div>
@@ -297,11 +297,11 @@ function Thread({ comment, documentId, mutate }: { comment: Comment; documentId:
   const [replying, setReplying] = useState(false);
 
   return (
-    <div className={clsx("border-t border-zinc-100 dark:border-zinc-800", comment.resolved && "opacity-60")}>
+    <div className={clsx("border-t border-border", comment.resolved && "opacity-60")}>
       <CommentItem comment={comment} documentId={documentId} mutate={mutate} onReply={() => setReplying((v) => !v)} isTopLevel />
 
       {comment.replies && comment.replies.length > 0 && (
-        <div className="pl-6 border-l-2 border-zinc-100 dark:border-zinc-800 ml-4 mb-1">
+        <div className="pl-6 border-l-2 border-border ml-4 mb-1">
           {comment.replies.map((reply) => (
             <CommentItem key={reply.id} comment={reply} documentId={documentId} mutate={mutate} />
           ))}
@@ -310,9 +310,9 @@ function Thread({ comment, documentId, mutate }: { comment: Comment; documentId:
 
       {replying && (
         <div className="px-4 pb-3 pl-10">
-          <div className="flex items-center gap-1 text-xs text-zinc-400 mb-1.5">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
             <CornerDownRight size={11} />
-            Replying to <span className="font-medium text-zinc-600 dark:text-zinc-300">{comment.authorName}</span>
+            Replying to <span className="font-medium text-muted-foreground">{comment.authorName}</span>
           </div>
           <MentionComposer
             documentId={documentId}
@@ -349,13 +349,13 @@ export function CommentsPanel({ documentId, defaultOpen = false }: Props) {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-4 py-2.5 bg-zinc-50 dark:bg-zinc-900 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-muted text-sm font-medium text-foreground/80 hover:bg-accent transition-colors"
         >
           <span className="flex items-center gap-2">
             <MessageSquare size={14} />
             Comments
             {topLevel.length > 0 && (
-              <span className="text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-1.5 py-0.5 rounded-full font-mono leading-none">
+              <span className="text-xs bg-border text-muted-foreground px-1.5 py-0.5 rounded-full font-mono leading-none">
                 {topLevel.length}
               </span>
             )}
@@ -365,18 +365,18 @@ export function CommentsPanel({ documentId, defaultOpen = false }: Props) {
       )}
 
       {open && (
-        <div className={clsx("bg-white dark:bg-zinc-900", defaultOpen && "flex flex-col flex-1")}>
-          {isLoading && <div className="flex justify-center py-6"><Spinner size="sm" /></div>}
+        <div className={clsx("bg-card", defaultOpen && "flex flex-col flex-1")}>
+          {isLoading && <div className="flex justify-center py-6"><Spinner size={14} /></div>}
 
           {!isLoading && topLevel.length === 0 && (
-            <p className="text-xs text-zinc-400 text-center py-4">No comments yet. Start the discussion!</p>
+            <p className="text-xs text-muted-foreground text-center py-4">No comments yet. Start the discussion!</p>
           )}
 
           {topLevel.map((comment) => (
             <Thread key={comment.id} comment={comment} documentId={documentId} mutate={mutate} />
           ))}
 
-          <div className={clsx("border-t border-zinc-100 dark:border-zinc-800 px-4 py-3", defaultOpen && "sticky bottom-0 bg-white dark:bg-zinc-900")}>
+          <div className={clsx("border-t border-border px-4 py-3", defaultOpen && "sticky bottom-0 bg-card")}>
             <MentionComposer
               documentId={documentId}
               onSubmit={async (body) => {

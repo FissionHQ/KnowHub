@@ -5,7 +5,8 @@ import useSWR from "swr";
 import Link from "next/link";
 import { groupsApi, spacesApi } from "@/lib/api";
 import type { AccessLevel, Space, SpacePermissionRecord } from "@wiki/types";
-import { Button, Card, CardContent } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Users } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 
@@ -52,7 +53,7 @@ export function SpacesSection() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Create space
           </h2>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -60,21 +61,21 @@ export function SpacesSection() {
               placeholder="Space name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
               required
             />
             <input
               placeholder="Icon emoji"
               value={iconEmoji}
               onChange={(e) => setIconEmoji(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
               maxLength={4}
             />
             <input
               placeholder="Description (optional)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm md:col-span-2"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm md:col-span-2"
             />
             <Select
               value={defaultGroupId}
@@ -91,9 +92,9 @@ export function SpacesSection() {
             <div className="md:col-span-2">
               <Button
                 type="submit"
-                variant="primary"
+                variant="default"
                 size="sm"
-                isDisabled={submitting || !defaultGroupId}
+                disabled={submitting || !defaultGroupId}
               >
                 Create space
               </Button>
@@ -103,7 +104,7 @@ export function SpacesSection() {
       </Card>
 
       <Card>
-        <CardContent className="p-0 divide-y divide-zinc-100 dark:divide-zinc-800">
+        <CardContent className="p-0 divide-y divide-border">
           {spaces.map((space) => (
             <SpaceRow
               key={space.id}
@@ -198,12 +199,12 @@ function SpaceRow({
           <div className="min-w-0">
             <Link
               href={`/spaces/${space.id}`}
-              className="font-medium text-zinc-900 dark:text-zinc-100 hover:text-[#f25011] dark:hover:text-[#f25011]"
+              className="font-medium text-foreground hover:text-primary dark:hover:text-primary"
             >
               {space.name}
             </Link>
             {space.description && (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {space.description}
               </p>
             )}
@@ -213,11 +214,11 @@ function SpaceRow({
           <Button
             variant="secondary"
             size="sm"
-            onPress={() => (expanded ? setExpanded(false) : beginEdit())}
+            onClick={() => (expanded ? setExpanded(false) : beginEdit())}
           >
             {expanded ? "Close" : "Manage access"}
           </Button>
-          <Button variant="secondary" size="sm" onPress={onDelete}>
+          <Button variant="secondary" size="sm" onClick={onDelete}>
             Delete
           </Button>
         </div>
@@ -226,18 +227,18 @@ function SpaceRow({
       {expanded && (
         <div className="mt-4 pl-11 space-y-4">
           {activePermissions.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               No groups assigned. Add a group to grant access.
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <ul className="divide-y divide-border rounded-lg border border-border">
               {activePermissions.map((perm) => (
                 <li
                   key={perm.groupId}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white dark:bg-zinc-900 text-sm"
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-card text-sm"
                 >
-                  <span className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300 min-w-0 truncate">
-                    <Users size={14} className="text-zinc-400 shrink-0" />
+                  <span className="inline-flex items-center gap-2 text-foreground/80 min-w-0 truncate">
+                    <Users size={14} className="text-muted-foreground shrink-0" />
                     {perm.groupName}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
@@ -258,7 +259,7 @@ function SpaceRow({
                     <Button
                       variant="secondary"
                       size="sm"
-                      onPress={() =>
+                      onClick={() =>
                         updateDraft((current) =>
                           current.filter((row) => row.groupId !== perm.groupId),
                         )
@@ -290,7 +291,7 @@ function SpaceRow({
                 type="submit"
                 variant="secondary"
                 size="sm"
-                isDisabled={!selectedAddGroupId}
+                disabled={!selectedAddGroupId}
               >
                 Add group
               </Button>
@@ -299,10 +300,10 @@ function SpaceRow({
 
           <div className="flex items-center gap-2">
             <Button
-              variant="primary"
+              variant="default"
               size="sm"
-              isDisabled={saving || draft === null}
-              onPress={handleSave}
+              disabled={saving || draft === null}
+              onClick={handleSave}
             >
               {saving ? "Saving…" : "Save access"}
             </Button>
@@ -310,7 +311,7 @@ function SpaceRow({
               <Button
                 variant="secondary"
                 size="sm"
-                onPress={() => setDraft(null)}
+                onClick={() => setDraft(null)}
               >
                 Reset
               </Button>

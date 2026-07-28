@@ -80,8 +80,8 @@ export function Select({ value, onChange, options, className, disabled }: Select
           setOpen((v) => !v);
         }}
         className={clsx(
-          "w-full flex items-center justify-between gap-2 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm text-zinc-800 dark:text-zinc-200 transition-colors",
-          "focus:outline-none focus:border-[#f25011]",
+          "w-full flex items-center justify-between gap-2 px-3 rounded-md border border-input bg-background text-sm text-foreground transition-colors",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           heightClass,
         )}
@@ -89,7 +89,7 @@ export function Select({ value, onChange, options, className, disabled }: Select
         <span className="truncate">{selected?.label ?? ""}</span>
         <ChevronDown
           size={12}
-          className={clsx("shrink-0 text-zinc-400 transition-transform", open && "rotate-180")}
+          className={clsx("shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
         />
       </button>
 
@@ -99,7 +99,7 @@ export function Select({ value, onChange, options, className, disabled }: Select
           <ul
             ref={menuRef}
             style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
-            className="fixed z-[9999] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1 text-sm"
+            className="fixed z-[9999] rounded-md border border-border bg-popover text-popover-foreground shadow-lg py-1 text-sm"
           >
             {options.map((opt) => (
               <li
@@ -111,8 +111,8 @@ export function Select({ value, onChange, options, className, disabled }: Select
                 className={clsx(
                   "px-3 py-2 cursor-pointer transition-colors",
                   opt.value === value
-                    ? "bg-[#f25011] text-white"
-                    : "text-zinc-700 dark:text-zinc-300 hover:bg-[#f25011]/10 hover:text-[#f25011]",
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/80 hover:bg-primary/10 hover:text-primary",
                 )}
               >
                 {opt.label}

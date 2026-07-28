@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { searchApi, spacesApi, usersApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { SearchResponse, Space, User } from "@wiki/types";
-import { Button, Chip, Card, CardContent, Skeleton } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Search, FileText, File, X, SlidersHorizontal } from "lucide-react";
 import useSWR from "swr";
 
@@ -44,7 +47,7 @@ function FilterSelect({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 flex items-center justify-between gap-2 cursor-pointer transition-colors"
+        className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-card text-foreground flex items-center justify-between gap-2 cursor-pointer transition-colors"
       >
         <span className="truncate">{selected?.label}</span>
         <svg width="12" height="12" viewBox="0 0 12 12" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}>
@@ -52,7 +55,7 @@ function FilterSelect({
         </svg>
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
           {options.map((opt) => (
             <button
               key={opt.value}
@@ -60,8 +63,8 @@ function FilterSelect({
               onMouseDown={() => { onChange(opt.value); setOpen(false); }}
               className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                 opt.value === value
-                  ? "bg-[#f25011] text-white"
-                  : "text-zinc-700 dark:text-zinc-300 hover:bg-[#f25011] hover:text-white"
+                  ? "bg-primary text-white"
+                  : "text-foreground/80 hover:bg-primary hover:text-white"
               }`}
             >
               {opt.label}
@@ -271,7 +274,7 @@ export function SearchPanel({
         <div className="relative flex-1">
           <Search
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
           />
           <input
             type="search"
@@ -280,18 +283,18 @@ export function SearchPanel({
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder={placeholder}
-            className="w-full h-11 pl-9 pr-4 text-sm border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f25011]/30 focus:border-[#f25011] transition-colors"
+            className="w-full h-11 pl-9 pr-4 text-sm border border-border rounded-xl bg-card text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-colors"
           />
           {showSuggestions && (
-            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg overflow-hidden">
+            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
               {suggestions.map((s, i) => (
                 <button
                   key={`${s}-${i}`}
                   type="button"
-                  className="w-full text-left px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                  className="w-full text-left px-4 py-2.5 text-sm text-foreground/80 hover:bg-background dark:hover:bg-accent transition-colors"
                   onMouseDown={() => selectSuggestion(s)}
                 >
-                  <Search size={12} className="inline mr-2 text-zinc-400" />
+                  <Search size={12} className="inline mr-2 text-muted-foreground" />
                   {s}
                 </button>
               ))}
@@ -301,25 +304,24 @@ export function SearchPanel({
         <Button
           type="button"
           variant="outline"
-          size="md"
-          onPress={() => setShowFilters(!showFilters)}
-          className={`h-11 px-3 border-zinc-200 dark:border-zinc-700 relative ${
-            hasActiveFilters ? "border-[#f25011]/50 text-[#f25011]" : ""
+          onClick={() => setShowFilters(!showFilters)}
+          className={`h-11 px-3 border-border relative ${
+            hasActiveFilters ? "border-primary/50 text-primary" : ""
           }`}
         >
           <SlidersHorizontal size={16} />
           {hasActiveFilters && (
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#f25011]" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
           )}
         </Button>
       </form>
 
       {showFilters && (
-        <div className="mb-6 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-900/50">
+        <div className="mb-6 p-4 border border-border rounded-xl bg-muted/50">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {!lockedSpaceId && (
               <div>
-                <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
                   Space
                 </label>
                 <FilterSelect
@@ -330,7 +332,7 @@ export function SearchPanel({
               </div>
             )}
             <div>
-              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
                 Author
               </label>
               <FilterSelect
@@ -340,7 +342,7 @@ export function SearchPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
                 Tag / label
               </label>
               <input
@@ -348,11 +350,11 @@ export function SearchPanel({
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="e.g. policies, onboarding"
-                className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-card text-foreground placeholder:text-muted-foreground"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
                 File type
               </label>
               <FilterSelect
@@ -366,25 +368,25 @@ export function SearchPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
                 From date
               </label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+                className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-card text-foreground"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
                 To date
               </label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full h-9 px-3 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100"
+                className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-card text-foreground"
               />
             </div>
           </div>
@@ -392,7 +394,7 @@ export function SearchPanel({
             <button
               type="button"
               onClick={clearFilters}
-              className="mt-3 text-xs text-[#f25011] hover:underline flex items-center gap-1"
+              className="mt-3 text-xs text-primary hover:underline flex items-center gap-1"
             >
               <X size={12} /> Clear filters
             </button>
@@ -410,13 +412,13 @@ export function SearchPanel({
 
       {!loading && searched && results && (
         <div>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-4 font-medium">
+          <p className="text-xs text-muted-foreground mb-4 font-medium">
             {resultsLabel}
           </p>
 
           {results.hits.length === 0 ? (
             <Card>
-              <CardContent className="py-14 flex flex-col items-center gap-3 text-zinc-400 dark:text-zinc-500">
+              <CardContent className="py-14 flex flex-col items-center gap-3 text-muted-foreground">
                 <Search size={32} className="opacity-30" />
                 <p className="text-sm">
                   {hasTextQuery
@@ -436,13 +438,13 @@ export function SearchPanel({
                     router.push(`/spaces/${hit.spaceId}/docs/${hit.documentId}`)
                   }
                 >
-                  <Card className="transition-all hover:shadow-sm hover:border-[#f25011]/30 cursor-pointer">
+                  <Card className="transition-all hover:shadow-sm hover:border-primary/30 cursor-pointer">
                     <CardContent className="flex flex-row items-start gap-3 p-4">
                       <div
                         className={
                           hit.type === "pdf"
                             ? "p-2 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0 mt-0.5"
-                            : "p-2 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-[#f25011] shrink-0 mt-0.5"
+                            : "p-2 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-primary shrink-0 mt-0.5"
                         }
                       >
                         {hit.type === "pdf" ? (
@@ -453,27 +455,27 @@ export function SearchPanel({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
-                          className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm group-hover:text-[#f25011] transition-colors [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:px-0.5 [&_mark]:rounded [&_mark]:text-inherit"
+                          className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:px-0.5 [&_mark]:rounded [&_mark]:text-inherit"
                           dangerouslySetInnerHTML={{
                             __html: hit.highlight.title?.[0] ?? hit.title,
                           }}
                         />
                         {hit.highlight.body?.[0] ? (
                           <p
-                            className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:px-0.5 [&_mark]:rounded"
+                            className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:px-0.5 [&_mark]:rounded"
                             dangerouslySetInnerHTML={{
                               __html: hit.highlight.body[0],
                             }}
                           />
                         ) : hit.preview ? (
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
                             {hit.preview}
                           </p>
                         ) : null}
                       </div>
-                      <Chip size="sm" variant="soft" className="text-xs shrink-0">
+                      <Badge variant="secondary" className="text-xs shrink-0">
                         {hit.type.toUpperCase()}
-                      </Chip>
+                      </Badge>
                     </CardContent>
                   </Card>
                 </button>

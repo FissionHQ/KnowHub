@@ -8,8 +8,11 @@ import useSWR, { mutate as globalMutate } from "swr";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
 import { FileText, Plus, ChevronRight, MoreHorizontal, Trash2, PenIcon } from "lucide-react";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 import { TrashConfirmDialog } from "@/components/TrashConfirmDialog";
+
+const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
+const navItemActive = "bg-sidebar-accent text-primary";
 
 interface NodeProps {
   doc: Document;
@@ -116,22 +119,22 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
   return (
     <div>
       <div
-        className="group flex items-center gap-1 rounded-md pr-1 hover:bg-white/10 transition-colors"
+        className="group flex items-center gap-1 rounded-md pr-1 transition-colors hover:bg-white/5"
         style={{ paddingLeft: `${16 + depth * 16}px` }}
       >
         {/* expand/collapse toggle */}
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="shrink-0 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 w-4 h-4 flex items-center justify-center"
+          className="flex h-4 w-4 shrink-0 items-center justify-center text-sidebar-muted transition-colors hover:text-sidebar-foreground"
         >
           {children.length > 0 ? (
             <ChevronRight
               size={11}
-              className={clsx("transition-transform", expanded && "rotate-90")}
+              className={cn("transition-transform", expanded && "rotate-90")}
             />
           ) : (
-            <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600 block" />
+            <span className="block h-1 w-1 rounded-full bg-sidebar-muted" />
           )}
         </button>
 
@@ -143,17 +146,16 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
               onChange={(e) => setRenameValue(e.target.value)}
               onBlur={handleRenameSubmit}
               onKeyDown={(e) => e.key === "Escape" && setRenaming(false)}
-              className="w-full text-[13px] px-1 py-0.5 rounded border border-[#f25011] outline-none bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100"
+              className="w-full text-[13px] px-1 py-0.5 rounded border border-primary outline-none bg-card text-foreground"
             />
           </form>
         ) : (
           <Link
             href={`/spaces/${spaceId}/docs/${doc.id}`}
-            className={clsx(
-              "flex-1 flex items-center gap-1.5 py-1.5 text-[13px] truncate min-w-0",
-              isActive ? "font-medium" : "text-zinc-300",
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-md px-1 py-1.5 text-sm font-medium transition-colors",
+              isActive ? navItemActive : navItemIdle,
             )}
-            style={isActive ? { color: "#f25011" } : {}}
           >
             <FileText size={12} className="shrink-0 opacity-60" />
             <span className="truncate">{doc.title}</span>
@@ -167,7 +169,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
             onClick={handleCreate}
             disabled={creating}
             title="New sub-page"
-            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-sidebar-muted opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
           >
             <Plus size={12} />
           </button>
@@ -186,7 +188,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
             setMenuOpen((v) => !v);
           }}
           title="More options"
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-sidebar-muted opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
         >
           <MoreHorizontal size={12} />
         </button>
@@ -196,12 +198,12 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
           <div
             ref={menuRef}
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-[9999] w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
+            className="fixed z-[9999] w-32 bg-card border border-border rounded-lg shadow-lg py-1 text-[13px]"
           >
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenameValue(doc.title); setRenaming(true); }}
-              className="w-full text-left px-3 py-1.5 text-zinc-700 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-[#f25011] transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full text-left px-3 py-1.5 text-foreground/80 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-primary transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <PenIcon size={10} />
               Rename
@@ -210,7 +212,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
               type="button"
               disabled={deleting}
               onClick={handleTrashClick}
-              className="w-full text-left px-3 py-1.5 text-zinc-700 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-[#f25011] transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full text-left px-3 py-1.5 text-foreground/80 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-primary transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <Trash2 size={10} />
               Move to trash
@@ -295,7 +297,7 @@ export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
         <button
           type="button"
           onClick={handleNewRootPage}
-          className="flex items-center gap-1.5 py-1.5 mt-0.5 w-full text-left text-[12px] text-zinc-500 hover:text-[#f25011] hover:bg-white/10 rounded-md transition-colors"
+          className="mt-0.5 flex w-full items-center gap-1.5 rounded-md py-1.5 text-left text-sm font-medium text-sidebar-muted transition-colors hover:bg-white/5 hover:text-sidebar-foreground"
           style={{ paddingLeft: "20px" }}
         >
           <Plus size={11} />

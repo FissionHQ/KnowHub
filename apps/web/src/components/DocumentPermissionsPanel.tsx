@@ -5,7 +5,8 @@ import useSWR from "swr";
 import { documentsApi, groupsApi, usersApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { AccessLevel, User, UserRole } from "@wiki/types";
-import { Button, Skeleton } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Users, User as UserIcon, Globe, Lock } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import type { DocumentVisibility } from "@wiki/types";
@@ -120,7 +121,7 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
   return (
     <div className="p-5 space-y-6">
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Access mode
         </h3>
         <div className="grid grid-cols-2 gap-2">
@@ -144,22 +145,22 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Inherited from space
         </h3>
         {data.inherited.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             No space-level group permissions configured.
           </p>
         ) : (
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+          <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden">
             {data.inherited.map((perm) => (
               <li
                 key={perm.groupId}
-                className="flex items-center justify-between gap-3 px-3 py-2.5 bg-zinc-50/50 dark:bg-zinc-900/50 text-sm"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 bg-muted/50 text-sm"
               >
-                <span className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                  <Users size={14} className="text-zinc-400" />
+                <span className="inline-flex items-center gap-2 text-foreground/80">
+                  <Users size={14} className="text-muted-foreground" />
                   {perm.groupName}
                 </span>
                 <AccessBadge level={perm.accessLevel} />
@@ -167,7 +168,7 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
             ))}
           </ul>
         )}
-        <p className="text-xs text-zinc-400 mt-2">
+        <p className="text-xs text-muted-foreground mt-2">
           {isRestricted
             ? "This document is restricted, so inherited space access does not apply — only the overrides below grant access."
             : "Everyone with space access can view this document. Overrides below grant additional access on top of this."}
@@ -175,17 +176,17 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           Document overrides
         </h3>
         {data.overrides.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
+          <p className="text-sm text-muted-foreground mb-3">
             {isRestricted
               ? "No one is listed yet. Add a group or user below to grant them access to this restricted document."
               : "No document-specific permissions. Add an override to grant a specific group or user extra access on top of the space defaults."}
           </p>
         ) : (
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden mb-3">
+          <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden mb-3">
             {data.overrides.map((perm) => {
               const label = perm.groupId
                 ? (perm.groupName ?? "Group")
@@ -205,18 +206,18 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
               return (
                 <li
                   key={perm.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white dark:bg-zinc-900 text-sm"
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-card text-sm"
                 >
-                  <span className="inline-flex items-center gap-2 min-w-0 text-zinc-700 dark:text-zinc-300">
+                  <span className="inline-flex items-center gap-2 min-w-0 text-foreground/80">
                     {perm.groupId ? (
-                      <Users size={14} className="text-zinc-400 shrink-0" />
+                      <Users size={14} className="text-muted-foreground shrink-0" />
                     ) : (
-                      <UserIcon size={14} className="text-zinc-400 shrink-0" />
+                      <UserIcon size={14} className="text-muted-foreground shrink-0" />
                     )}
                     <span className="truncate">
                       {label}
                       {perm.userEmail && perm.userName && (
-                        <span className="text-zinc-400 ml-1">({perm.userEmail})</span>
+                        <span className="text-muted-foreground ml-1">({perm.userEmail})</span>
                       )}
                     </span>
                   </span>
@@ -232,7 +233,7 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onPress={() => handleRemove(perm.id, label)}
+                          onClick={() => handleRemove(perm.id, label)}
                         >
                           Remove
                         </Button>
@@ -275,9 +276,9 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
           />
           <Button
             type="submit"
-            variant="primary"
+            variant="default"
             size="sm"
-            isDisabled={submitting || !selectedGranteeId}
+            disabled={submitting || !selectedGranteeId}
             className="w-full"
           >
             Add override
@@ -311,19 +312,19 @@ function VisibilityOption({
       onClick={onSelect}
       className={`flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors disabled:opacity-60 ${
         active
-          ? "border-[#f25011] bg-orange-50 dark:bg-orange-950/30"
-          : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 bg-white dark:bg-zinc-900"
+          ? "border-primary bg-orange-50 dark:bg-orange-950/30"
+          : "border-border hover:border-muted-foreground/40 bg-card"
       }`}
     >
       <span
         className={`inline-flex items-center gap-1.5 text-sm font-medium ${
-          active ? "text-[#f25011]" : "text-zinc-700 dark:text-zinc-200"
+          active ? "text-primary" : "text-foreground/80"
         }`}
       >
         {icon}
         {title}
       </span>
-      <span className="text-xs text-zinc-500 dark:text-zinc-400 leading-snug">
+      <span className="text-xs text-muted-foreground leading-snug">
         {description}
       </span>
     </button>
@@ -336,8 +337,8 @@ function AccessBadge({ level }: { level: AccessLevel }) {
     <span
       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
         isEdit
-          ? "bg-orange-100 text-[#f25011] dark:bg-orange-900/40 dark:text-orange-300"
-          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+          ? "bg-orange-100 text-primary dark:bg-orange-900/40 dark:text-orange-300"
+          : "bg-muted text-muted-foreground"
       }`}
     >
       {isEdit ? "Edit" : "View"}
