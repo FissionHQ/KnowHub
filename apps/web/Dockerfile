@@ -21,10 +21,10 @@ COPY packages/types ./packages/types
 COPY packages/doc-collab ./packages/doc-collab
 COPY apps/web ./apps/web
 
-ARG API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
 ARG NEXT_PUBLIC_COLLAB_WS_URL=ws://localhost:3003
 
-ENV API_URL=$API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_COLLAB_WS_URL=$NEXT_PUBLIC_COLLAB_WS_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_BUILD_STANDALONE=1

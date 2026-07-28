@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getServerApiUrl } from "@/lib/serverApiUrl";
+
+const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,7 @@ export async function POST(
   // Forward the raw request body with its original content-type (multipart boundary)
   const contentType = request.headers.get("content-type") ?? "";
 
-  const res = await fetch(`${getServerApiUrl()}/api/documents/${documentId}/attachments`, {
+  const res = await fetch(`${API_URL}/api/documents/${documentId}/attachments`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerApiUrl } from "@/lib/serverApiUrl";
 
+const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
 const TOKEN_COOKIE = "wiki_token";
 const TOKEN_MAX_AGE = 30 * 24 * 60 * 60;
 
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${getServerApiUrl()}/api/auth/login`, {
+    upstream = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
