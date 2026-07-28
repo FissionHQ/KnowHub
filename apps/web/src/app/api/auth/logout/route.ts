@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getServerApiUrl } from "@/lib/serverApiUrl";
 
-const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
 const TOKEN_COOKIE = "wiki_token";
 
 export async function POST() {
@@ -9,7 +9,7 @@ export async function POST() {
   const token = cookieStore.get(TOKEN_COOKIE)?.value;
 
   if (token) {
-    await fetch(`${API_URL}/api/auth/logout`, {
+    await fetch(`${getServerApiUrl()}/api/auth/logout`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     }).catch(() => undefined);

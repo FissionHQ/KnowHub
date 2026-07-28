@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
+import { getServerApiUrl } from "@/lib/serverApiUrl";
 
 export async function GET(
   request: Request,
@@ -16,7 +15,7 @@ export async function GET(
   }
 
   // Get presigned URL from the Express API
-  const metaRes = await fetch(`${API_URL}/api/attachments/${attachmentId}/view`, {
+  const metaRes = await fetch(`${getServerApiUrl()}/api/attachments/${attachmentId}/view`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 

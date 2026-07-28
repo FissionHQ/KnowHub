@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
+import { getServerApiUrl } from "@/lib/serverApiUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +19,7 @@ export async function POST(
 
   const contentType = request.headers.get("content-type") ?? "";
 
-  const res = await fetch(`${API_URL}/api/documents/${documentId}/attachments/replace`, {
+  const res = await fetch(`${getServerApiUrl()}/api/documents/${documentId}/attachments/replace`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
-
-const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
+import { getServerApiUrl } from "@/lib/serverApiUrl";
 
 const TEXT_EXTENSIONS = new Set([
   "txt", "csv", "md", "json", "xml", "log", "ini", "cfg", "conf", "env", "yml", "yaml", "toml",
@@ -37,7 +36,7 @@ ${extra}
 }
 
 async function fetchFileBuffer(attachmentId: string, token: string): Promise<{ buffer: Buffer; filename: string } | NextResponse> {
-  const metaRes = await fetch(`${API_URL}/api/attachments/${attachmentId}/view`, {
+  const metaRes = await fetch(`${getServerApiUrl()}/api/attachments/${attachmentId}/view`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!metaRes.ok) return new NextResponse("Attachment not available", { status: metaRes.status });
