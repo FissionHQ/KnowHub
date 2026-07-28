@@ -522,15 +522,13 @@ export function DocumentView({ spaceId, docId }: Props) {
             ) : null}
           </div>
         ) : showPublishedReadonly ? (
-          <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-            <RichTextEditor
-              content={doc.contentRef ?? ""}
-              onChange={() => {}}
-              readOnly
-              title={doc.title}
-              documentId={docId}
-            />
-          </div>
+          <RichTextEditor
+            content={doc.contentRef ?? ""}
+            onChange={() => {}}
+            readOnly
+            title={doc.title}
+            documentId={docId}
+          />
         ) : null}
       </div>
 
