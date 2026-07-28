@@ -41,7 +41,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3001
+        NEXT_PUBLIC_API_URL: http://api:3001
         NEXT_PUBLIC_COLLAB_WS_URL: ws://localhost:3003
     environment:
       NEXT_PUBLIC_API_URL: http://api:3001
