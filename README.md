@@ -1,34 +1,34 @@
 # KnowHub
 
-KnowHub is a multi-tenant organizational wiki platform. It is built as a **pnpm monorepo** managed by Turborepo, with a modular monolith API, a dedicated search service, async workers, and a Next.js frontend.
+KnowHub is a multi-tenant organizational wiki platform. It is built as a **pnpm monorepo** managed by Turborepo, with a modular monolith API, a real-time collaboration server, async workers, and a Next.js frontend. Full-text search runs in PostgreSQL (GIN indexes) via the API — no separate search service.
 
 ## Architecture
 
 ```
 Browser
   │
-  ├─── Next.js frontend (apps/web)       :3000
+  ├─── Next.js frontend (apps/web)              :3000
   │         │
-  │         ├── REST  ──►  API server (apps/api)        :3001
-  │         │                    │
-  │         └── REST  ──►  Search service (apps/search) :3002
+  │         ├── REST  ──►  API server (apps/api)           :3001
+  │         │                    ├── PostgreSQL (search via GIN)
+  │         └── WS    ──►  Collab server (apps/collab)     :3003
   │
   └──── (async)
              │
              └── SQS  ──►  Worker (apps/worker)
                                  │
                                  ├── S3 (quarantine → served)
-                                 └── OpenSearch index writes
+                                 └── ClamAV (virus scan)
 ```
 
 | Service | Package | Description |
 |---------|---------|-------------|
 | Web | `@wiki/web` | Next.js 15 App Router frontend |
-| API | `@wiki/api` | Express.js modular monolith |
-| Search | `@wiki/search` | OpenSearch query service |
-| Worker | `@wiki/worker` | SQS consumer for PDF processing and search indexing |
+| API | `@wiki/api` | Express.js modular monolith (includes PostgreSQL full-text search) |
+| Collab | `@wiki/collab` | Hocuspocus WebSocket server for real-time document editing |
+| Worker | `@wiki/worker` | SQS consumer for PDF processing and virus scanning |
 
-Shared packages live under `packages/` (`@wiki/db`, `@wiki/types`, `@wiki/config`).
+Shared packages live under `packages/` (`@wiki/db`, `@wiki/types`, `@wiki/config`, `@wiki/doc-collab`).
 
 For deeper design notes, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
 
@@ -38,7 +38,7 @@ For deeper design notes, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [d
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Node.js | 20+ | [nodejs.org](https://nodejs.org) or `nvm install 20` |
+| Node.js | 22+ | [nodejs.org](https://nodejs.org) or `nvm install 22` |
 | pnpm | 9.x | `npm install -g pnpm@9` |
 | Docker Desktop | latest | [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop) |
 
@@ -76,7 +76,6 @@ This starts:
 |---------|-----------|
 | PostgreSQL 16 | 5434 |
 | Redis 7 | 6380 |
-| OpenSearch 2.17 | 9200 |
 | LocalStack (S3, SQS, SES) | 4566 |
 
 LocalStack automatically creates S3 buckets and SQS queues on startup via `scripts/localstack-init.sh`.
@@ -123,7 +122,7 @@ pnpm dev
 |---------|-----|
 | Web (Next.js) | http://localhost:3000 |
 | API (Express) | http://localhost:3001 |
-| Search service | http://localhost:3002 |
+| Collab (WebSocket) | ws://localhost:3003 |
 | Worker | Background process (no HTTP port) |
 
 ### Run individual services
@@ -131,8 +130,14 @@ pnpm dev
 ```bash
 pnpm --filter @wiki/web dev
 pnpm --filter @wiki/api dev
-pnpm --filter @wiki/search dev
+pnpm --filter @wiki/collab dev
 pnpm --filter @wiki/worker dev
+```
+
+After schema changes or a fresh database, backfill search columns:
+
+```bash
+pnpm --filter @wiki/db db:reindex
 ```
 
 ### Stop everything
@@ -145,7 +150,7 @@ Ctrl+C   # in the terminal running pnpm dev
 docker compose down
 ```
 
-To wipe all persisted data (Postgres, Redis, OpenSearch):
+To wipe all persisted data (Postgres, Redis, LocalStack):
 
 ```bash
 docker compose down -v
@@ -155,7 +160,7 @@ docker compose down -v
 
 ## Optional dev tools
 
-Start OpenSearch Dashboards and MailHog with the `tools` profile:
+Start MailHog with the `tools` profile:
 
 ```bash
 docker compose --profile tools up -d
@@ -163,7 +168,6 @@ docker compose --profile tools up -d
 
 | Tool | URL | Purpose |
 |------|-----|---------|
-| OpenSearch Dashboards | http://localhost:5601 | Browse and query the search index |
 | MailHog | http://localhost:8025 | Inspect outgoing emails |
 
 ---
@@ -173,13 +177,14 @@ docker compose --profile tools up -d
 ```
 KnowHub/
 ├── apps/
-│   ├── api/          Express API (modular monolith)
-│   ├── search/       OpenSearch query service
+│   ├── api/          Express API (modular monolith + PostgreSQL search)
+│   ├── collab/       Hocuspocus WebSocket server (real-time editing)
 │   ├── web/          Next.js 15 frontend
-│   └── worker/       SQS consumer (PDF + search indexing)
+│   └── worker/       SQS consumer (PDF processing + virus scan)
 ├── packages/
 │   ├── config/       Zod-validated environment schemas
 │   ├── db/           Drizzle ORM schema, migrations, RLS
+│   ├── doc-collab/   Shared TipTap/Yjs collaboration helpers
 │   └── types/        Shared TypeScript types
 ├── scripts/
 │   └── localstack-init.sh
@@ -225,6 +230,9 @@ Verify the API is up:
 ```bash
 curl http://localhost:3001/health
 # should return: {"status":"ok"}
+
+curl http://localhost:3003/health
+# should return: {"status":"ok"}
 ```
 
 **Ports already in use**
@@ -269,6 +277,58 @@ Check LocalStack health and queue creation:
 docker compose ps localstack
 docker compose exec localstack awslocal sqs list-queues
 ```
+
+---
+
+## Production deployment (AWS)
+
+Each app has a multi-stage Dockerfile under `apps/*/Dockerfile`. Build from the repo root:
+
+```bash
+# API, Worker, Collab (env vars injected at runtime)
+docker build -f apps/api/Dockerfile -t knowhub-api .
+docker build -f apps/worker/Dockerfile -t knowhub-worker .
+docker build -f apps/collab/Dockerfile -t knowhub-collab .
+
+# Web — pass public URLs at build time (baked into the client bundle)
+docker build -f apps/web/Dockerfile -t knowhub-web \
+  --build-arg NEXT_PUBLIC_API_URL=http://api.internal:3001 \
+  --build-arg NEXT_PUBLIC_COLLAB_WS_URL=wss://collab.example.com .
+```
+
+### Services to run
+
+| Service | Port | Health check |
+|---------|------|--------------|
+| Web | 3000 | `GET /` |
+| API | 3001 | `GET /health` |
+| Collab | 3003 | `GET /health` |
+| Worker | — | SQS consumer (no HTTP) |
+
+### AWS resources
+
+| Resource | Purpose |
+|----------|---------|
+| RDS PostgreSQL 16 | Primary database + full-text search (GIN indexes) |
+| ElastiCache Redis | API ACL cache + collab multi-instance sync |
+| S3 (×2) | Quarantine + served file buckets |
+| SQS | PDF processing queue |
+| SES | Transactional email |
+| ClamAV | Worker virus scanning (sidecar or dedicated service) |
+
+### Deploy steps
+
+1. Set environment variables from `.env.example` (omit LocalStack/MailHog endpoints in prod).
+2. `pnpm install --frozen-lockfile && pnpm build` (or use Docker images above).
+3. Run migrations: `DATABASE_URL=<prod-url> pnpm db:migrate`
+4. Backfill search index: `DATABASE_URL=<prod-url> pnpm --filter @wiki/db db:reindex`
+5. Start all four services. **Do not** run `pnpm db:seed` in production.
+
+### DNS & networking
+
+- Wildcard DNS: `*.{BASE_DOMAIN}` → Web ALB (multi-tenant subdomains).
+- Collab needs a public `wss://` endpoint (`NEXT_PUBLIC_COLLAB_WS_URL`).
+- HTTPS required in production (auth cookies are `secure`).
 
 ---
 

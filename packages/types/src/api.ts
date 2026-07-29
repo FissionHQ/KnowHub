@@ -1,4 +1,4 @@
-import type { AccessLevel, DocumentStatus, DocumentType, UserRole } from "./enums.js";
+import type { AccessLevel, DocumentStatus, DocumentType, DocumentVisibility, UserRole } from "./enums.js";
 
 export interface ApiSuccess<T> {
   data: T;
@@ -108,6 +108,10 @@ export interface UpdateDocumentBody {
   tags?: string[];
   status?: DocumentStatus;
   restrictDownload?: boolean;
+  /** "inherit" (additive) or "restricted" (whitelist). */
+  visibility?: DocumentVisibility;
+  /** When true, snapshot current title/content as a new published version. */
+  publish?: boolean;
 }
 
 export interface CreateCommentBody {
@@ -199,6 +203,9 @@ export interface UpdateOrgSettingsBody {
 export interface AuditLogQuery {
   limit?: number;
   offset?: number;
+  action?: string;
+  from?: string;
+  to?: string;
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────
@@ -224,6 +231,7 @@ export interface SearchHit {
     title?: string[];
     body?: string[];
   };
+  preview?: string;
   score: number;
   updatedAt: string;
 }

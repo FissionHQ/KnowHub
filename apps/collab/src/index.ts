@@ -8,7 +8,6 @@ config({ path: path.resolve(__dirname, "../../../.env") });
 import { Server } from "@hocuspocus/server";
 import { Redis as RedisExtension } from "@hocuspocus/extension-redis";
 import { Redis } from "ioredis";
-import { SQSClient } from "@aws-sdk/client-sqs";
 import { parseCollabEnv } from "@wiki/config";
 import { getDb } from "@wiki/db";
 import { authenticateCollabConnection } from "./auth.js";
@@ -26,22 +25,18 @@ const redis = new Redis(env.REDIS_URL);
 
 const redisSubscriber = new Redis(env.REDIS_URL);
 
-const sqs = new SQSClient({
-  region: env.AWS_REGION,
-  ...(env.SQS_ENDPOINT
-    ? {
-        endpoint: env.SQS_ENDPOINT,
-        credentials: {
-          accessKeyId: env.AWS_ACCESS_KEY_ID ?? "test",
-          secretAccessKey: env.AWS_SECRET_ACCESS_KEY ?? "test",
-        },
-      }
-    : {}),
-});
-
 const server = Server.configure({
   port: env.COLLAB_PORT,
   extensions: [new RedisExtension({ redis })],
+
+  async onRequest({ request, response }) {
+    const path = request.url?.split("?")[0];
+    if (path === "/health") {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ status: "ok" }));
+      return Promise.reject(undefined);
+    }
+  },
 
   async onAuthenticate({ token, documentName }) {
     const context = await authenticateCollabConnection(
@@ -104,7 +99,7 @@ const server = Server.configure({
     const documentId = context.documentId as string;
 
     await storeCollabYjsState(db, orgId, documentId, document);
-    scheduleHtmlPersist(db, sqs, env.SQS_INDEX_QUEUE_URL, orgId, documentId, document);
+    scheduleHtmlPersist(db, orgId, documentId, document);
   },
 });
 

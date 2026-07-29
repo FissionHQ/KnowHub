@@ -8,6 +8,7 @@ import { ValidationError, NotFoundError, ForbiddenError } from "../../lib/errors
 import type { Redis } from "ioredis";
 import { invalidateGroupCache } from "../../middleware/tenantContext.js";
 import { recordAudit } from "../../lib/audit.js";
+import { isDefaultGroup } from "./defaultGroup.js";
 
 const createGroupSchema = z.object({
   name: z.string().min(1).max(100),
@@ -79,6 +80,11 @@ export function createAccessRouter(db: Db, redis: Redis): Router {
   router.delete("/groups/:groupId", async (req, res) => {
     if (req.tenant.userRole !== "admin") throw new ForbiddenError();
     const { groupId } = req.params;
+
+    if (await isDefaultGroup(db, req.tenant.orgId, groupId ?? "")) {
+      throw new ForbiddenError("Cannot delete the default group");
+    }
+
     const deleted = await db
       .delete(groups)
       .where(and(eq(groups.id, groupId ?? ""), eq(groups.orgId, req.tenant.orgId)))
@@ -134,6 +140,10 @@ export function createAccessRouter(db: Db, redis: Redis): Router {
   router.delete("/groups/:groupId/members/:userId", async (req, res) => {
     if (req.tenant.userRole !== "admin") throw new ForbiddenError();
     const { groupId, userId } = req.params;
+
+    if (await isDefaultGroup(db, req.tenant.orgId, groupId ?? "")) {
+      throw new ForbiddenError("Cannot remove users from the default group");
+    }
 
     await db
       .delete(groupMemberships)

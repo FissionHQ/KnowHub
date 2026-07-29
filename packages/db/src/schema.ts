@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -13,6 +14,12 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+const tsvector = customType<{ data: string | null }>({
+  dataType() {
+    return "tsvector";
+  },
+});
+
 // ─── Enums ────────────────────────────────────────────────────────────────
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "member", "viewer"]);
@@ -20,6 +27,7 @@ export const userStatusEnum = pgEnum("user_status", ["active", "invited", "deact
 export const accessLevelEnum = pgEnum("access_level", ["view", "edit"]);
 export const documentTypeEnum = pgEnum("document_type", ["page", "pdf"]);
 export const documentStatusEnum = pgEnum("document_status", ["draft", "published", "trashed"]);
+export const documentVisibilityEnum = pgEnum("document_visibility", ["inherit", "restricted"]);
 export const scanStatusEnum = pgEnum("scan_status", [
   "pending",
   "scanning",
@@ -162,7 +170,33 @@ export const documents = pgTable(
     version: integer("version").notNull().default(1),
     tags: text("tags").array().notNull().default([]),
     restrictDownload: boolean("restrict_download").notNull().default(false),
+    /**
+     * Access model for the document:
+     * - inherit (default): effective access = space-inherited access UNION doc overrides (additive).
+     * - restricted: whitelist — only doc overrides (+ owner + admin); space inheritance ignored.
+     */
+    visibility: documentVisibilityEnum("visibility").notNull().default("inherit"),
+    /**
+     * Unpublished WIP for the next publish (Confluence-style).
+     * Null when there are no unpublished changes. Readers always see title/content_ref.
+     */
+    draftTitle: text("draft_title"),
+    draftContentRef: text("draft_content_ref"),
+    draftUpdatedAt: timestamp("draft_updated_at", { withTimezone: true }),
+    draftUpdatedBy: uuid("draft_updated_by").references(() => users.id),
     trashedAt: timestamp("trashed_at", { withTimezone: true }),
+    /** draft | published — preserved when moved to trash for restore */
+    statusBeforeTrash: documentStatusEnum("status_before_trash"),
+    /** Denormalized published title for full-text search. */
+    searchTitle: text("search_title"),
+    /** Plain-text published body for full-text search. */
+    searchBody: text("search_body"),
+    searchPreview: text("search_preview"),
+    searchUpdatedAt: timestamp("search_updated_at", { withTimezone: true }),
+    searchIsEditable: boolean("search_is_editable").notNull().default(true),
+    searchAclGroupIds: uuid("search_acl_group_ids").array().notNull().default([]),
+    searchAclUserIds: uuid("search_acl_user_ids").array().notNull().default([]),
+    searchVector: tsvector("search_vector"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -199,6 +233,7 @@ export const documentVersions = pgTable(
       .references(() => documents.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
     contentSnapshot: text("content_snapshot").notNull(),
+    titleSnapshot: text("title_snapshot").notNull(),
     editedBy: uuid("edited_by")
       .notNull()
       .references(() => users.id),
@@ -318,6 +353,25 @@ export const recentlyViewed = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.documentId] }),
     index("recently_viewed_user_id_idx").on(t.userId),
+  ],
+);
+
+// ─── Recently Updated (per user) ─────────────────────────────────────────
+
+export const recentlyUpdated = pgTable(
+  "recently_updated",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.documentId] }),
+    index("recently_updated_user_id_idx").on(t.userId),
   ],
 );
 

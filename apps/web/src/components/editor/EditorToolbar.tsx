@@ -8,7 +8,7 @@ import {
   UnderlineIcon, Pilcrow, SquareCode, LinkIcon, Download, Upload,
   Paperclip,
 } from "lucide-react";
-import { Tooltip } from "@heroui/react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import clsx from "clsx";
 import { htmlToMarkdown, markdownToHtml, downloadFile, readTextFile } from "@/lib/markdownUtils";
 import { attachmentsApi } from "@/lib/api";
@@ -34,7 +34,7 @@ function ToolBtn({
 }) {
   return (
     <Tooltip>
-      <Tooltip.Trigger>
+      <TooltipTrigger asChild>
         <button
           type="button"
           onClick={onClick}
@@ -42,16 +42,16 @@ function ToolBtn({
           className={clsx(
             "p-1.5 rounded-md transition-colors",
             active
-              ? "bg-orange-50 dark:bg-orange-950/50 text-[#f25011]"
-              : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100",
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
           )}
         >
           {children}
         </button>
-      </Tooltip.Trigger>
-      <Tooltip.Content>
+      </TooltipTrigger>
+      <TooltipContent>
         <p className="text-xs">{label}</p>
-      </Tooltip.Content>
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -97,7 +97,7 @@ export function EditorToolbar({ editor, onInsertImage, title = "document", docum
   }
 
   return (
-    <div className="flex items-center gap-0.5 flex-wrap px-3 py-2 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900">
+    <div className="flex items-center gap-0.5 flex-wrap px-3 py-2 border-b border-border bg-muted">
       {/* hidden file inputs */}
       <input
         ref={fileInputRef}
@@ -134,7 +134,7 @@ export function EditorToolbar({ editor, onInsertImage, title = "document", docum
         <Redo size={14} />
       </ToolBtn>
 
-      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+      <div className="w-px h-4 bg-border mx-1" />
 
       <ToolBtn
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -151,7 +151,7 @@ export function EditorToolbar({ editor, onInsertImage, title = "document", docum
         <Heading3 size={14} />
       </ToolBtn>
 
-      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+      <div className="w-px h-4 bg-border mx-1" />
 
       <ToolBtn
         onClick={() => editor.chain().focus().toggleBold().run()}
@@ -189,7 +189,7 @@ export function EditorToolbar({ editor, onInsertImage, title = "document", docum
         <Code size={14} />
       </ToolBtn>
 
-      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+      <div className="w-px h-4 bg-border mx-1" />
 
       <ToolBtn
         onClick={() => editor.chain().focus().setParagraph().run()}
@@ -227,7 +227,7 @@ export function EditorToolbar({ editor, onInsertImage, title = "document", docum
         <SquareCode size={14} />
       </ToolBtn>
 
-      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+      <div className="w-px h-4 bg-border mx-1" />
 
       <ToolBtn
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
@@ -267,7 +267,7 @@ export function EditorToolbar({ editor, onInsertImage, title = "document", docum
         <Paperclip size={14} />
       </ToolBtn>
 
-      <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+      <div className="w-px h-4 bg-border mx-1" />
 
       <ToolBtn onClick={() => mdImportRef.current?.click()} label="Import Markdown">
         <Upload size={14} />

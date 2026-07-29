@@ -118,14 +118,20 @@ The result: even if application code accidentally omits an `orgId` filter, the d
 
 ## Permission model
 
-Permissions resolve in order: **document-level override → space-level ACL → deny**.
+Document access depends on the document's `visibility` mode:
+
+- **`inherit` (default)** — *additive*: effective access = space-inherited group ACL **UNION** document overrides (highest level wins). Document overrides (group or individual-user shares) only ever **add** access on top of the space defaults; they never remove it. This is how an individual share grants one named user access without disturbing everyone who already had space access.
+- **`restricted`** — *whitelist*: only the users/groups listed in `DocumentPermissions` (+ owner + admin) may access; space membership alone is not enough. Use this to lock down a sensitive page inside an otherwise-open space.
 
 ```
 User → belongs to → Groups (many-to-many)
                         ↓
-                  SpacePermissions (groupId, spaceId, accessLevel)
-                        ↓ fallback if no document override
-                  DocumentPermissions (groupId|userId, documentId, accessLevel)
+                  SpacePermissions (groupId, spaceId, accessLevel)   ← inherited space ACL
+                        ↓
+   visibility=inherit:  space ACL  ∪  DocumentPermissions (additive)
+   visibility=restricted: DocumentPermissions only (whitelist)
+                        ↓
+                     else → deny
 ```
 
 Access levels: `view` (read-only) and `edit` (read + write). `edit` satisfies a `view` requirement.
@@ -134,13 +140,13 @@ Admins (`role = admin`) bypass group checks entirely — they can access all spa
 
 ### Permission cache
 
-Group membership (`userId → [groupId, ...]`) is cached in Redis with a 30 s TTL:
+Group membership (`userId → [groupId, ...]`) is cached in Redis with a ~30 s TTL (30 s base plus up to 7 s of random jitter, so simultaneously-written keys do not all expire at once and stampede the database):
 
 ```
 Key: acl:groups:<orgId>:<userId>
 ```
 
-On any group membership change (add/remove member), the cache key is deleted **and** a pub/sub message is published to `acl-invalidate:<orgId>` so other API instances can drop their local state if applicable. The 30 s TTL acts as the backstop if the pub/sub message is lost.
+On any group membership change (add/remove member), the cache key is deleted. The cache lives in shared Redis, so a single `DEL` drops the entry for every API instance — no cross-instance pub/sub is required. The TTL acts as the backstop if the `DEL` is lost (e.g. Redis briefly unavailable). Cache reads and writes are best-effort: if Redis is unavailable the request falls back to querying group membership directly from PostgreSQL.
 
 ---
 
@@ -254,7 +260,7 @@ The auth middleware uses `jose` to verify the HS256 signature with `JWT_SECRET`.
    b. Redis cache hit → req.tenant.groupIds = [...]
 4. content router:
    a. SELECT document WHERE id = ? AND org_id = ?  (RLS applies)
-   b. assertDocumentAccess(edit) → checks doc override → falls back to space ACL
+   b. assertDocumentAccess(edit) → inherit: space ACL ∪ doc overrides; restricted: doc overrides only
    c. UPDATE documents SET contentRef = ?, version = version+1, updatedAt = now()
    d. INSERT INTO document_versions (versionNumber, contentSnapshot, editedBy)
    e. SQS SendMessage: { type: "SEARCH_INDEX", documentId, orgId, operation: "upsert" }

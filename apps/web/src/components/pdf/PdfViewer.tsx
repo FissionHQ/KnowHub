@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import { Spinner } from "@heroui/react";
+import { Spinner } from "@/components/ui/spinner";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Search, Download, X } from "lucide-react";
 import clsx from "clsx";
 
@@ -36,8 +36,8 @@ function NavBtn({
       className={clsx(
         "p-1.5 rounded-md transition-colors",
         disabled
-          ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
-          : "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800",
+          ? "text-muted-foreground dark:text-muted-foreground cursor-not-allowed"
+          : "text-muted-foreground hover:bg-accent",
       )}
     >
       {children}
@@ -107,7 +107,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
       onContextMenu={restrictDownload ? (e) => e.preventDefault() : undefined}
     >
       {/* Toolbar */}
-      <div className="flex items-center gap-1 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-sm sticky top-4 z-10 flex-wrap">
+      <div className="flex items-center gap-1 px-3 py-2 bg-card border border-border rounded-xl shadow-sm sticky top-4 z-10 flex-wrap">
         <NavBtn
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage <= 1}
@@ -116,7 +116,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
           <ChevronLeft size={16} />
         </NavBtn>
 
-        <span className="text-sm text-zinc-600 dark:text-zinc-300 min-w-[68px] text-center tabular-nums px-1">
+        <span className="text-sm text-muted-foreground min-w-[68px] text-center tabular-nums px-1">
           {loading ? "…" : `${currentPage} / ${numPages}`}
         </span>
 
@@ -128,7 +128,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
           <ChevronRight size={16} />
         </NavBtn>
 
-        <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+        <div className="w-px h-4 bg-border mx-1" />
 
         <NavBtn
           onClick={() => setScale((s) => Math.max(0.5, parseFloat((s - 0.2).toFixed(1))))}
@@ -138,7 +138,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
           <ZoomOut size={16} />
         </NavBtn>
 
-        <span className="text-xs text-zinc-500 dark:text-zinc-400 w-9 text-center tabular-nums">
+        <span className="text-xs text-muted-foreground w-9 text-center tabular-nums">
           {Math.round(scale * 100)}%
         </span>
 
@@ -150,7 +150,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
           <ZoomIn size={16} />
         </NavBtn>
 
-        <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+        <div className="w-px h-4 bg-border mx-1" />
 
         {/* Search toggle */}
         <NavBtn
@@ -175,16 +175,16 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
 
         {filename && (
           <>
-            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-1" />
-            <span className="text-xs text-zinc-400 max-w-[140px] truncate px-1">{filename}</span>
+            <div className="w-px h-4 bg-border mx-1" />
+            <span className="text-xs text-muted-foreground max-w-[140px] truncate px-1">{filename}</span>
           </>
         )}
       </div>
 
       {/* Search bar */}
       {searchOpen && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-sm w-full max-w-md">
-          <Search size={14} className="text-zinc-400 shrink-0" />
+        <div className="flex items-center gap-2 px-3 py-2 bg-card border border-border rounded-xl shadow-sm w-full max-w-md">
+          <Search size={14} className="text-muted-foreground shrink-0" />
           <input
             ref={searchInputRef}
             value={searchQuery}
@@ -194,10 +194,10 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
               if (e.key === "Escape") setSearchOpen(false);
             }}
             placeholder="Search in document…"
-            className="flex-1 text-sm bg-transparent outline-none text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400"
+            className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
           />
           {searchResults.length > 0 && (
-            <span className="text-xs text-zinc-500 shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               {searchIdx + 1}/{searchResults.length}
             </span>
           )}
@@ -212,7 +212,7 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
             </>
           )}
           {searchQuery && searchResults.length === 0 && (
-            <span className="text-xs text-zinc-400">No matches</span>
+            <span className="text-xs text-muted-foreground">No matches</span>
           )}
           <NavBtn onClick={() => { setSearchOpen(false); setSearchQuery(""); setSearchResults([]); }} title="Close search">
             <X size={13} />
@@ -222,8 +222,8 @@ export function PdfViewer({ url, filename, restrictDownload = false }: Props) {
 
       {/* PDF canvas */}
       {loading && (
-        <div className="flex items-center gap-3 text-zinc-400 py-16">
-          <Spinner size="sm" />
+        <div className="flex items-center gap-3 text-muted-foreground py-16">
+          <Spinner size={14} />
           <span className="text-sm">Loading PDF…</span>
         </div>
       )}

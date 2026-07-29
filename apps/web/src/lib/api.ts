@@ -1,6 +1,5 @@
 import type {
   Document,
-  DocumentVersion,
   Comment,
   Space,
   Group,
@@ -33,12 +32,7 @@ import type {
 } from "@wiki/types";
 
 const BASE = "/api";
-const SEARCH_BASE = "/search";
-
-function devAuthHeaders(): Record<string, string> {
-  const token = process.env["NEXT_PUBLIC_DEV_JWT"];
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+const SEARCH_BASE = "/api";
 
 async function apiFetch<T>(
   path: string,
@@ -48,7 +42,6 @@ async function apiFetch<T>(
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...devAuthHeaders(),
       ...init?.headers,
     },
     credentials: "include",
@@ -137,25 +130,39 @@ export const documentsApi = {
   listTrash: () => apiFetch<TrashedDocument[]>(`${BASE}/trash`),
   getVersions: (id: string) =>
     apiFetch<DocumentVersionListItem[]>(`${BASE}/documents/${id}/versions`),
-    restoreVersion: async (id: string, versionNumber: number) => {
-      const res = await fetch(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...devAuthHeaders(),
-        },
-        credentials: "include",
-      });
-  
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: { message: "Unknown error" } }));
-        throw new Error((err as { error?: { message?: string } }).error?.message ?? "Request failed");
-      }
-  
-      const json = (await res.json()) as { data: Document; reloadRequired?: boolean };
-      return { document: json.data, reloadRequired: json.reloadRequired ?? false };
-    },
-    listPermissions: (id: string) =>
+  restoreVersion: async (id: string, versionNumber: number) => {
+    const res = await fetch(`${BASE}/documents/${id}/versions/${versionNumber}/restore`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: "Unknown error" } }));
+      throw new Error((err as { error?: { message?: string } }).error?.message ?? "Request failed");
+    }
+
+    const json = (await res.json()) as { data: Document; reloadRequired?: boolean };
+    return { document: json.data, reloadRequired: json.reloadRequired ?? false };
+  },
+  discardDraft: async (id: string) => {
+    const res = await fetch(`${BASE}/documents/${id}/discard-draft`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: "Unknown error" } }));
+      throw new Error((err as { error?: { message?: string } }).error?.message ?? "Request failed");
+    }
+
+    const json = (await res.json()) as { data: Document; reloadRequired?: boolean };
+    return { document: json.data, reloadRequired: json.reloadRequired ?? false };
+  },
+  listPermissions: (id: string) =>
     apiFetch<DocumentPermissionsResponse>(`${BASE}/documents/${id}/permissions`),
   setPermission: (id: string, body: SetDocumentPermissionBody) =>
     apiFetch<DocumentPermissionRecord>(`${BASE}/documents/${id}/permissions`, {
@@ -177,30 +184,36 @@ export const documentsApi = {
 // ─── Attachments ──────────────────────────────────────────────────────────
 
 export const attachmentsApi = {
+  listByDocument: (documentId: string) =>
+    apiFetch<Array<{
+      attachmentId: string;
+      scanStatus: string;
+      ready: boolean;
+      originalName: string;
+      createdAt: string;
+    }>>(`${BASE}/documents/${documentId}/attachments`),
   upload: async (documentId: string, file: File): Promise<{ attachmentId: string }> => {
     const form = new FormData();
     form.append("file", file);
     const res = await fetch(`${BASE}/documents/${documentId}/attachments`, {
       method: "POST",
       body: form,
-      headers: devAuthHeaders(),
       credentials: "include",
     });
     if (!res.ok) throw new Error("Upload failed");
     const json = await res.json() as { data: { attachmentId: string } };
     return json.data;
   },
-  replacePdf: async (documentId: string, file: File): Promise<{ attachmentId: string; version: number }> => {
+  replacePdf: async (documentId: string, file: File): Promise<{ attachmentId: string }> => {
     const form = new FormData();
     form.append("file", file);
     const res = await fetch(`${BASE}/documents/${documentId}/attachments/replace`, {
       method: "POST",
       body: form,
-      headers: devAuthHeaders(),
       credentials: "include",
     });
     if (!res.ok) throw new Error("Replace failed");
-    const json = await res.json() as { data: { attachmentId: string; version: number } };
+    const json = await res.json() as { data: { attachmentId: string } };
     return json.data;
   },
   getStatus: (attachmentId: string) =>
@@ -211,6 +224,8 @@ export const attachmentsApi = {
     apiFetch<{ url: string; expiresIn: number }>(
       `${BASE}/attachments/${attachmentId}/view`,
     ),
+  /** Same-origin proxy — avoids S3 CORS when viewing in the browser (e.g. LocalStack). */
+  viewProxyUrl: (attachmentId: string) => `/proxy/attachments/${attachmentId}`,
 };
 
 // ─── Groups ───────────────────────────────────────────────────────────────
@@ -271,8 +286,11 @@ export const adminApi = {
     const qs = new URLSearchParams();
     if (params.limit !== undefined) qs.set("limit", String(params.limit));
     if (params.offset !== undefined) qs.set("offset", String(params.offset));
+    if (params.action !== undefined) qs.set("action", params.action);
+    if (params.from !== undefined) qs.set("from", params.from);
+    if (params.to !== undefined) qs.set("to", params.to);
     const query = qs.toString();
-    return apiFetch<AuditLogEntry[]>(
+    return apiFetch<(AuditLogEntry & { actorName?: string; actorEmail?: string })[]>(
       `${BASE}/admin/audit-log${query ? `?${query}` : ""}`,
     );
   },
@@ -305,7 +323,7 @@ export const activityApi = {
   recordView: (documentId: string) =>
     apiFetch<{ recorded: boolean }>(`${BASE}/documents/${documentId}/view`, { method: "POST", body: "{}" }),
   getRecent: () => apiFetch<Document[]>(`${BASE}/users/me/recent`),
-  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/documents/recent`),
+  getRecentlyUpdated: () => apiFetch<Document[]>(`${BASE}/users/me/recently-updated`),
   toggleFavorite: (documentId: string) =>
     apiFetch<{ favorited: boolean }>(`${BASE}/documents/${documentId}/favorite`, { method: "POST", body: "{}" }),
   isFavorited: (documentId: string) =>
@@ -333,6 +351,9 @@ export const searchApi = {
     }
     return apiFetch<SearchResponse>(`${SEARCH_BASE}/search?${qs}`);
   },
-  suggest: (q: string) =>
-    apiFetch<string[]>(`${SEARCH_BASE}/search/suggest?q=${encodeURIComponent(q)}`),
+  suggest: (q: string, spaceId?: string) => {
+    const qs = new URLSearchParams({ q });
+    if (spaceId) qs.set("spaceId", spaceId);
+    return apiFetch<string[]>(`${SEARCH_BASE}/search/suggest?${qs}`);
+  },
 };

@@ -5,8 +5,10 @@ import useSWR from "swr";
 import Link from "next/link";
 import { groupsApi, spacesApi } from "@/lib/api";
 import type { AccessLevel, Space, SpacePermissionRecord } from "@wiki/types";
-import { Button, Card, CardContent } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Users } from "lucide-react";
+import { Select } from "@/components/ui/Select";
 
 export function SpacesSection() {
   const { data: spaces = [], mutate } = useSWR("admin:spaces", spacesApi.list);
@@ -15,10 +17,11 @@ export function SpacesSection() {
   const [description, setDescription] = useState("");
   const [iconEmoji, setIconEmoji] = useState("📄");
   const [groupId, setGroupId] = useState("");
-  const [accessLevel, setAccessLevel] = useState<AccessLevel>("edit");
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>("view");
   const [submitting, setSubmitting] = useState(false);
 
-  const defaultGroupId = groupId || groups[0]?.id || "";
+  const defaultGroup = groups.find((g) => g.isDefault) ?? groups[0];
+  const defaultGroupId = groupId || defaultGroup?.id || "";
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -50,7 +53,7 @@ export function SpacesSection() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Create space
           </h2>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -58,47 +61,40 @@ export function SpacesSection() {
               placeholder="Space name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
               required
             />
             <input
               placeholder="Icon emoji"
               value={iconEmoji}
               onChange={(e) => setIconEmoji(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
               maxLength={4}
             />
             <input
               placeholder="Description (optional)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm md:col-span-2"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm md:col-span-2"
             />
-            <select
+            <Select
               value={defaultGroupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-            <select
+              onChange={setGroupId}
+              options={groups.map((g) => ({ value: g.id, label: g.name }))}
+              className="h-10"
+            />
+            <Select
               value={accessLevel}
-              onChange={(e) => setAccessLevel(e.target.value as AccessLevel)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              <option value="view">View access</option>
-              <option value="edit">Edit access</option>
-            </select>
+              onChange={(v) => setAccessLevel(v as AccessLevel)}
+              options={[{ value: "view", label: "View access" }, { value: "edit", label: "Edit access" }]}
+              className="h-10"
+            />
             <div className="md:col-span-2">
               <Button
                 type="submit"
-                variant="primary"
+                variant="default"
                 size="sm"
-                isDisabled={submitting || !defaultGroupId}
+                disabled={submitting || !defaultGroupId}
               >
                 Create space
               </Button>
@@ -108,7 +104,7 @@ export function SpacesSection() {
       </Card>
 
       <Card>
-        <CardContent className="p-0 divide-y divide-zinc-100 dark:divide-zinc-800">
+        <CardContent className="p-0 divide-y divide-border">
           {spaces.map((space) => (
             <SpaceRow
               key={space.id}
@@ -200,16 +196,15 @@ function SpaceRow({
     <div className="px-4 py-4">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-2xl">{space.iconEmoji ?? "📄"}</span>
           <div className="min-w-0">
             <Link
               href={`/spaces/${space.id}`}
-              className="font-medium text-zinc-900 dark:text-zinc-100 hover:text-violet-600 dark:hover:text-violet-400"
+              className="font-medium text-foreground hover:text-primary dark:hover:text-primary"
             >
               {space.name}
             </Link>
             {space.description && (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {space.description}
               </p>
             )}
@@ -219,11 +214,11 @@ function SpaceRow({
           <Button
             variant="secondary"
             size="sm"
-            onPress={() => (expanded ? setExpanded(false) : beginEdit())}
+            onClick={() => (expanded ? setExpanded(false) : beginEdit())}
           >
             {expanded ? "Close" : "Manage access"}
           </Button>
-          <Button variant="secondary" size="sm" onPress={onDelete}>
+          <Button variant="secondary" size="sm" onClick={onDelete}>
             Delete
           </Button>
         </div>
@@ -232,41 +227,39 @@ function SpaceRow({
       {expanded && (
         <div className="mt-4 pl-11 space-y-4">
           {activePermissions.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               No groups assigned. Add a group to grant access.
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+            <ul className="divide-y divide-border rounded-lg border border-border">
               {activePermissions.map((perm) => (
                 <li
                   key={perm.groupId}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white dark:bg-zinc-900 text-sm"
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 bg-card text-sm"
                 >
-                  <span className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
-                    <Users size={14} className="text-zinc-400" />
+                  <span className="inline-flex items-center gap-2 text-foreground/80 min-w-0 truncate">
+                    <Users size={14} className="text-muted-foreground shrink-0" />
                     {perm.groupName}
                   </span>
-                  <div className="flex items-center gap-2">
-                    <select
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Select
                       value={perm.accessLevel}
-                      onChange={(e) =>
+                      onChange={(v) =>
                         updateDraft((current) =>
                           current.map((row) =>
                             row.groupId === perm.groupId
-                              ? { ...row, accessLevel: e.target.value as AccessLevel }
+                              ? { ...row, accessLevel: v as AccessLevel }
                               : row,
                           ),
                         )
                       }
-                      className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs"
-                    >
-                      <option value="view">View</option>
-                      <option value="edit">Edit</option>
-                    </select>
+                      options={[{ value: "view", label: "View" }, { value: "edit", label: "Edit" }]}
+                      className="h-8 w-28"
+                    />
                     <Button
                       variant="secondary"
                       size="sm"
-                      onPress={() =>
+                      onClick={() =>
                         updateDraft((current) =>
                           current.filter((row) => row.groupId !== perm.groupId),
                         )
@@ -282,30 +275,23 @@ function SpaceRow({
 
           {availableGroups.length > 0 && (
             <form onSubmit={handleAddGroup} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <select
+              <Select
                 value={selectedAddGroupId}
-                onChange={(e) => setAddGroupId(e.target.value)}
-                className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-              >
-                {availableGroups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={setAddGroupId}
+                options={availableGroups.map((g) => ({ value: g.id, label: g.name }))}
+                className="h-9"
+              />
+              <Select
                 value={addAccessLevel}
-                onChange={(e) => setAddAccessLevel(e.target.value as AccessLevel)}
-                className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-              >
-                <option value="view">View access</option>
-                <option value="edit">Edit access</option>
-              </select>
+                onChange={(v) => setAddAccessLevel(v as AccessLevel)}
+                options={[{ value: "view", label: "View access" }, { value: "edit", label: "Edit access" }]}
+                className="h-9"
+              />
               <Button
                 type="submit"
                 variant="secondary"
                 size="sm"
-                isDisabled={!selectedAddGroupId}
+                disabled={!selectedAddGroupId}
               >
                 Add group
               </Button>
@@ -314,10 +300,10 @@ function SpaceRow({
 
           <div className="flex items-center gap-2">
             <Button
-              variant="primary"
+              variant="default"
               size="sm"
-              isDisabled={saving || draft === null}
-              onPress={handleSave}
+              disabled={saving || draft === null}
+              onClick={handleSave}
             >
               {saving ? "Saving…" : "Save access"}
             </Button>
@@ -325,7 +311,7 @@ function SpaceRow({
               <Button
                 variant="secondary"
                 size="sm"
-                onPress={() => setDraft(null)}
+                onClick={() => setDraft(null)}
               >
                 Reset
               </Button>

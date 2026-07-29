@@ -3,6 +3,7 @@ import type {
   AuditAction,
   DocumentStatus,
   DocumentType,
+  DocumentVisibility,
   ScanStatus,
   UserRole,
   UserStatus,
@@ -57,6 +58,8 @@ export interface Space {
   iconEmoji?: string;
   createdBy: string;
   createdAt: Date;
+  /** Effective access for the current user (from space group ACL). */
+  accessLevel?: AccessLevel;
 }
 
 export interface SpacePermission {
@@ -71,7 +74,9 @@ export interface Document {
   spaceId: string;
   parentId?: string;
   type: DocumentType;
+  /** Published (or never-published working) title. */
   title: string;
+  /** Published (or never-published working) HTML body. */
   contentRef?: string;
   ownerId: string;
   ownerName?: string;
@@ -82,9 +87,23 @@ export interface Document {
   updatedAt: Date;
   tags: string[];
   restrictDownload: boolean;
+  /** Access model: "inherit" (additive with space ACL) or "restricted" (whitelist). */
+  visibility: DocumentVisibility;
   trashedAt?: Date;
   /** Present on GET /documents/:id — effective access for the current user */
   accessLevel?: AccessLevel;
+  /** True when draft_* differs from published (editors only). */
+  hasUnpublishedChanges?: boolean;
+  /**
+   * Editable title/body for editors: draft when present, else published/working.
+   * Viewers receive the same values as title/contentRef (published only).
+   */
+  editableTitle?: string;
+  editableContentRef?: string;
+  /** Present on recently-viewed lists */
+  viewedAt?: Date;
+  /** Present on recently-updated lists */
+  editedAt?: Date;
 }
 
 export interface TrashedDocument {
@@ -96,6 +115,8 @@ export interface TrashedDocument {
   ownerId: string;
   trashedAt: Date;
   purgeAt: Date;
+  /** Status before trash (draft or published) */
+  previousStatus: "draft" | "published";
 }
 
 export interface DocumentPermission {
@@ -111,6 +132,7 @@ export interface DocumentVersion {
   documentId: string;
   versionNumber: number;
   contentSnapshot: string;
+  titleSnapshot: string;
   editedBy: string;
   editedByName?: string;
   editedAt: Date;

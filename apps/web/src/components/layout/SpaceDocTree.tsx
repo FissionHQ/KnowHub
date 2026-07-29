@@ -4,11 +4,15 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import { documentsApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
-import { FileText, Plus, ChevronRight, MoreHorizontal } from "lucide-react";
-import clsx from "clsx";
+import { FileText, Plus, ChevronRight, MoreHorizontal, Trash2, PenIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { TrashConfirmDialog } from "@/components/TrashConfirmDialog";
+
+const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
+const navItemActive = "bg-sidebar-accent text-primary";
 
 interface NodeProps {
   doc: Document;
@@ -16,14 +20,17 @@ interface NodeProps {
   spaceId: string;
   depth: number;
   mutate: () => void;
+  canEdit: boolean;
 }
 
-function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
+function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(doc.title);
@@ -44,14 +51,33 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  async function handleDelete(e: React.MouseEvent) {
+  useEffect(() => {
+    if (!trashConfirmOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !deleting) setTrashConfirmOpen(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [trashConfirmOpen, deleting]);
+
+  function handleTrashClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
-    await documentsApi.delete(doc.id);
-    mutate();
-    if (pathname === `/spaces/${spaceId}/docs/${doc.id}`) {
-      router.push(`/spaces/${spaceId}`);
+    setTrashConfirmOpen(true);
+  }
+
+  async function confirmTrash() {
+    setDeleting(true);
+    try {
+      await documentsApi.delete(doc.id);
+      mutate();
+      setTrashConfirmOpen(false);
+      if (pathname === `/spaces/${spaceId}/docs/${doc.id}`) {
+        router.push(`/spaces/${spaceId}`);
+      }
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -61,11 +87,14 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
     if (trimmed && trimmed !== doc.title) {
       await documentsApi.update(doc.id, { title: trimmed });
       mutate();
+      void globalMutate(`doc:${doc.id}`);
+      void globalMutate("favorites");
     }
     setRenaming(false);
   }
 
-  const children = allDocs.filter((d) => d.parentId === doc.id);
+  const idSet = new Set(allDocs.map((d) => d.id));
+  const children = allDocs.filter((d) => d.parentId === doc.id && idSet.has(d.id));
   const isActive = pathname === `/spaces/${spaceId}/docs/${doc.id}`;
 
   async function handleCreate(e: React.MouseEvent) {
@@ -90,22 +119,22 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
   return (
     <div>
       <div
-        className="group flex items-center gap-1 rounded-md pr-1 hover:bg-white/10 transition-colors"
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
+        className="group flex items-center gap-1 rounded-md pr-1 transition-colors hover:bg-white/5"
+        style={{ paddingLeft: `${16 + depth * 16}px` }}
       >
         {/* expand/collapse toggle */}
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="shrink-0 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 w-4 h-4 flex items-center justify-center"
+          className="flex h-4 w-4 shrink-0 items-center justify-center text-sidebar-muted transition-colors hover:text-sidebar-foreground"
         >
           {children.length > 0 ? (
             <ChevronRight
               size={11}
-              className={clsx("transition-transform", expanded && "rotate-90")}
+              className={cn("transition-transform", expanded && "rotate-90")}
             />
           ) : (
-            <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600 block" />
+            <span className="block h-1 w-1 rounded-full bg-sidebar-muted" />
           )}
         </button>
 
@@ -117,17 +146,16 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
               onChange={(e) => setRenameValue(e.target.value)}
               onBlur={handleRenameSubmit}
               onKeyDown={(e) => e.key === "Escape" && setRenaming(false)}
-              className="w-full text-[13px] px-1 py-0.5 rounded border border-[#f25011] outline-none bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100"
+              className="w-full text-[13px] px-1 py-0.5 rounded border border-primary outline-none bg-card text-foreground"
             />
           </form>
         ) : (
           <Link
             href={`/spaces/${spaceId}/docs/${doc.id}`}
-            className={clsx(
-              "flex-1 flex items-center gap-1.5 py-1.5 text-[13px] truncate min-w-0",
-              isActive ? "font-medium" : "text-zinc-300",
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-md px-1 py-1.5 text-sm font-medium transition-colors",
+              isActive ? navItemActive : navItemIdle,
             )}
-            style={isActive ? { color: "#f25011" } : {}}
           >
             <FileText size={12} className="shrink-0 opacity-60" />
             <span className="truncate">{doc.title}</span>
@@ -135,17 +163,20 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
         )}
 
         {/* + new subpage */}
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={creating}
-          title="New sub-page"
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
-        >
-          <Plus size={12} />
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={creating}
+            title="New sub-page"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-sidebar-muted opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
+          >
+            <Plus size={12} />
+          </button>
+        )}
 
         {/* ⋯ context menu */}
+        {canEdit && (
         <button
           ref={btnRef}
           type="button"
@@ -157,34 +188,50 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
             setMenuOpen((v) => !v);
           }}
           title="More options"
-          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-sidebar-muted opacity-0 transition-opacity hover:text-sidebar-foreground group-hover:opacity-100"
         >
           <MoreHorizontal size={12} />
         </button>
+        )}
 
         {menuOpen && typeof window !== "undefined" && createPortal(
           <div
             ref={menuRef}
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-[9999] w-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
+            className="fixed z-[9999] w-32 bg-card border border-border rounded-lg shadow-lg py-1 text-[13px]"
           >
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setRenameValue(doc.title); setRenaming(true); }}
-              className="w-full text-left px-3 py-1.5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+              className="w-full text-left px-3 py-1.5 text-foreground/80 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-primary transition-colors flex items-center gap-2 disabled:opacity-50"
             >
+              <PenIcon size={10} />
               Rename
             </button>
             <button
               type="button"
-              onClick={handleDelete}
-              className="w-full text-left px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+              disabled={deleting}
+              onClick={handleTrashClick}
+              className="w-full text-left px-3 py-1.5 text-foreground/80 hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-primary transition-colors flex items-center gap-2 disabled:opacity-50"
             >
-              Delete
+              <Trash2 size={10} />
+              Move to trash
             </button>
           </div>,
           document.body,
         )}
+
+        {trashConfirmOpen &&
+          typeof window !== "undefined" &&
+          createPortal(
+            <TrashConfirmDialog
+              title={doc.title}
+              deleting={deleting}
+              onCancel={() => setTrashConfirmOpen(false)}
+              onConfirm={confirmTrash}
+            />,
+            document.body,
+          )}
       </div>
 
       {expanded && children.length > 0 && (
@@ -197,6 +244,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
               spaceId={spaceId}
               depth={depth + 1}
               mutate={mutate}
+              canEdit={canEdit}
             />
           ))}
         </div>
@@ -207,16 +255,19 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate }: NodeProps) {
 
 interface Props {
   spaceId: string;
+  canEdit?: boolean;
 }
 
-export function SpaceDocTree({ spaceId }: Props) {
+export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
   const router = useRouter();
   const { data: docs = [], mutate } = useSWR<Document[]>(
     `space:${spaceId}:docs`,
     () => documentsApi.listBySpace(spaceId),
+    { revalidateOnFocus: false },
   );
 
-  const rootDocs = docs.filter((d) => !d.parentId);
+  const idSet = new Set(docs.map((d) => d.id));
+  const rootDocs = docs.filter((d) => !d.parentId || !idSet.has(d.parentId));
 
   async function handleNewRootPage() {
     const created = await documentsApi.create({
@@ -239,16 +290,20 @@ export function SpaceDocTree({ spaceId }: Props) {
           spaceId={spaceId}
           depth={0}
           mutate={mutate}
+          canEdit={canEdit}
         />
       ))}
-      <button
-        type="button"
-        onClick={handleNewRootPage}
-        className="flex items-center gap-1.5 px-3 py-1.5 mt-0.5 w-full text-left text-[12px] text-zinc-500 hover:text-[#f25011] hover:bg-white/10 rounded-md transition-colors"
-      >
-        <Plus size={11} />
-        New page
-      </button>
+      {canEdit && (
+        <button
+          type="button"
+          onClick={handleNewRootPage}
+          className="mt-0.5 flex w-full items-center gap-1.5 rounded-md py-1.5 text-left text-sm font-medium text-sidebar-muted transition-colors hover:bg-white/5 hover:text-sidebar-foreground"
+          style={{ paddingLeft: "20px" }}
+        >
+          <Plus size={11} />
+          New page
+        </button>
+      )}
     </div>
   );
 }

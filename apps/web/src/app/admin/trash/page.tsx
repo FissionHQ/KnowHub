@@ -4,18 +4,25 @@ import { useState } from "react";
 import useSWR from "swr";
 import { trashApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
-import { Card, CardContent, Button, Chip } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Trash2, RotateCcw, AlertTriangle, FileText, File } from "lucide-react";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function TrashPage() {
+  const { toast } = useToast();
   const { data: docs = [], mutate } = useSWR<Document[]>("trash", trashApi.list);
   const [loading, setLoading] = useState<string | null>(null);
 
-  async function handleRestore(id: string) {
+  async function handleRestore(id: string, title: string) {
     setLoading(id);
     try {
       await trashApi.restore(id);
-      mutate();
+      await mutate();
+      toast(`"${title}" restored`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to restore document", "error");
     } finally {
       setLoading(null);
     }
@@ -35,18 +42,18 @@ export default function TrashPage() {
   return (
     <div className="max-w-4xl mx-auto p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-          <Trash2 size={22} className="text-zinc-400" />
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <Trash2 size={22} className="text-muted-foreground" />
           Trash
         </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Deleted documents can be restored by admins within the retention window.
         </p>
       </div>
 
       {docs.length === 0 ? (
         <Card>
-          <CardContent className="py-16 flex flex-col items-center gap-3 text-zinc-400 dark:text-zinc-500 p-5">
+          <CardContent className="py-16 flex flex-col items-center gap-3 text-muted-foreground p-5">
             <Trash2 size={36} className="opacity-30" />
             <p className="text-sm">Trash is empty</p>
           </CardContent>
@@ -56,26 +63,26 @@ export default function TrashPage() {
           {docs.map((doc) => (
             <Card key={doc.id}>
               <CardContent className="flex items-center gap-3 p-4">
-                <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 shrink-0">
+                <div className="p-2 rounded-lg bg-muted text-muted-foreground shrink-0">
                   {doc.type === "pdf" ? <File size={15} /> : <FileText size={15} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">
+                  <p className="font-medium text-sm text-foreground truncate">
                     {doc.title}
                   </p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Deleted {new Date(doc.updatedAt).toLocaleDateString()}
                     {(doc as unknown as { ownerName?: string }).ownerName && ` · by ${(doc as unknown as { ownerName?: string }).ownerName}`}
                   </p>
                 </div>
-                <Chip size="sm" variant="secondary" className="text-xs shrink-0">
+                <Badge variant="secondary" className="text-xs shrink-0">
                   {doc.type.toUpperCase()}
-                </Chip>
+                </Badge>
                 <Button
                   size="sm"
                   variant="outline"
-                  isDisabled={loading === doc.id}
-                  onPress={() => handleRestore(doc.id)}
+                  disabled={loading === doc.id}
+                  onClick={() => handleRestore(doc.id, doc.title)}
                   className="shrink-0 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                 >
                   <RotateCcw size={13} />
@@ -84,8 +91,8 @@ export default function TrashPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  isDisabled={loading === doc.id}
-                  onPress={() => handleDelete(doc.id)}
+                  disabled={loading === doc.id}
+                  onClick={() => handleDelete(doc.id)}
                   className="shrink-0 text-red-600 border-red-200 hover:bg-red-50"
                 >
                   <AlertTriangle size={13} />

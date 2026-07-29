@@ -4,9 +4,12 @@ import { useState } from "react";
 import useSWR from "swr";
 import { groupsApi, usersApi } from "@/lib/api";
 import { membersForGroup, usersNotInGroup } from "@/components/admin/GroupMembershipChips";
-import { Button, Card, CardContent, Chip } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import clsx from "clsx";
+import { Select } from "@/components/ui/Select";
 
 export function GroupsSection() {
   const { data: groups = [], mutate: mutateGroups } = useSWR("admin:groups", groupsApi.list);
@@ -76,7 +79,7 @@ export function GroupsSection() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Create group
           </h2>
           <form onSubmit={handleCreate} className="flex flex-col sm:flex-row gap-3">
@@ -84,16 +87,16 @@ export function GroupsSection() {
               placeholder="Group name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm flex-1"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm flex-1"
               required
             />
             <input
               placeholder="Description (optional)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm flex-1"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm flex-1"
             />
-            <Button type="submit" variant="primary" size="sm" isDisabled={submitting}>
+            <Button type="submit" variant="default" size="sm" disabled={submitting}>
               Create
             </Button>
           </form>
@@ -117,31 +120,31 @@ export function GroupsSection() {
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-zinc-900 dark:text-zinc-100">{group.name}</p>
-                        <Chip size="sm" variant="secondary" className="text-xs">
+                        <p className="font-medium text-foreground">{group.name}</p>
+                        <Badge variant="secondary" className="text-xs">
                           {members.length} member{members.length === 1 ? "" : "s"}
-                        </Chip>
+                        </Badge>
                         {group.isDefault && (
-                          <span className="text-xs text-[#f25011]">Default</span>
+                          <span className="text-xs text-primary">Default</span>
                         )}
                       </div>
                       {group.description && (
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
+                        <p className="text-sm text-muted-foreground mt-0.5 truncate">
                           {group.description}
                         </p>
                       )}
                     </div>
                     {expanded ? (
-                      <ChevronUp size={16} className="text-zinc-400 shrink-0" />
+                      <ChevronUp size={16} className="text-muted-foreground shrink-0" />
                     ) : (
-                      <ChevronDown size={16} className="text-zinc-400 shrink-0" />
+                      <ChevronDown size={16} className="text-muted-foreground shrink-0" />
                     )}
                   </button>
                   {!group.isDefault && (
                     <Button
                       variant="secondary"
                       size="sm"
-                      onPress={() => handleDelete(group.id, group.name)}
+                      onClick={() => handleDelete(group.id, group.name)}
                     >
                       Delete
                     </Button>
@@ -149,12 +152,12 @@ export function GroupsSection() {
                 </div>
 
                 {expanded && (
-                  <div className="px-4 pb-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400 mt-4 mb-2">
+                  <div className="px-4 pb-4 border-t border-border">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-4 mb-2">
                       Members
                     </p>
                     {members.length === 0 ? (
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
+                      <p className="text-sm text-muted-foreground mb-3">
                         No members in this group yet.
                       </p>
                     ) : (
@@ -162,34 +165,36 @@ export function GroupsSection() {
                         {members.map((member) => (
                           <li
                             key={member.userId}
-                            className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                            className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg border border-border bg-card"
                           >
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                              <p className="text-sm font-medium text-foreground truncate">
                                 {member.userName}
                               </p>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                              <p className="text-xs text-muted-foreground truncate">
                                 {member.userEmail}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <Chip size="sm" variant="secondary" className="text-xs capitalize">
+                              <Badge variant="secondary" className="text-xs capitalize">
                                 {member.userStatus}
-                              </Chip>
-                              <button
-                                type="button"
-                                disabled={busyKey === `${group.id}:${member.userId}`}
-                                onClick={() =>
-                                  handleRemoveMember(group.id, member.userId, member.userName)
-                                }
-                                className={clsx(
-                                  "p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors",
-                                  busyKey === `${group.id}:${member.userId}` && "opacity-50",
-                                )}
-                                aria-label={`Remove ${member.userName}`}
-                              >
-                                <X size={14} />
-                              </button>
+                              </Badge>
+                              {!group.isDefault && (
+                                <button
+                                  type="button"
+                                  disabled={busyKey === `${group.id}:${member.userId}`}
+                                  onClick={() =>
+                                    handleRemoveMember(group.id, member.userId, member.userName)
+                                  }
+                                  className={clsx(
+                                    "p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors",
+                                    busyKey === `${group.id}:${member.userId}` && "opacity-50",
+                                  )}
+                                  aria-label={`Remove ${member.userName}`}
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
                             </div>
                           </li>
                         ))}
@@ -198,27 +203,19 @@ export function GroupsSection() {
 
                     {availableUsers.length > 0 ? (
                       <div className="flex items-center gap-2">
-                        <select
-                          defaultValue=""
-                          disabled={busyKey?.startsWith(`${group.id}:`) ?? false}
-                          onChange={(e) => {
-                            const userId = e.target.value;
-                            if (!userId) return;
-                            void handleAddMember(group.id, userId);
-                            e.target.value = "";
-                          }}
-                          className="h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm flex-1"
-                        >
-                          <option value="">Add member…</option>
-                          {availableUsers.map((user) => (
-                            <option key={user.id} value={user.id}>
-                              {user.name} ({user.email})
-                            </option>
-                          ))}
-                        </select>
+                      <Select
+                        value=""
+                        onChange={(userId) => {
+                          if (!userId) return;
+                          void handleAddMember(group.id, userId);
+                        }}
+                        options={[{ value: "", label: "Add member…" }, ...availableUsers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))]}
+                        disabled={busyKey?.startsWith(`${group.id}:`) ?? false}
+                        className="h-9 flex-1"
+                      />
                       </div>
                     ) : (
-                      <p className="text-xs text-zinc-400">
+                      <p className="text-xs text-muted-foreground">
                         All active users are already in this group.
                       </p>
                     )}

@@ -4,4 +4,10 @@ export {
   collabDocumentName,
 } from "./constants.js";
 export { collabTiptapExtensions } from "./extensions.js";
-export { htmlToYdoc, encodeHtmlAsYjsStateBase64 } from "./yjsState.js";
+export {
+  htmlToYdoc,
+  ydocToHtml,
+  encodeHtmlAsYjsStateBase64,
+  canonicalizeHtml,
+  isHtmlContentChanged,
+} from "./yjsState.js";

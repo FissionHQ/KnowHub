@@ -11,6 +11,7 @@ import type { Redis } from "ioredis";
 import { invalidateGroupCache } from "../../middleware/tenantContext.js";
 import { recordAudit } from "../../lib/audit.js";
 import { sendInviteEmail, getAppBaseUrl } from "../../lib/email.js";
+import { ensureDefaultGroup } from "../access/defaultGroup.js";
 
 const inviteSchema = z.object({
   email: z.string().min(3).regex(/^[^\s@]+@[^\s@]+$/, "Invalid email"),
@@ -128,11 +129,12 @@ export function createIdentityRouter(
       status: "invited",
     });
 
-    if (groupIds.length) {
-      await db.insert(groupMemberships).values(
-        groupIds.map((groupId) => ({ userId, groupId })),
-      );
-    }
+    // Every user belongs to the default group; space ACL decides view vs edit.
+    const defaultGroupId = await ensureDefaultGroup(db, orgId);
+    const membershipGroupIds = [...new Set([defaultGroupId, ...groupIds])];
+    await db.insert(groupMemberships).values(
+      membershipGroupIds.map((groupId) => ({ userId, groupId })),
+    );
 
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

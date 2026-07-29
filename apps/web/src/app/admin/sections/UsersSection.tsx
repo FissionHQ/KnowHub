@@ -5,9 +5,22 @@ import useSWR from "swr";
 import { groupsApi, usersApi } from "@/lib/api";
 import { UserGroupChips, GroupSelectChips } from "@/components/admin/GroupMembershipChips";
 import type { User, UserRole } from "@wiki/types";
-import { Button, Card, CardContent, Chip } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/Select";
 
 const ROLES: UserRole[] = ["admin", "member", "viewer"];
+
+/** Prefer the host the admin is browsing; API APP_URL may still be localhost. */
+function publicInviteUrl(apiInviteUrl: string): string {
+  try {
+    const path = new URL(apiInviteUrl).pathname;
+    return `${window.location.origin}${path}`;
+  } catch {
+    return apiInviteUrl;
+  }
+}
 
 export function UsersSection() {
   const { data: users = [], mutate } = useSWR("admin:users", usersApi.list);
@@ -30,6 +43,9 @@ export function UsersSection() {
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
 
   async function toggleUserGroup(userId: string, groupId: string, isMember: boolean) {
+    const group = groups.find((g) => g.id === groupId);
+    if (isMember && group?.isDefault) return;
+
     setBusyUserId(userId);
     try {
       if (isMember) {
@@ -50,7 +66,7 @@ export function UsersSection() {
     setLastInviteUrl(null);
     try {
       const result = await usersApi.invite({ email, name, role, groupIds });
-      setLastInviteUrl(result.inviteUrl);
+      setLastInviteUrl(publicInviteUrl(result.inviteUrl));
       setEmail("");
       setName("");
       setRole("member");
@@ -79,7 +95,7 @@ export function UsersSection() {
 
   async function resendInvite(userId: string) {
     const result = await usersApi.resendInvite(userId);
-    setLastInviteUrl(result.inviteUrl);
+    setLastInviteUrl(publicInviteUrl(result.inviteUrl));
     await mutateInvites();
   }
 
@@ -95,7 +111,7 @@ export function UsersSection() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Invite user
           </h2>
           <form onSubmit={handleInvite} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -104,37 +120,37 @@ export function UsersSection() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
               required
             />
             <input
               placeholder="Full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
+              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
               required
             />
-            <select
+            <Select
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="h-10 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm"
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-            <Button type="submit" variant="primary" size="sm" isDisabled={submitting}>
+              onChange={(v) => setRole(v as UserRole)}
+              options={ROLES.map((r) => ({ value: r, label: r }))}
+              className="h-10"
+            />
+            <Button type="submit" variant="default" size="sm" disabled={submitting}>
               Send invite
             </Button>
           </form>
           {groups.length > 0 && (
-            <GroupSelectChips
-              groups={groups}
-              selectedIds={groupIds}
-              onToggle={toggleGroup}
-            />
+            <>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Everyone (default) is always included. Optionally add more groups below.
+              </p>
+              <GroupSelectChips
+                groups={groups.filter((g) => !g.isDefault)}
+                selectedIds={groupIds}
+                onToggle={toggleGroup}
+              />
+            </>
           )}
           {lastInviteUrl && (
             <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900">
@@ -151,14 +167,14 @@ export function UsersSection() {
       {invites.length > 0 && (
         <Card>
           <CardContent className="p-0 overflow-x-auto">
-            <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <div className="px-4 py-3 border-b border-border">
+              <h2 className="text-sm font-semibold text-foreground">
                 Pending invitations
               </h2>
             </div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500 dark:text-zinc-400">
+                <tr className="border-b border-border text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">User</th>
                   <th className="px-4 py-3 font-medium">Role</th>
                   <th className="px-4 py-3 font-medium">Expires</th>
@@ -169,14 +185,14 @@ export function UsersSection() {
                 {invites.map((invite) => (
                   <tr
                     key={invite.userId}
-                    className="border-b border-zinc-100 dark:border-zinc-800/80 last:border-0"
+                    className="border-b border-border/80 last:border-0"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900 dark:text-zinc-100">{invite.name}</div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400">{invite.email}</div>
+                      <div className="font-medium text-foreground">{invite.name}</div>
+                      <div className="text-xs text-muted-foreground">{invite.email}</div>
                     </td>
                     <td className="px-4 py-3 capitalize">{invite.role}</td>
-                    <td className="px-4 py-3 text-xs text-zinc-500">
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
                       {new Date(invite.expiresAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3">
@@ -184,8 +200,8 @@ export function UsersSection() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onPress={() => {
-                            void navigator.clipboard.writeText(invite.inviteUrl);
+                          onClick={() => {
+                            void navigator.clipboard.writeText(publicInviteUrl(invite.inviteUrl));
                           }}
                         >
                           Copy link
@@ -193,7 +209,7 @@ export function UsersSection() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onPress={() => resendInvite(invite.userId)}
+                          onClick={() => resendInvite(invite.userId)}
                         >
                           Resend
                         </Button>
@@ -209,12 +225,12 @@ export function UsersSection() {
 
       <Card>
         <CardContent className="p-0 overflow-x-auto">
-          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">All users</h2>
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="text-sm font-semibold text-foreground">All users</h2>
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500 dark:text-zinc-400">
+              <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">Role</th>
                 <th className="px-4 py-3 font-medium">Groups</th>
@@ -226,29 +242,24 @@ export function UsersSection() {
               {users.map((user) => (
                 <tr
                   key={user.id}
-                  className="border-b border-zinc-100 dark:border-zinc-800/80 last:border-0"
+                  className="border-b border-border/80 last:border-0"
                 >
                   <td className="px-4 py-3">
-                    <div className="font-medium text-zinc-900 dark:text-zinc-100">{user.name}</div>
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400">{user.email}</div>
+                    <div className="font-medium text-foreground">{user.name}</div>
+                    <div className="text-xs text-muted-foreground">{user.email}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <select
+                    <Select
                       value={user.role}
-                      onChange={(e) => changeRole(user, e.target.value as UserRole)}
+                      onChange={(v) => changeRole(user, v as UserRole)}
+                      options={ROLES.map((r) => ({ value: r, label: r }))}
                       disabled={user.status === "invited"}
-                      className="h-8 px-2 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs disabled:opacity-50"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
+                      className="h-8 w-28"
+                    />
                   </td>
                   <td className="px-4 py-3 min-w-[180px] max-w-[280px]">
                     {user.status === "deactivated" ? (
-                      <span className="text-xs text-zinc-400">—</span>
+                      <span className="text-xs text-muted-foreground">—</span>
                     ) : (
                       <UserGroupChips
                         groups={groups}
@@ -262,16 +273,16 @@ export function UsersSection() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <Chip size="sm" variant="secondary" className="text-xs capitalize">
+                    <Badge variant="secondary" className="text-xs capitalize">
                       {user.status}
-                    </Chip>
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">
                     {user.status === "invited" ? (
                       <Button
                         variant="secondary"
                         size="sm"
-                        onPress={() => resendInvite(user.id)}
+                        onClick={() => resendInvite(user.id)}
                       >
                         Resend invite
                       </Button>
@@ -279,7 +290,7 @@ export function UsersSection() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onPress={() => deactivate(user)}
+                        onClick={() => deactivate(user)}
                       >
                         Deactivate
                       </Button>

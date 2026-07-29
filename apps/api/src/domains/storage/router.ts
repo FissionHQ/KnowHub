@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -65,6 +65,7 @@ export function createStorageRouter(
         db, userRole, userId, groupIds,
         documentId: doc.id,
         spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
         required: "edit",
       });
 
@@ -154,15 +155,9 @@ export function createStorageRouter(
         db, userRole, userId, groupIds,
         documentId: doc.id,
         spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
         required: "edit",
       });
-
-      // Increment document version
-      const newVersion = doc.version + 1;
-      await db
-        .update(documents)
-        .set({ version: newVersion, updatedAt: new Date() })
-        .where(eq(documents.id, documentId ?? ""));
 
       const attachmentId = uuidv4();
       const quarantineKey = `quarantine/${orgId}/${attachmentId}/${req.file.originalname}`;
@@ -201,9 +196,53 @@ export function createStorageRouter(
         new SendMessageCommand({ QueueUrl: opts.pdfQueueUrl, MessageBody: JSON.stringify(msg) }),
       ).catch(() => null);
 
-      res.status(202).json({ data: { attachmentId, version: newVersion, status: "pending" } });
+      res.status(202).json({ data: { attachmentId, status: "pending" } });
     },
   );
+
+  // GET /documents/:documentId/attachments — list attachments for a document
+  router.get("/documents/:documentId/attachments", async (req, res) => {
+    const { orgId, userRole, userId, groupIds } = req.tenant;
+    const { documentId } = req.params;
+
+    const docRows = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+
+    if (!docRows.length) throw new NotFoundError("Document");
+    const doc = docRows[0]!;
+
+    await assertDocumentAccess({
+      db, userRole, userId, groupIds,
+        documentId: doc.id,
+        spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
+        required: "view",
+    });
+
+    const rows = await db
+      .select({
+        id: attachments.id,
+        scanStatus: attachments.scanStatus,
+        s3Key: attachments.s3Key,
+        originalName: attachments.originalName,
+        createdAt: attachments.createdAt,
+      })
+      .from(attachments)
+      .where(and(eq(attachments.documentId, documentId ?? ""), eq(attachments.orgId, orgId)))
+      .orderBy(desc(attachments.createdAt));
+
+    res.json({
+      data: rows.map((row) => ({
+        attachmentId: row.id,
+        scanStatus: row.scanStatus,
+        ready: row.scanStatus === "clean" && Boolean(row.s3Key),
+        originalName: row.originalName,
+        createdAt: row.createdAt,
+      })),
+    });
+  });
 
   // GET /attachments/:attachmentId/status
   router.get("/attachments/:attachmentId/status", async (req, res) => {
@@ -255,9 +294,10 @@ export function createStorageRouter(
 
     await assertDocumentAccess({
       db, userRole, userId, groupIds,
-      documentId: doc.id,
-      spaceId: doc.spaceId,
-      required: "view",
+        documentId: doc.id,
+        spaceId: doc.spaceId,
+        ownerId: doc.ownerId,
+        required: "view",
     });
 
     // Generate presigned URL — ACL check done above, URL is short-lived

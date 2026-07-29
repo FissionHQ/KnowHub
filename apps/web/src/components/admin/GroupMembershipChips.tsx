@@ -62,7 +62,7 @@ export function UserGroupChips({
   }, [open]);
 
   if (!groups.length) {
-    return <span className="text-xs text-zinc-400">No groups</span>;
+    return <span className="text-xs text-muted-foreground">No groups</span>;
   }
 
   const inlineGroups = memberGroups.slice(0, MAX_INLINE_CHIPS);
@@ -74,19 +74,19 @@ export function UserGroupChips({
         {inlineGroups.map((group) => (
           <span
             key={group.id}
-            className="px-2 py-0.5 rounded-full text-xs border border-[#f25011] bg-orange-50 dark:bg-orange-950/40 text-[#f25011] truncate max-w-[120px]"
+            className="px-2 py-0.5 rounded-full text-xs border border-primary bg-orange-50 dark:bg-orange-950/40 text-primary truncate max-w-[120px]"
             title={group.name}
           >
             {group.name}
           </span>
         ))}
         {overflowCount > 0 && (
-          <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+          <span className="px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground">
             +{overflowCount}
           </span>
         )}
         {memberGroups.length === 0 && (
-          <span className="text-xs text-zinc-400">None</span>
+          <span className="text-xs text-muted-foreground">None</span>
         )}
         <button
           type="button"
@@ -94,8 +94,8 @@ export function UserGroupChips({
           onClick={() => setOpen((v) => !v)}
           className={clsx(
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors",
-            "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400",
-            "hover:border-[#f25011]/50 hover:text-[#f25011]",
+            "border-border text-muted-foreground",
+            "hover:border-primary/50 hover:text-primary",
             disabled && "opacity-50 cursor-not-allowed",
           )}
         >
@@ -105,26 +105,26 @@ export function UserGroupChips({
       </div>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-30 w-64 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg">
-          <div className="p-2 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="absolute left-0 top-full mt-1 z-30 w-64 rounded-xl border border-border bg-card shadow-lg">
+          <div className="p-2 border-b border-border">
             <div className="relative">
               <Search
                 size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <input
                 type="search"
                 placeholder="Search groups…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="w-full h-8 pl-8 pr-8 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-xs"
+                className="w-full h-8 pl-8 pr-8 rounded-lg border border-border bg-background text-xs"
                 autoFocus
               />
               {query && (
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
                   aria-label="Clear search"
                 >
                   <X size={12} />
@@ -134,34 +134,37 @@ export function UserGroupChips({
           </div>
           <ul className="max-h-52 overflow-y-auto py-1">
             {filteredGroups.length === 0 ? (
-              <li className="px-3 py-2 text-xs text-zinc-400">No groups match</li>
+              <li className="px-3 py-2 text-xs text-muted-foreground">No groups match</li>
             ) : (
               filteredGroups.map((group) => {
                 const isMember = memberGroupIds.has(group.id);
+                const lockedDefault = group.isDefault && isMember;
                 return (
                   <li key={group.id}>
                     <button
                       type="button"
-                      disabled={disabled}
+                      disabled={disabled || lockedDefault}
                       onClick={() => onToggle(group.id, isMember)}
                       className={clsx(
                         "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors",
-                        "hover:bg-zinc-50 dark:hover:bg-zinc-800/80",
-                        disabled && "opacity-50",
+                        "hover:bg-background dark:hover:bg-accent/80",
+                        (disabled || lockedDefault) && "opacity-50",
+                        lockedDefault && "cursor-not-allowed",
                       )}
                     >
-                      <span className="truncate font-medium text-zinc-800 dark:text-zinc-200">
+                      <span className="truncate font-medium text-foreground">
                         {group.name}
+                        {group.isDefault ? " (default)" : ""}
                       </span>
                       <span
                         className={clsx(
                           "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide",
                           isMember
-                            ? "bg-orange-50 text-[#f25011] dark:bg-orange-950/30"
-                            : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+                            ? "bg-orange-50 text-primary dark:bg-orange-950/30"
+                            : "bg-muted text-muted-foreground",
                         )}
                       >
-                        {isMember ? "In" : "Add"}
+                        {lockedDefault ? "Required" : isMember ? "In" : "Add"}
                       </span>
                     </button>
                   </li>
@@ -169,7 +172,7 @@ export function UserGroupChips({
               })
             )}
           </ul>
-          <div className="px-3 py-2 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-400">
+          <div className="px-3 py-2 border-t border-border text-[10px] text-muted-foreground">
             {memberGroups.length} of {groups.length} groups
           </div>
         </div>
@@ -225,7 +228,7 @@ export function GroupSelectChips({
           placeholder="Filter groups…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-8 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs w-full max-w-xs"
+          className="h-8 px-3 rounded-lg border border-border bg-card text-xs w-full max-w-xs"
         />
       )}
       <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
@@ -237,8 +240,8 @@ export function GroupSelectChips({
             className={clsx(
               "px-2.5 py-1 rounded-full text-xs border transition-colors",
               selected.has(group.id)
-                ? "border-[#f25011] bg-orange-50 dark:bg-orange-950/40 text-[#f25011]"
-                : "border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300",
+                ? "border-primary bg-orange-50 dark:bg-orange-950/40 text-primary"
+                : "border-border text-muted-foreground hover:border-muted-foreground/40",
             )}
           >
             {group.name}

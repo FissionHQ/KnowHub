@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { documentsApi } from "@/lib/api";
-import { Button, Card, CardContent, Skeleton } from "@heroui/react";
+import useSWR from "swr";
+import { documentsApi, spacesApi } from "@/lib/api";
+import type { Space } from "@wiki/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
   spaceId: string;
@@ -12,8 +16,18 @@ interface Props {
 export function NewPageView({ spaceId }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const { data: space, isLoading } = useSWR<Space>(
+    `space:${spaceId}`,
+    () => spacesApi.get(spaceId),
+  );
 
   useEffect(() => {
+    if (isLoading || !space) return;
+    if (space.accessLevel !== "edit") {
+      setError("You need edit access to create pages in this space.");
+      return;
+    }
+
     let cancelled = false;
 
     async function createPage() {
@@ -40,7 +54,7 @@ export function NewPageView({ spaceId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [spaceId, router]);
+  }, [spaceId, router, space, isLoading]);
 
   if (error) {
     return (
@@ -48,7 +62,7 @@ export function NewPageView({ spaceId }: Props) {
         <Card className="border-red-100 bg-red-50">
           <CardContent className="p-5 flex flex-col gap-3">
             <p className="text-red-600 text-sm">{error}</p>
-            <Button variant="secondary" size="sm" onPress={() => router.back()}>
+            <Button variant="secondary" size="sm" onClick={() => router.back()}>
               Go back
             </Button>
           </CardContent>

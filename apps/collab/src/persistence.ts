@@ -1,33 +1,25 @@
-import { createHash, randomUUID } from "node:crypto";
 import * as Y from "yjs";
 import { eq, and } from "drizzle-orm";
-import { TiptapTransformer } from "@hocuspocus/transformer";
-import { generateHTML, generateJSON } from "@tiptap/html";
-import { SendMessageCommand, type SQSClient } from "@aws-sdk/client-sqs";
 import type { Db } from "@wiki/db";
 import {
   documents,
   documentCollabState,
-  documentVersions,
   setTenantContext,
+  recordRecentlyUpdated,
+  saveDocumentContent,
+  hasUnpublishedChanges,
+  syncDocumentSearchIndex,
 } from "@wiki/db";
-import type { SearchIndexMessage } from "@wiki/types";
-import { COLLAB_FIELD, collabTiptapExtensions } from "@wiki/doc-collab";
-import { getLastEditor } from "./lastEditor.js";
+import {
+  htmlToYdoc,
+  ydocToHtml,
+  isHtmlContentChanged,
+} from "@wiki/doc-collab";
+import { clearLastEditor, getLastEditor } from "./lastEditor.js";
 import { logger } from "./logger.js";
 
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const PERSIST_DEBOUNCE_MS = 3000;
-
-function htmlToYdoc(html: string): Y.Doc {
-  const json = generateJSON(html, collabTiptapExtensions);
-  return TiptapTransformer.toYdoc(json, COLLAB_FIELD, collabTiptapExtensions);
-}
-
-function ydocToHtml(ydoc: Y.Doc): string {
-  const json = TiptapTransformer.fromYdoc(ydoc, COLLAB_FIELD);
-  return generateHTML(json, collabTiptapExtensions);
-}
 
 function isHtmlEmpty(html: string): boolean {
   return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length === 0;
@@ -41,10 +33,6 @@ function isYdocEmpty(ydoc: Y.Doc): boolean {
   }
 }
 
-function contentHash(html: string): string {
-  return createHash("sha256").update(html).digest("hex");
-}
-
 async function seedFromHtml(
   db: Db,
   orgId: string,
@@ -52,11 +40,16 @@ async function seedFromHtml(
   ydoc: Y.Doc,
 ): Promise<boolean> {
   const docRows = await db
-    .select({ contentRef: documents.contentRef })
+    .select({
+      contentRef: documents.contentRef,
+      draftContentRef: documents.draftContentRef,
+    })
     .from(documents)
     .where(and(eq(documents.id, documentId), eq(documents.orgId, orgId)));
 
-  const html = docRows[0]?.contentRef;
+  const row = docRows[0];
+  // Prefer unpublished WIP so editors resume the shared draft; readers do not join collab.
+  const html = row?.draftContentRef ?? row?.contentRef;
   if (!html || isHtmlEmpty(html)) {
     return false;
   }
@@ -72,6 +65,9 @@ export async function loadCollabDocument(
   documentId: string,
   ydoc: Y.Doc,
 ): Promise<void> {
+  // No editor yet — reconnect/load must not create a draft from serialize noise.
+  clearLastEditor(orgId, documentId);
+
   await setTenantContext(db, orgId);
 
   const stateRows = await db
@@ -118,8 +114,6 @@ export async function storeCollabYjsState(
 
 export function scheduleHtmlPersist(
   db: Db,
-  sqs: SQSClient,
-  indexQueueUrl: string,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -132,7 +126,7 @@ export function scheduleHtmlPersist(
     key,
     setTimeout(() => {
       persistTimers.delete(key);
-      void persistHtmlAndIndex(db, sqs, indexQueueUrl, orgId, documentId, ydoc).catch((err) => {
+      void persistHtmlAndIndex(db, orgId, documentId, ydoc).catch((err) => {
         logger.error("Failed to persist collaborative document", {
           documentId,
           orgId,
@@ -145,8 +139,6 @@ export function scheduleHtmlPersist(
 
 async function persistHtmlAndIndex(
   db: Db,
-  sqs: SQSClient,
-  indexQueueUrl: string,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -156,17 +148,20 @@ async function persistHtmlAndIndex(
     return;
   }
 
-  const htmlDigest = contentHash(html);
   const editedBy = getLastEditor(orgId, documentId);
 
-  const nextVersion = await db.transaction(async (tx) => {
+  const saved = await db.transaction(async (tx) => {
     await setTenantContext(tx, orgId);
 
     const docRows = await tx
       .select({
         version: documents.version,
         contentRef: documents.contentRef,
+        title: documents.title,
         ownerId: documents.ownerId,
+        status: documents.status,
+        draftTitle: documents.draftTitle,
+        draftContentRef: documents.draftContentRef,
       })
       .from(documents)
       .where(and(eq(documents.id, documentId), eq(documents.orgId, orgId)))
@@ -175,55 +170,66 @@ async function persistHtmlAndIndex(
     const doc = docRows[0];
     if (!doc) return null;
 
-    const previousDigest = doc.contentRef ? contentHash(doc.contentRef) : null;
-    if (previousDigest === htmlDigest) {
+    // Published pages: only write draft_* after a real editor onChange (lastEditor set).
+    // Reconnect/store without typing must not create false unpublished drafts.
+    if (doc.status === "published" && !editedBy) {
+      logger.debug("Skipped draft persist — no editor change since load", {
+        documentId,
+        orgId,
+      });
       return null;
     }
 
-    const version = doc.version + 1;
-    const attributedEditor = editedBy ?? doc.ownerId;
+    const hasDraft = hasUnpublishedChanges(doc);
+    const baseContent = hasDraft
+      ? (doc.draftContentRef ?? doc.contentRef)
+      : doc.contentRef;
 
-    await tx
-      .update(documents)
-      .set({
-        contentRef: html,
-        version,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(documents.id, documentId), eq(documents.orgId, orgId)));
+    // TipTap roundtrip can change byte-exact HTML without a user edit.
+    if (!isHtmlContentChanged(baseContent, html)) {
+      return null;
+    }
 
-    await tx.insert(documentVersions).values({
-      id: randomUUID(),
-      documentId,
-      versionNumber: version,
-      contentSnapshot: html,
-      editedBy: attributedEditor,
+    const result = await saveDocumentContent(tx, {
+      doc: {
+        id: documentId,
+        orgId,
+        version: doc.version,
+        title: doc.title,
+        contentRef: doc.contentRef,
+        status: doc.status,
+        draftTitle: doc.draftTitle,
+        draftContentRef: doc.draftContentRef,
+      },
+      nextContent: html,
+      ...(editedBy ? { editedBy } : {}),
     });
 
-    return version;
+    return result.saved ? doc.status : null;
   });
 
-  if (nextVersion === null) {
+  if (!saved) {
     return;
   }
 
-  const msg: SearchIndexMessage = {
-    type: "SEARCH_INDEX",
-    documentId,
-    orgId,
-    operation: "upsert",
-  };
-  await sqs.send(
-    new SendMessageCommand({
-      QueueUrl: indexQueueUrl,
-      MessageBody: JSON.stringify(msg),
-    }),
-  );
+  if (editedBy) {
+    await recordRecentlyUpdated(db, editedBy, documentId);
+  }
 
-  logger.debug("Persisted collaborative HTML snapshot", {
+  // Published docs are indexed from the latest published snapshot only (on publish).
+  if (saved === "published") {
+    logger.debug("Skipped search reindex for draft autosave on published document", {
+      documentId,
+      orgId,
+    });
+    return;
+  }
+
+  await syncDocumentSearchIndex(db, documentId, orgId, "upsert");
+
+  logger.debug("Persisted collaborative HTML (no version bump)", {
     documentId,
     orgId,
-    version: nextVersion,
     editedBy: editedBy ?? "owner-fallback",
   });
 }

@@ -12,7 +12,7 @@ import TableHeader from "@tiptap/extension-table-header";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import { useEffect, useRef, useCallback } from "react";
-import { EditorToolbar } from "./EditorToolbar";
+import { BlockMenu } from "./BlockMenu";
 import Underline from "@tiptap/extension-underline";
 import { FileEmbedExtension } from "./FileEmbedExtension";
 
@@ -40,6 +40,7 @@ export function RichTextEditor({
   readOnly = false,
 }: Props) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDirty = useRef(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -62,18 +63,22 @@ export function RichTextEditor({
       if (readOnly) return;
       const html = editor.getHTML();
       onChange(html);
+      isDirty.current = true;
 
       // Auto-save debounce
       if (onAutoSave) {
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-        autoSaveTimer.current = setTimeout(() => onAutoSave(html), autoSaveMs);
+        autoSaveTimer.current = setTimeout(() => {
+          isDirty.current = false;
+          onAutoSave(html);
+        }, autoSaveMs);
       }
     },
   });
 
-  // Sync external content changes (e.g. version restore)
+  // Sync external content changes (e.g. version restore) — skip if editor has unsaved changes
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    if (editor && !isDirty.current && content !== editor.getHTML()) {
       editor.commands.setContent(content);
     }
   }, [content, editor]);
@@ -90,24 +95,25 @@ export function RichTextEditor({
     };
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleInsertImage = useCallback((src: string) => {
     editor?.chain().focus().setImage({ src }).run();
   }, [editor]);
 
   if (!editor) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-zinc-400">
+      <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
         Loading editor…
       </div>
     );
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      {!readOnly && <EditorToolbar editor={editor} onInsertImage={handleInsertImage} title={title} documentId={documentId} />}
+    <>
+      {!readOnly && <BlockMenu editor={editor} title={title} {...(documentId !== undefined && { documentId })} />}
       <EditorContent
         editor={editor}
-        className="prose prose-sm max-w-none"
+        className="prose prose-sm max-w-none focus:outline-none"
         onMouseDown={(e) => {
           if (!(e.metaKey || e.ctrlKey)) return;
           const target = (e.target as HTMLElement).closest("a");
@@ -117,6 +123,6 @@ export function RichTextEditor({
           }
         }}
       />
-    </div>
+    </>
   );
 }

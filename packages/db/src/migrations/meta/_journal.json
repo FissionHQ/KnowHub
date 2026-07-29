@@ -57,6 +57,41 @@
       "when": 1783884000000,
       "tag": "0007_document_trashed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783885000000,
+      "tag": "0008_document_status_before_trash",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783886000000,
+      "tag": "0009_recently_updated",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783887000000,
+      "tag": "0010_document_version_title_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784714282758,
+      "tag": "0011_document_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784900000000,
+      "tag": "0013_document_search",
+      "breakpoints": true
     }
   ]
 }

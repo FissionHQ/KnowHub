@@ -29,7 +29,7 @@ export function createCommentsRouter(db: Db): Router {
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
     if (!docRows.length) throw new NotFoundError("Document");
 
-    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, required: "view" });
+    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, ownerId: docRows[0]!.ownerId, required: "view" });
 
     const rows = await db
       .select({
@@ -71,7 +71,7 @@ export function createCommentsRouter(db: Db): Router {
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
     if (!docRows.length) throw new NotFoundError("Document");
 
-    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, required: "view" });
+    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, ownerId: docRows[0]!.ownerId, required: "view" });
 
     if (body.data.parentId) {
       const parentRows = await db.select().from(documentComments)
@@ -104,7 +104,7 @@ export function createCommentsRouter(db: Db): Router {
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
     if (!docRows.length) throw new NotFoundError("Document");
 
-    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, required: "view" });
+    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, ownerId: docRows[0]!.ownerId, required: "view" });
 
     const commentRows = await db.select().from(documentComments)
       .where(and(eq(documentComments.id, commentId ?? ""), eq(documentComments.documentId, documentId ?? "")));
@@ -137,7 +137,7 @@ export function createCommentsRouter(db: Db): Router {
       .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
     if (!docRows.length) throw new NotFoundError("Document");
 
-    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, required: "view" });
+    await assertDocumentAccess({ db, userRole, userId, groupIds, documentId: docRows[0]!.id, spaceId: docRows[0]!.spaceId, ownerId: docRows[0]!.ownerId, required: "view" });
 
     const commentRows = await db.select().from(documentComments)
       .where(and(eq(documentComments.id, commentId ?? ""), eq(documentComments.documentId, documentId ?? "")));
