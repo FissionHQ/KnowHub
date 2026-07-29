@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -34,6 +34,9 @@ const navItemBase =
 const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
 const navItemActive = "bg-sidebar-accent text-primary";
 
+/** Survives Sidebar remounts when navigating between pages. */
+const expandedSpaceIds = new Set<string>();
+
 function SpaceRow({
   space,
   isActive,
@@ -43,20 +46,50 @@ function SpaceRow({
   isActive: boolean;
   onMenuOpen: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(
+    () => expandedSpaceIds.has(space.id) || isActive,
+  );
+
+  // Keep the active space expanded when landing via a deep link / doc URL.
+  useEffect(() => {
+    if (!isActive) return;
+    if (expandedSpaceIds.has(space.id)) return;
+    expandedSpaceIds.add(space.id);
+    setOpen(true);
+  }, [isActive, space.id]);
+
+  function setExpanded(next: boolean) {
+    if (next) expandedSpaceIds.add(space.id);
+    else expandedSpaceIds.delete(space.id);
+    setOpen(next);
+  }
+
+  function toggleExpanded() {
+    setExpanded(!open);
+  }
 
   return (
     <div>
       <div className="group/space flex items-center gap-0.5 rounded-md pr-1">
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={toggleExpanded}
           className="shrink-0 w-5 h-5 flex items-center justify-center text-sidebar-muted hover:text-sidebar-foreground ml-1 transition-colors"
+          aria-label={open ? "Collapse space" : "Expand space"}
         >
           <ChevronRight size={12} className={cn("transition-transform", open && "rotate-90")} />
         </button>
         <Link
           href={spacePath(space)}
+          onClick={(e) => {
+            if (open) {
+              // Collapse without navigating away from the current doc/page.
+              e.preventDefault();
+              setExpanded(false);
+            } else {
+              setExpanded(true);
+            }
+          }}
           className={cn(
             "flex-1 min-w-0",
             navItemBase,
