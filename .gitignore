@@ -20,4 +20,3 @@ infra/cdk.out/
 docker-volumes/
 
 # Generated from node_modules at install time
-apps/web/src/styles/heroui.css

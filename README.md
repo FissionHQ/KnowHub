@@ -54,7 +54,7 @@ cd KnowHub
 pnpm install
 ```
 
-The root `postinstall` builds shared packages (`@wiki/types`, `@wiki/config`, `@wiki/db`). The `apps/web` postinstall copies the HeroUI stylesheet into `src/styles/heroui.css`.
+The root `postinstall` builds shared packages (`@wiki/types`, `@wiki/config`, `@wiki/db`).
 
 ### 2. Configure environment variables
 
@@ -257,16 +257,6 @@ Reset Postgres and re-apply migrations:
 docker compose down -v
 docker compose up -d
 pnpm db:generate && pnpm db:migrate
-```
-
-**HeroUI styles not appearing**
-
-Re-run the postinstall copy step:
-
-```bash
-pnpm install
-# or directly:
-node apps/web/scripts/copy-heroui-styles.mjs
 ```
 
 **Worker not processing messages**

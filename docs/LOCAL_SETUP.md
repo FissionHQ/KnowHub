@@ -20,8 +20,6 @@ cd fissiondocs
 pnpm install
 ```
 
-The `postinstall` script in `apps/web` automatically copies the HeroUI stylesheet into `src/styles/heroui.css`.
-
 ### 2. Configure environment variables
 
 ```bash
@@ -194,15 +192,6 @@ If migrations fail due to stale state, reset and re-apply:
 docker compose down -v   # wipes Postgres volume
 docker compose up -d
 pnpm db:generate && pnpm db:migrate
-```
-
-**HeroUI styles not appearing**
-
-The stylesheet is copied from `node_modules` at install time. Re-run:
-```bash
-pnpm install
-# or directly:
-cp apps/web/node_modules/@heroui/styles/dist/heroui.min.css apps/web/src/styles/heroui.css
 ```
 
 **Worker not processing messages**
