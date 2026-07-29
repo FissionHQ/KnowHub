@@ -16,6 +16,9 @@ import clsx from "clsx";
 import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
 import { SearchPanel } from "@/components/search/SearchPanel";
 import { PdfImportModal } from "@/components/PdfImportModal";
+import { Pagination } from "@/components/ui/Pagination";
+
+const PAGE_SIZE = 10;
 
 interface Props { spaceId: string }
 
@@ -79,6 +82,7 @@ export function SpaceView({ spaceId }: Props) {
 
   const [searchActive, setSearchActive] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(0);
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -104,6 +108,7 @@ export function SpaceView({ spaceId }: Props) {
 
   const idSet = new Set(docs.map((d) => d.id));
   const rootDocs = docs.filter((d) => !d.parentId || !idSet.has(d.parentId));
+  const pagedRootDocs = rootDocs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const canEdit = space?.accessLevel === "edit";
 
   function getChildren(parentId: string): Document[] {
@@ -279,7 +284,15 @@ export function SpaceView({ spaceId }: Props) {
         </Card>
       ) : (
           <div className="flex flex-col gap-0.5">
-            {renderRows(rootDocs, 0)}
+            {renderRows(pagedRootDocs, 0)}
+            <Pagination
+              page={page}
+              totalPages={Math.ceil(rootDocs.length / PAGE_SIZE)}
+              total={rootDocs.length}
+              pageSize={PAGE_SIZE}
+              onChange={(p) => { setPage(p); setExpandedIds(new Set()); }}
+              label="documents"
+            />
           </div>
       )}
         </>

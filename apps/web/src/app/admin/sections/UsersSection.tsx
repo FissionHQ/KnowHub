@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/Select";
+import { Pagination } from "@/components/ui/Pagination";
+
+const USERS_PAGE_SIZE = 10;
+const INVITES_PAGE_SIZE = 10;
 
 const ROLES: UserRole[] = ["admin", "member", "viewer"];
 
@@ -41,6 +45,11 @@ export function UsersSection() {
   const [error, setError] = useState<string | null>(null);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [usersPage, setUsersPage] = useState(0);
+  const [invitesPage, setInvitesPage] = useState(0);
+
+  const pagedUsers = users.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
+  const pagedInvites = invites.slice(invitesPage * INVITES_PAGE_SIZE, (invitesPage + 1) * INVITES_PAGE_SIZE);
 
   async function toggleUserGroup(userId: string, groupId: string, isMember: boolean) {
     const group = groups.find((g) => g.id === groupId);
@@ -182,7 +191,7 @@ export function UsersSection() {
                 </tr>
               </thead>
               <tbody>
-                {invites.map((invite) => (
+                {pagedInvites.map((invite) => (
                   <tr
                     key={invite.userId}
                     className="border-b border-border/80 last:border-0"
@@ -219,6 +228,16 @@ export function UsersSection() {
                 ))}
               </tbody>
             </table>
+            <div className="px-0">
+              <Pagination
+                page={invitesPage}
+                totalPages={Math.ceil(invites.length / INVITES_PAGE_SIZE)}
+                total={invites.length}
+                pageSize={INVITES_PAGE_SIZE}
+                onChange={setInvitesPage}
+                label="invitations"
+              />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -239,7 +258,7 @@ export function UsersSection() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {pagedUsers.map((user) => (
                 <tr
                   key={user.id}
                   className="border-b border-border/80 last:border-0"
@@ -300,6 +319,14 @@ export function UsersSection() {
               ))}
             </tbody>
           </table>
+          <Pagination
+            page={usersPage}
+            totalPages={Math.ceil(users.length / USERS_PAGE_SIZE)}
+            total={users.length}
+            pageSize={USERS_PAGE_SIZE}
+            onChange={setUsersPage}
+            label="users"
+          />
         </CardContent>
       </Card>
     </div>

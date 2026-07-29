@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { adminApi } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, Users, FileText, Key, Settings, Activity, Download, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Shield, Users, FileText, Key, Settings, Activity, Download, Search } from "lucide-react";
+import { Pagination } from "@/components/ui/Pagination";
 import type { AuditAction } from "@wiki/types";
 
 // ─── Action metadata ────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ function exportCsv(entries: ReturnType<typeof useEntries>["entries"]) {
 
 // ─── Data hook ──────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 
 function useEntries(category: Category, search: string, page: number, from: string, to: string) {
   const { data = [], isLoading } = useSWR(
@@ -323,29 +324,14 @@ export function AuditLogSection() {
       </div>
 
       {/* Pagination */}
-      {total > PAGE_SIZE && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>{total} events · page {page + 1} of {totalPages}</span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="p-1.5 rounded-lg hover:bg-accent disabled:opacity-40 transition-colors"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              className="p-1.5 rounded-lg hover:bg-accent disabled:opacity-40 transition-colors"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={PAGE_SIZE}
+        onChange={setPage}
+        label="events"
+      />
     </div>
   );
 }

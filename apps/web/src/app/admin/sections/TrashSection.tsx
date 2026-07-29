@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { File, FileText, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
+import { Pagination } from "@/components/ui/Pagination";
+
+const PAGE_SIZE = 10;
 
 export function TrashSection() {
   const { toast } = useToast();
@@ -16,6 +19,8 @@ export function TrashSection() {
     documentsApi.listTrash,
   );
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const pagedItems = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   async function handleRestore(item: TrashedDocument) {
     setRestoringId(item.id);
@@ -60,7 +65,8 @@ export function TrashSection() {
               <p className="text-sm">Trash is empty.</p>
             </div>
           ) : (
-            items.map((item) => (
+            <>
+              {pagedItems.map((item) => (
               <div
                 key={item.id}
                 className="px-4 py-4 flex items-center justify-between gap-4 flex-wrap"
@@ -110,7 +116,16 @@ export function TrashSection() {
                   {restoringId === item.id ? "Restoring…" : "Restore"}
                 </Button>
               </div>
-            ))
+              ))}
+              <Pagination
+                page={page}
+                totalPages={Math.ceil(items.length / PAGE_SIZE)}
+                total={items.length}
+                pageSize={PAGE_SIZE}
+                onChange={setPage}
+                label="documents"
+              />
+            </>
           )}
         </CardContent>
       </Card>

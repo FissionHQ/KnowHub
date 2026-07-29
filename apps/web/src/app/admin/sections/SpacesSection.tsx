@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users } from "lucide-react";
 import { Select } from "@/components/ui/Select";
+import { Pagination } from "@/components/ui/Pagination";
+
+const PAGE_SIZE = 10;
 
 export function SpacesSection() {
   const { data: spaces = [], mutate } = useSWR("admin:spaces", spacesApi.list);
@@ -19,6 +22,8 @@ export function SpacesSection() {
   const [groupId, setGroupId] = useState("");
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("view");
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(0);
+  const pagedSpaces = spaces.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const defaultGroup = groups.find((g) => g.isDefault) ?? groups[0];
   const defaultGroupId = groupId || defaultGroup?.id || "";
@@ -105,7 +110,7 @@ export function SpacesSection() {
 
       <Card>
         <CardContent className="p-0 divide-y divide-border">
-          {spaces.map((space) => (
+          {pagedSpaces.map((space) => (
             <SpaceRow
               key={space.id}
               space={space}
@@ -113,6 +118,14 @@ export function SpacesSection() {
               onDelete={() => handleDelete(space.id, space.name)}
             />
           ))}
+          <Pagination
+            page={page}
+            totalPages={Math.ceil(spaces.length / PAGE_SIZE)}
+            total={spaces.length}
+            pageSize={PAGE_SIZE}
+            onChange={setPage}
+            label="spaces"
+          />
         </CardContent>
       </Card>
     </div>
