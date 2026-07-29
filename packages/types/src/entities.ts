@@ -54,6 +54,8 @@ export interface Space {
   id: string;
   orgId: string;
   name: string;
+  /** URL-safe unique-per-org identifier. */
+  slug: string;
   description?: string;
   iconEmoji?: string;
   createdBy: string;
@@ -74,6 +76,8 @@ export interface Document {
   spaceId: string;
   parentId?: string;
   type: DocumentType;
+  /** URL-safe unique-per-org identifier (`{title-slug}-{shortId}`). */
+  slug: string;
   /** Published (or never-published working) title. */
   title: string;
   /** Published (or never-published working) HTML body. */

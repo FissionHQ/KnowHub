@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import useSWR from "swr";
@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
 import { PdfImportModal } from "@/components/PdfImportModal";
+import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { SpaceDocTree } from "./SpaceDocTree";
 
 /** Fission sidebar nav item styles — match ui-design-system AppSidebar */
@@ -33,6 +34,9 @@ const navItemBase =
   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors";
 const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
 const navItemActive = "bg-sidebar-accent text-primary";
+
+/** Survives Sidebar remounts when navigating between pages. */
+const expandedSpaceIds = new Set<string>();
 
 function SpaceRow({
   space,
@@ -43,20 +47,50 @@ function SpaceRow({
   isActive: boolean;
   onMenuOpen: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(
+    () => expandedSpaceIds.has(space.id) || isActive,
+  );
+
+  // Keep the active space expanded when landing via a deep link / doc URL.
+  useEffect(() => {
+    if (!isActive) return;
+    if (expandedSpaceIds.has(space.id)) return;
+    expandedSpaceIds.add(space.id);
+    setOpen(true);
+  }, [isActive, space.id]);
+
+  function setExpanded(next: boolean) {
+    if (next) expandedSpaceIds.add(space.id);
+    else expandedSpaceIds.delete(space.id);
+    setOpen(next);
+  }
+
+  function toggleExpanded() {
+    setExpanded(!open);
+  }
 
   return (
     <div>
       <div className="group/space flex items-center gap-0.5 rounded-md pr-1">
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={toggleExpanded}
           className="shrink-0 w-5 h-5 flex items-center justify-center text-sidebar-muted hover:text-sidebar-foreground ml-1 transition-colors"
+          aria-label={open ? "Collapse space" : "Expand space"}
         >
           <ChevronRight size={12} className={cn("transition-transform", open && "rotate-90")} />
         </button>
         <Link
-          href={`/spaces/${space.id}`}
+          href={spacePath(space)}
+          onClick={(e) => {
+            if (open) {
+              // Collapse without navigating away from the current doc/page.
+              e.preventDefault();
+              setExpanded(false);
+            } else {
+              setExpanded(true);
+            }
+          }}
           className={cn(
             "flex-1 min-w-0",
             navItemBase,
@@ -78,7 +112,13 @@ function SpaceRow({
           <MoreHorizontal size={12} />
         </button>
       </div>
-      {open && <SpaceDocTree spaceId={space.id} canEdit={space.accessLevel === "edit"} />}
+      {open && (
+        <SpaceDocTree
+          spaceId={space.id}
+          spaceSlug={space.slug}
+          canEdit={space.accessLevel === "edit"}
+        />
+      )}
     </div>
   );
 }
@@ -105,16 +145,16 @@ export function Sidebar() {
   const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
   const [pdfModalSpaceId, setPdfModalSpaceId] = useState<string>("");
 
-  async function handleFileImport(spaceId: string, file: File) {
+  async function handleFileImport(space: Space, file: File) {
     setSpaceMenu(null);
     if (file.name.toLowerCase().endsWith(".pdf")) {
-      setPdfModalSpaceId(spaceId);
+      setPdfModalSpaceId(space.id);
       setPdfModalFile(file);
       return;
     }
     try {
-      const doc = await importDocumentFile(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const doc = await importDocumentFile(space.id, file);
+      router.push(spaceDocPath(space, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -147,7 +187,8 @@ export function Sidebar() {
   }
 
   const spaceMatch = pathname.match(/^\/spaces\/([^/]+)/);
-  const activeSpaceId = spaceMatch?.[1] ?? null;
+  const activeSpaceRef = spaceMatch?.[1] ?? null;
+  const slugById = Object.fromEntries(spaces.map((s) => [s.id, s.slug]));
 
   return (
     <aside
@@ -161,8 +202,9 @@ export function Sidebar() {
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file && uploadSpaceRef.current) {
-            handleFileImport(uploadSpaceRef.current, file);
+          const space = spaces.find((s) => s.id === uploadSpaceRef.current);
+          if (file && space) {
+            void handleFileImport(space, file);
           }
           e.target.value = "";
         }}
@@ -201,7 +243,7 @@ export function Sidebar() {
             <SpaceRow
               key={space.id}
               space={space}
-              isActive={activeSpaceId === space.id}
+              isActive={activeSpaceRef === space.slug || activeSpaceRef === space.id}
               onMenuOpen={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -236,7 +278,7 @@ export function Sidebar() {
               {favDocs.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <Star size={11} className="shrink-0 fill-amber-400 text-amber-400" />
@@ -269,7 +311,7 @@ export function Sidebar() {
               {recentDocs.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <Clock size={11} className="shrink-0 text-sidebar-muted" />
@@ -300,7 +342,7 @@ export function Sidebar() {
               {recentlyUpdated.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <RefreshCw size={11} className="shrink-0 text-sidebar-muted" />

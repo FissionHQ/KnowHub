@@ -14,13 +14,14 @@ import { Separator } from "@/components/ui/separator";
 import { FileText, Plus, File, ChevronRight} from "lucide-react";
 import clsx from "clsx";
 import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
+import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { SearchPanel } from "@/components/search/SearchPanel";
 import { PdfImportModal } from "@/components/PdfImportModal";
 import { Pagination } from "@/components/ui/Pagination";
 
 const PAGE_SIZE = 10;
 
-interface Props { spaceId: string }
+interface Props { spaceSlug: string }
 
 function formatDateTime(date: Date) {
   const d = new Date(date);
@@ -34,21 +35,32 @@ function formatDateTime(date: Date) {
   });
 }
 
-export function SpaceView({ spaceId }: Props) {
+export function SpaceView({ spaceSlug }: Props) {
   const router = useRouter();
   const [, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
+
+  const { data: space, isLoading: spaceLoading } = useSWR<Space>(
+    `space:${spaceSlug}`,
+    () => spacesApi.get(spaceSlug),
+  );
+  const { data: docs = [], isLoading: docsLoading } = useSWR<Document[]>(
+    space ? `space:${space.slug}:docs` : null,
+    () => documentsApi.listBySpace(space!.slug),
+    { revalidateOnFocus: false },
+  );
 
   async function handleImport(file: File) {
     if (file.name.toLowerCase().endsWith(".pdf")) {
       setPdfModalFile(file);
       return;
     }
+    if (!space) return;
     setImporting(true);
     try {
-      const doc = await importDocumentFile(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const doc = await importDocumentFile(space.id, file);
+      router.push(spaceDocPath(space, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     } finally {
@@ -61,8 +73,8 @@ export function SpaceView({ spaceId }: Props) {
     const file = pdfModalFile;
     setPdfModalFile(null);
     try {
-      const doc = await importDocumentFile(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const doc = await importDocumentFile(space!.id, file);
+      router.push(spaceDocPath(space!, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -73,8 +85,8 @@ export function SpaceView({ spaceId }: Props) {
     const file = pdfModalFile;
     setPdfModalFile(null);
     try {
-      const doc = await importPdfAsViewer(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const doc = await importPdfAsViewer(space!.id, file);
+      router.push(spaceDocPath(space!, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -96,16 +108,6 @@ export function SpaceView({ spaceId }: Props) {
     });
   }
 
-  const { data: space, isLoading: spaceLoading } = useSWR<Space>(
-    `space:${spaceId}`,
-    () => spacesApi.get(spaceId),
-  );
-  const { data: docs = [], isLoading: docsLoading } = useSWR<Document[]>(
-    `space:${spaceId}:docs`,
-    () => documentsApi.listBySpace(spaceId),
-    { revalidateOnFocus: false },
-  );
-
   const idSet = new Set(docs.map((d) => d.id));
   const rootDocs = docs.filter((d) => !d.parentId || !idSet.has(d.parentId));
   const pagedRootDocs = rootDocs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -119,13 +121,14 @@ export function SpaceView({ spaceId }: Props) {
     return items.map((doc) => {
       const children = getChildren(doc.id);
       const isExpanded = expandedIds.has(doc.id);
+      const href = space ? spaceDocPath(space, doc.slug) : `/spaces/${spaceSlug}/docs/${doc.slug}`;
       return (
         <div key={doc.id}>
           <div
             role="button"
             tabIndex={0}
-            onClick={() => router.push(`/spaces/${spaceId}/docs/${doc.id}`)}
-            onKeyDown={(e) => e.key === "Enter" && router.push(`/spaces/${spaceId}/docs/${doc.id}`)}
+            onClick={() => router.push(href)}
+            onKeyDown={(e) => e.key === "Enter" && router.push(href)}
             className="group block cursor-pointer"
             style={{ paddingLeft: depth * 20 }}
           >
@@ -228,7 +231,7 @@ export function SpaceView({ spaceId }: Props) {
               <Upload size={14} />
               {importing ? "Importing…" : "Import"}
             </Button>
-            <Link href={`/spaces/${spaceId}/new` as never}>
+            <Link href={space ? (spacePath(space, "new") as never) : (`/spaces/${spaceSlug}/new` as never)}>
               <Button
                 variant="default"
                 size="sm"
@@ -249,11 +252,18 @@ export function SpaceView({ spaceId }: Props) {
       )}
 
       <div className="mb-6">
-        <SearchPanel
-          lockedSpaceId={spaceId}
-          placeholder="Search in this space…"
-          onSearchedChange={setSearchActive}
-        />
+        {space?.id ? (
+          <SearchPanel
+            lockedSpaceId={space.id}
+            placeholder="Search in this space…"
+            onSearchedChange={setSearchActive}
+          />
+        ) : (
+          <SearchPanel
+            placeholder="Search in this space…"
+            onSearchedChange={setSearchActive}
+          />
+        )}
       </div>
 
       {!searchActive && (
@@ -272,8 +282,8 @@ export function SpaceView({ spaceId }: Props) {
             <p className="text-sm">
               {canEdit ? "No documents yet. Create the first page." : "No documents in this space yet."}
             </p>
-            {canEdit && (
-              <Link href={`/spaces/${spaceId}/new` as never}>
+            {canEdit && space && (
+              <Link href={spacePath(space, "new") as never}>
                 <Button variant="secondary" size="sm" className="flex items-center gap-1.5 mt-1">
                   <Plus size={14} />
                   New Page
