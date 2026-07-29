@@ -48,7 +48,7 @@ export function TrashConfirmDialog({
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/50 rounded-b-xl">
+          <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-border bg-muted/50 rounded-b-xl">
             <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={deleting}>
               Cancel
             </Button>
