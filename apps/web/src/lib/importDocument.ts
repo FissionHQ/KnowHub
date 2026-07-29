@@ -1,5 +1,5 @@
 import type { Document } from "@wiki/types";
-import { documentsApi } from "@/lib/api";
+import { documentsApi, attachmentsApi } from "@/lib/api";
 import { parseFileToHtml } from "@/lib/importers";
 
 function isPdfFile(file: File): boolean {
@@ -12,4 +12,12 @@ export async function importDocumentFile(spaceId: string, file: File): Promise<D
   const html = await parseFileToHtml(file);
   const type = isPdfFile(file) ? "pdf" : "page";
   return documentsApi.create({ spaceId, type, title, content: html });
+}
+
+/** Create a pdf doc with no content body and attach the original file — renders via PdfViewer. */
+export async function importPdfAsViewer(spaceId: string, file: File): Promise<Document> {
+  const title = file.name.replace(/\.[^.]+$/, "");
+  const doc = await documentsApi.create({ spaceId, type: "pdf", title });
+  await attachmentsApi.upload(doc.id, file);
+  return doc;
 }

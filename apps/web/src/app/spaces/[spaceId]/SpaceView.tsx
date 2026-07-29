@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FileText, Plus, File, ChevronRight} from "lucide-react";
 import clsx from "clsx";
-import { importDocumentFile } from "@/lib/importDocument";
+import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
 import { SearchPanel } from "@/components/search/SearchPanel";
+import { PdfImportModal } from "@/components/PdfImportModal";
 
 interface Props { spaceId: string }
 
@@ -34,8 +35,13 @@ export function SpaceView({ spaceId }: Props) {
   const router = useRouter();
   const [, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
 
   async function handleImport(file: File) {
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      setPdfModalFile(file);
+      return;
+    }
     setImporting(true);
     try {
       const doc = await importDocumentFile(spaceId, file);
@@ -44,6 +50,30 @@ export function SpaceView({ spaceId }: Props) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function handlePdfConvert() {
+    if (!pdfModalFile) return;
+    const file = pdfModalFile;
+    setPdfModalFile(null);
+    try {
+      const doc = await importDocumentFile(spaceId, file);
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
+    }
+  }
+
+  async function handlePdfAttach() {
+    if (!pdfModalFile) return;
+    const file = pdfModalFile;
+    setPdfModalFile(null);
+    try {
+      const doc = await importPdfAsViewer(spaceId, file);
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
     }
   }
 
@@ -255,6 +285,14 @@ export function SpaceView({ spaceId }: Props) {
         </>
       )}
 
+      {pdfModalFile && typeof window !== "undefined" && (
+        <PdfImportModal
+          fileName={pdfModalFile.name}
+          onConvert={() => { void handlePdfConvert(); }}
+          onAttach={() => { void handlePdfAttach(); }}
+          onCancel={() => setPdfModalFile(null)}
+        />
+      )}
     </div>
   );
 }

@@ -10,7 +10,8 @@ import type { Space, Document } from "@wiki/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowRight, MoreVertical, Upload, Clock, RefreshCw } from "lucide-react";
-import { importDocumentFile } from "@/lib/importDocument";
+import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
+import { PdfImportModal } from "@/components/PdfImportModal";
 
 export function SpacesList() {
   const router = useRouter();
@@ -25,8 +26,16 @@ export function SpacesList() {
   const [uploading, setUploading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadSpaceRef = useRef<string>("");
+  const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
+  const [pdfModalSpaceId, setPdfModalSpaceId] = useState<string>("");
 
   async function handleFileUpload(spaceId: string, file: File) {
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      setPdfModalSpaceId(spaceId);
+      setPdfModalFile(file);
+      setMenuOpen(null);
+      return;
+    }
     setUploading(spaceId);
     setMenuOpen(null);
     try {
@@ -36,6 +45,32 @@ export function SpacesList() {
       alert(err instanceof Error ? err.message : "Failed to import file");
     } finally {
       setUploading(null);
+    }
+  }
+
+  async function handlePdfConvert() {
+    if (!pdfModalFile) return;
+    const spaceId = pdfModalSpaceId;
+    const file = pdfModalFile;
+    setPdfModalFile(null);
+    try {
+      const doc = await importDocumentFile(spaceId, file);
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
+    }
+  }
+
+  async function handlePdfAttach() {
+    if (!pdfModalFile) return;
+    const spaceId = pdfModalSpaceId;
+    const file = pdfModalFile;
+    setPdfModalFile(null);
+    try {
+      const doc = await importPdfAsViewer(spaceId, file);
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
     }
   }
 
@@ -211,6 +246,15 @@ export function SpacesList() {
           </div>
         ))}
       </div>
+
+      {pdfModalFile && typeof window !== "undefined" && (
+        <PdfImportModal
+          fileName={pdfModalFile.name}
+          onConvert={() => { void handlePdfConvert(); }}
+          onAttach={() => { void handlePdfAttach(); }}
+          onCancel={() => setPdfModalFile(null)}
+        />
+      )}
     </>
   );
 }
