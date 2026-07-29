@@ -16,14 +16,14 @@ export function SearchView() {
     >
       {!searched && (
         <div className="flex flex-col items-center gap-3 mb-6">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">
             Search KnowHub
           </h1>
         </div>
       )}
 
       {searched && (
-        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-6">
+        <h1 className="text-xl font-bold text-foreground mb-6">
           Search
         </h1>
       )}

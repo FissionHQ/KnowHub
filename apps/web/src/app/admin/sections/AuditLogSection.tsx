@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { adminApi } from "@/lib/api";
-import { Skeleton } from "@heroui/react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Shield, Users, FileText, Key, Settings, Activity, Download, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import type { AuditAction } from "@wiki/types";
 
@@ -14,7 +14,7 @@ type Category = "all" | "auth" | "users" | "documents" | "spaces" | "org";
 const ACTION_META: Record<AuditAction, { label: string; category: Exclude<Category, "all">; color: string }> = {
   "auth.login":               { label: "Login",            category: "auth",      color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
   "auth.login_failed":        { label: "Login failed",     category: "auth",      color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
-  "auth.logout":              { label: "Logout",           category: "auth",      color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
+  "auth.logout":              { label: "Logout",           category: "auth",      color: "bg-muted text-muted-foreground" },
   "user.invite":              { label: "Invite",           category: "users",     color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
   "user.activate":            { label: "Activated",        category: "users",     color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
   "user.deactivate":          { label: "Deactivated",      category: "users",     color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
@@ -27,14 +27,14 @@ const ACTION_META: Record<AuditAction, { label: string; category: Exclude<Catego
   "space.delete":             { label: "Space deleted",    category: "spaces",    color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
   "space.permission_change":  { label: "Permissions",      category: "spaces",    color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   "document.create":          { label: "Created",          category: "documents", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  "document.update":          { label: "Updated",          category: "documents", color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
+  "document.update":          { label: "Updated",          category: "documents", color: "bg-muted text-muted-foreground" },
   "document.delete":          { label: "Trashed",          category: "documents", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   "document.purge":           { label: "Purged",           category: "documents", color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
   "document.restore":         { label: "Restored",         category: "documents", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
   "document.version_restore": { label: "Version restored", category: "documents", color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
   "document.permission_change":{ label: "Permissions",     category: "documents", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   "attachment.upload":        { label: "Upload",           category: "documents", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  "attachment.scan_result":   { label: "Scan result",      category: "documents", color: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
+  "attachment.scan_result":   { label: "Scan result",      category: "documents", color: "bg-muted text-muted-foreground" },
   "org.settings_update":      { label: "Settings updated", category: "org",       color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
 };
 
@@ -89,15 +89,15 @@ function formatValue(key: string, value: unknown): string {
 function DetailRow({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="flex items-start gap-2 text-xs">
-      <span className="text-zinc-400 dark:text-zinc-500 shrink-0 w-28">{label}</span>
-      <span className="text-zinc-700 dark:text-zinc-200 break-all">{formatValue(label, value)}</span>
+      <span className="text-muted-foreground shrink-0 w-28">{label}</span>
+      <span className="text-foreground/80 break-all">{formatValue(label, value)}</span>
     </div>
   );
 }
 
 function DetailsCell({ target }: { target: Record<string, unknown> }) {
   const entries = Object.entries(target).filter(([k]) => !HIDDEN_KEYS.has(k));
-  if (entries.length === 0) return <span className="text-zinc-400 text-xs">—</span>;
+  if (entries.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
   return (
     <div className="flex flex-col gap-1">
       {entries.map(([k, v]) => (
@@ -188,7 +188,7 @@ export function AuditLogSection() {
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex items-center gap-1 flex-wrap border-b border-zinc-200 dark:border-zinc-800 pb-0">
+      <div className="flex items-center gap-1 flex-wrap border-b border-border pb-0">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
@@ -196,8 +196,8 @@ export function AuditLogSection() {
             onClick={() => handleCategoryChange(cat.id)}
             className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
               category === cat.id
-                ? "border-[#f25011] text-[#f25011]"
-                : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground dark:hover:text-sidebar-foreground"
             }`}
           >
             {cat.icon}
@@ -209,34 +209,34 @@ export function AuditLogSection() {
       {/* Filters row */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder="Search actor, action, details…"
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#f25011]/30"
+            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
           />
         </div>
         {/* <input
           type="date"
           value={from}
           onChange={(e) => { setFrom(e.target.value); setPage(0); }}
-          className="px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#f25011]/30"
+          className="px-3 py-1.5 text-sm rounded-lg border border-border bg-card text-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring/30"
           title="From date"
         />
-        <span className="text-zinc-400 text-sm">to</span>
+        <span className="text-muted-foreground text-sm">to</span>
         <input
           type="date"
           value={to}
           onChange={(e) => { setTo(e.target.value); setPage(0); }}
-          className="px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#f25011]/30"
+          className="px-3 py-1.5 text-sm rounded-lg border border-border bg-card text-foreground/80 focus:outline-none focus:ring-2 focus:ring-ring/30"
           title="To date"
         /> */}
         <button
           type="button"
           onClick={() => exportCsv(allFiltered)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-border text-muted-foreground hover:bg-background dark:hover:bg-accent transition-colors"
         >
           <Download size={14} />
           Export CSV
@@ -244,11 +244,11 @@ export function AuditLogSection() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500 dark:text-zinc-400">
+              <tr className="bg-muted border-b border-border text-left text-muted-foreground">
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Time</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Actor</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Action</th>
@@ -258,7 +258,7 @@ export function AuditLogSection() {
             </thead>
             <tbody>
               {isLoading && Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800/80">
+                <tr key={i} className="border-b border-border/80">
                   <td className="px-4 py-3"><Skeleton className="h-4 w-32 rounded" /></td>
                   <td className="px-4 py-3"><Skeleton className="h-4 w-24 rounded" /></td>
                   <td className="px-4 py-3"><Skeleton className="h-5 w-20 rounded-full" /></td>
@@ -269,7 +269,7 @@ export function AuditLogSection() {
 
               {!isLoading && entries.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-zinc-400 text-sm">
+                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground text-sm">
                     No audit events found.
                   </td>
                 </tr>
@@ -282,25 +282,25 @@ export function AuditLogSection() {
                 return (
                   <tr
                     key={entry.id}
-                    className="border-b border-zinc-100 dark:border-zinc-800/80 last:border-0 align-top hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors"
+                    className="border-b border-border/80 last:border-0 align-top hover:bg-background/50 dark:hover:bg-accent/30 transition-colors"
                   >
                     {/* Time */}
-                    <td className="px-4 py-3 whitespace-nowrap text-zinc-500 dark:text-zinc-400 text-xs">
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
                       <div>{ts.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
-                      <div className="text-zinc-400">{ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</div>
+                      <div className="text-muted-foreground">{ts.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</div>
                     </td>
 
                     {/* Actor */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-zinc-800 dark:text-zinc-100 text-xs font-medium">{actor}</div>
+                      <div className="text-foreground text-xs font-medium">{actor}</div>
                       {entry.actorName && entry.actorEmail && (
-                        <div className="text-zinc-400 text-xs">{entry.actorEmail}</div>
+                        <div className="text-muted-foreground text-xs">{entry.actorEmail}</div>
                       )}
                     </td>
 
                     {/* Action chip */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${meta?.color ?? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${meta?.color ?? "bg-muted text-muted-foreground"}`}>
                         {meta?.label ?? entry.action}
                       </span>
                     </td>
@@ -311,7 +311,7 @@ export function AuditLogSection() {
                     </td>
 
                     {/* IP */}
-                    <td className="px-4 py-3 whitespace-nowrap text-xs text-zinc-400 dark:text-zinc-500 font-mono">
+                    <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground font-mono">
                       {entry.ipAddress ?? "—"}
                     </td>
                   </tr>
@@ -324,14 +324,14 @@ export function AuditLogSection() {
 
       {/* Pagination */}
       {total > PAGE_SIZE && (
-        <div className="flex items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>{total} events · page {page + 1} of {totalPages}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-accent disabled:opacity-40 transition-colors"
             >
               <ChevronLeft size={16} />
             </button>
@@ -339,7 +339,7 @@ export function AuditLogSection() {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-accent disabled:opacity-40 transition-colors"
             >
               <ChevronRight size={16} />
             </button>

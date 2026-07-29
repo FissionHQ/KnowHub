@@ -16,7 +16,8 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
-import { Skeleton, Card, CardContent } from "@heroui/react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle2,
   Clock,
@@ -331,18 +332,18 @@ export function DocumentView({ spaceId, docId }: Props) {
       <div>
         <nav
           aria-label="Breadcrumb"
-          className="text-xs text-zinc-400 mb-5 flex items-center gap-1.5 flex-wrap"
+          className="text-xs text-muted-foreground mb-5 flex items-center gap-1.5 flex-wrap"
         >
           <Link
             href="/spaces"
-            className="hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors"
+            className="hover:text-primary dark:hover:text-primary transition-colors"
           >
             Spaces
           </Link>
           <span aria-hidden="true">/</span>
           <Link
             href={`/spaces/${spaceId}`}
-            className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors truncate max-w-[160px]"
+            className="text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors truncate max-w-[160px]"
           >
             {space?.name ?? "Space"}
           </Link>
@@ -351,14 +352,14 @@ export function DocumentView({ spaceId, docId }: Props) {
             <>
               <Link
                 href={`/spaces/${spaceId}/docs/${parentDoc.id}`}
-                className="text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors truncate max-w-[160px]"
+                className="text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors truncate max-w-[160px]"
               >
                 {parentDoc.title}
               </Link>
               <span aria-hidden="true">/</span>
             </>
           )}
-          <span className="text-zinc-700 dark:text-zinc-200 font-medium truncate max-w-[240px]">
+          <span className="text-foreground/80 font-medium truncate max-w-[240px]">
             {canEdit ? title || doc.title : doc.title}
           </span>
         </nav>
@@ -393,11 +394,11 @@ export function DocumentView({ spaceId, docId }: Props) {
               onFocus={() => { titleFocused.current = true; }}
               onBlur={() => { titleFocused.current = false; handleTitleBlur(); }}
               onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-              className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex-1 leading-tight bg-transparent border-none outline-none focus:ring-0 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 w-full min-w-0"
+              className="text-3xl font-bold text-foreground flex-1 leading-tight bg-transparent border-none outline-none focus:ring-0 placeholder:text-muted-foreground dark:placeholder:text-muted-foreground w-full min-w-0"
               placeholder="Untitled"
             />
           ) : (
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 flex-1 leading-tight">
+            <h1 className="text-3xl font-bold text-foreground flex-1 leading-tight">
               {doc.title}
             </h1>
           )}
@@ -415,7 +416,7 @@ export function DocumentView({ spaceId, docId }: Props) {
                 className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
                   isFavorited
                     ? "text-amber-500"
-                    : "text-zinc-400 hover:text-amber-500"
+                    : "text-muted-foreground hover:text-amber-500"
                 }`}
               >
                 <Star size={15} className={isFavorited ? "fill-amber-500" : ""} />
@@ -443,29 +444,29 @@ export function DocumentView({ spaceId, docId }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-3 mb-1 flex-wrap">
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">
+          <span className="text-xs text-muted-foreground">
             {doc.lastEditedByName ?? doc.ownerName ?? "Someone"} updated {formatRelativeTime(doc.updatedAt)}
           </span>
           {doc.tags.length > 0 && (
             <>
-              <span className="text-zinc-200 dark:text-zinc-700">·</span>
+              <span className="text-border">·</span>
               {doc.tags.map((tag) => (
-                <span key={tag} className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md">
+                <span key={tag} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-md">
                   {tag}
                 </span>
               ))}
             </>
           )}
-          <span className="text-zinc-200 dark:text-zinc-700">·</span>
+          <span className="text-border">·</span>
           <button
             type="button"
             onClick={() => setCommentsOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors"
           >
             <MessageSquare size={12} />
             <span>Comments</span>
             {commentCount > 0 && (
-              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                 {commentCount}
               </span>
             )}
@@ -474,7 +475,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             <button
               type="button"
               onClick={() => setPermissionsOpen(true)}
-              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#f25011] dark:hover:text-[#f25011] transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors"
             >
               <Shield size={12} />
               <span>Permissions</span>
@@ -494,7 +495,7 @@ export function DocumentView({ spaceId, docId }: Props) {
             />
           ) : (
             <Card>
-              <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-zinc-400 p-5">
+              <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-muted-foreground p-5">
                 <Clock size={18} className="animate-pulse" />
                 <span className="text-sm">PDF is being processed…</span>
               </CardContent>
@@ -536,31 +537,31 @@ export function DocumentView({ spaceId, docId }: Props) {
         <div className="fixed inset-0 z-40" onClick={() => setCommentsOpen(false)} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[30%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-[30%] min-w-[380px] z-50 flex flex-col bg-card border-l border-border shadow-2xl transition-transform duration-300 ease-in-out ${
           commentsOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
           <button
             type="button"
             onClick={() => setCommentsOpen(false)}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground/80 dark:hover:text-sidebar-foreground hover:bg-accent transition-colors"
             title="Close comments"
           >
             <ChevronRight size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <MessageSquare size={15} className="text-[#f25011]" />
-            <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">
+            <MessageSquare size={15} className="text-primary" />
+            <span className="font-semibold text-sm text-foreground">
               Comments
             </span>
             {commentCount > 0 && (
-              <span className="bg-[#f25011] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                 {commentCount}
               </span>
             )}
           </div>
-          <span className="ml-auto text-xs text-zinc-400 truncate max-w-[160px]">
+          <span className="ml-auto text-xs text-muted-foreground truncate max-w-[160px]">
             {doc.title}
           </span>
         </div>
@@ -573,26 +574,26 @@ export function DocumentView({ spaceId, docId }: Props) {
         <div className="fixed inset-0 z-40" onClick={() => setPermissionsOpen(false)} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[48%] min-w-[380px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-[48%] min-w-[380px] z-50 flex flex-col bg-card border-l border-border shadow-2xl transition-transform duration-300 ease-in-out ${
           permissionsOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
           <button
             type="button"
             onClick={() => setPermissionsOpen(false)}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground/80 dark:hover:text-sidebar-foreground hover:bg-accent transition-colors"
             title="Close permissions"
           >
             <ChevronRight size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <Shield size={15} className="text-[#f25011]" />
-            <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">
+            <Shield size={15} className="text-primary" />
+            <span className="font-semibold text-sm text-foreground">
               Permissions
             </span>
           </div>
-          <span className="ml-auto text-xs text-zinc-400 truncate max-w-[160px]">
+          <span className="ml-auto text-xs text-muted-foreground truncate max-w-[160px]">
             {doc.title}
           </span>
         </div>
@@ -604,21 +605,21 @@ export function DocumentView({ spaceId, docId }: Props) {
         <div className="fixed inset-0 z-40" onClick={() => setVersionsOpen(false)} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[30%] min-w-[320px] z-50 flex flex-col bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-700 shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-[30%] min-w-[320px] z-50 flex flex-col bg-card border-l border-border shadow-2xl transition-transform duration-300 ease-in-out ${
           versionsOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
           <button
             type="button"
             onClick={() => setVersionsOpen(false)}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground/80 dark:hover:text-sidebar-foreground hover:bg-accent transition-colors"
           >
             <ChevronRight size={18} />
           </button>
           <div className="flex items-center gap-2">
-            <History size={15} className="text-[#f25011]" />
-            <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-100">Version history</span>
+            <History size={15} className="text-primary" />
+            <span className="font-semibold text-sm text-foreground">Version history</span>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
@@ -760,7 +761,7 @@ function DocumentActionsMenu({
           setOpen((v) => !v);
         }}
         title="More options"
-        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground/80 dark:hover:text-sidebar-foreground hover:bg-accent transition-colors"
       >
         <MoreVertical size={16} />
       </button>
@@ -771,34 +772,34 @@ function DocumentActionsMenu({
           <div
             ref={menuRef}
             style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-[9999] w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 text-[13px]"
+            className="fixed z-[9999] w-56 bg-card border border-border rounded-lg shadow-lg py-1 text-[13px]"
           >
             <button
               type="button"
               disabled={publishing}
               onClick={handlePublish}
-              className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="w-full text-left px-3 py-2 text-foreground/80 hover:bg-muted dark:hover:bg-accent transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <Globe size={14} />
               {publishing ? "…" : "Publish"}
             </button>
 
-            <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+            <div className="border-t border-border my-1" />
 
             <button
               type="button"
               onClick={() => { setOpen(false); onOpenVersions(); }}
-              className="w-full text-left px-3 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-foreground/80 hover:bg-muted dark:hover:bg-accent transition-colors flex items-center gap-2"
             >
               <History size={14} />
               Version history
             </button>
 
-            <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+            <div className="border-t border-border my-1" />
 
             {/* Tags section */}
             <div className="px-3 py-2">
-              <div className="flex items-center gap-1.5 mb-2 text-zinc-400 dark:text-zinc-500">
+              <div className="flex items-center gap-1.5 mb-2 text-muted-foreground">
                 <Tag size={12} />
                 <span className="text-[11px] font-semibold uppercase tracking-wider">Tags</span>
               </div>
@@ -806,7 +807,7 @@ function DocumentActionsMenu({
                 {doc.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-md"
+                    className="inline-flex items-center gap-1 text-xs bg-muted text-foreground/80 px-2 py-0.5 rounded-md"
                   >
                     {tag}
                     <button type="button" onClick={() => removeTag(tag)} disabled={savingTag} className="hover:text-red-500">
@@ -821,20 +822,20 @@ function DocumentActionsMenu({
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTag()}
                   placeholder="Add tag…"
-                  className="flex-1 text-xs border border-zinc-200 dark:border-zinc-600 rounded-md px-2 py-1 bg-transparent outline-none focus:border-[#f25011] dark:text-zinc-200"
+                  className="flex-1 text-xs border border-border rounded-md px-2 py-1 bg-transparent outline-none focus:border-primary text-foreground"
                 />
                 <button
                   type="button"
                   onClick={addTag}
                   disabled={savingTag || !tagInput.trim()}
-                  className="text-[#f25011] hover:text-[#e0470f] disabled:opacity-40"
+                  className="text-primary hover:text-[#e0470f] disabled:opacity-40"
                 >
                   <Plus size={14} />
                 </button>
               </div>
             </div>
 
-            <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+            <div className="border-t border-border my-1" />
 
             <button
               type="button"
@@ -880,7 +881,7 @@ function EditorCountInline({
       className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${
         status === "disconnected"
           ? "text-amber-600 bg-amber-50 dark:bg-amber-950/30"
-          : "text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800"
+          : "text-muted-foreground bg-muted"
       }`}
     >
       <Users size={12} />
@@ -907,7 +908,7 @@ function SaveIndicator({
   }
   if (status === "saving") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-zinc-400 bg-zinc-50 dark:bg-zinc-800 px-2.5 py-1 rounded-full animate-pulse shrink-0">
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-background dark:bg-muted px-2.5 py-1 rounded-full animate-pulse shrink-0">
         Saving…
       </span>
     );

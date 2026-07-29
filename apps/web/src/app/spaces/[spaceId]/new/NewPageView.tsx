@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { documentsApi, spacesApi } from "@/lib/api";
 import type { Space } from "@wiki/types";
-import { Button, Card, CardContent, Skeleton } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
   spaceId: string;
@@ -60,7 +62,7 @@ export function NewPageView({ spaceId }: Props) {
         <Card className="border-red-100 bg-red-50">
           <CardContent className="p-5 flex flex-col gap-3">
             <p className="text-red-600 text-sm">{error}</p>
-            <Button variant="secondary" size="sm" onPress={() => router.back()}>
+            <Button variant="secondary" size="sm" onClick={() => router.back()}>
               Go back
             </Button>
           </CardContent>

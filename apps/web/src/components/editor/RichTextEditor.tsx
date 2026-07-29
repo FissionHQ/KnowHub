@@ -102,7 +102,7 @@ export function RichTextEditor({
 
   if (!editor) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-zinc-400">
+      <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
         Loading editor…
       </div>
     );

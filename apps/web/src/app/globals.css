@@ -1,25 +1,185 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @source "../components/**/*.{js,ts,jsx,tsx}";
 @source "./**/*.{js,ts,jsx,tsx}";
 
-:root {
+/* Fission Design System tokens — match https://fissionhq.github.io/ui-design-system */
+:root,
+:root[data-theme="fission"] {
   --sidebar-width: 264px;
-  --accent: oklch(64.99% 0.2079 37.63);
-  --accent-hover: oklch(59% 0.2 37.63);
-  --accent-foreground: oklch(100% 0 0);
+
+  --color-brand: #f25011;
+  --color-brand-hover: #e0470f;
+  --color-brand-active: #cf400d;
+  --color-on-brand: #ffffff;
+
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
+
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-text: #18181b;
+  --color-text-muted: #71717a;
+  --color-border: #e4e4e7;
+  --color-sidebar: #1c1e2e;
+
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+
+  --primary: var(--color-brand);
+  --primary-hover: var(--color-brand-hover);
+  --primary-active: var(--color-brand-active);
+  --primary-foreground: var(--color-on-brand);
+
+  --secondary: var(--color-zinc-100);
+  --secondary-foreground: var(--color-zinc-900);
+
+  --muted: var(--color-zinc-100);
+  --muted-foreground: var(--color-text-muted);
+
+  --accent: var(--color-zinc-100);
+  --accent-foreground: var(--color-zinc-900);
+
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-brand);
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+
+  --sidebar-background: var(--color-sidebar);
+  --sidebar-foreground: #ffffff;
+  --sidebar-muted: #9ca3af;
+  --sidebar-accent: rgba(242, 80, 17, 0.12);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --chart-1: #8b5cf6;
+  --chart-2: #3b82f6;
+  --chart-3: #ec4899;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+  --chart-6: #f43f5e;
+
+  --radius: 0.5rem;
+}
+
+.dark {
+  --color-bg: #09090b;
+  --color-surface: #18181b;
+  --color-text: #f4f4f5;
+  --color-text-muted: #a1a1aa;
+  --color-border: #3f3f46;
+
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+
+  --secondary: var(--color-zinc-800);
+  --secondary-foreground: var(--color-zinc-50);
+  --muted: var(--color-zinc-800);
+  --muted-foreground: var(--color-text-muted);
+  --accent: var(--color-zinc-800);
+  --accent-foreground: var(--color-zinc-50);
+
+  --border: var(--color-border);
+  --input: var(--color-border);
+}
+
+/* Tailwind v4 theme mapping — Fission tokens */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-sidebar: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 /* Sidebar scrollbar — no arrows, transparent track */
-aside nav::-webkit-scrollbar { width: 4px; }
-aside nav::-webkit-scrollbar-track { background: transparent; }
-aside nav::-webkit-scrollbar-button { display: none; }
-aside nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
-aside nav { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+aside nav::-webkit-scrollbar {
+  width: 4px;
+}
+aside nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+aside nav::-webkit-scrollbar-button {
+  display: none;
+}
+aside nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+aside nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
 
-/* All interactive elements should show pointer cursor */
+/* Interactive cursor */
 button,
 [role="button"],
 a,
@@ -31,12 +191,6 @@ label[for],
 summary {
   cursor: pointer;
 }
-
-/* Links and interactive hover color */
-a:hover {
-  color: #f25011;
-}
-
 
 /* Tiptap editor */
 .ProseMirror {
@@ -55,7 +209,7 @@ a:hover {
 
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #a1a1aa;
+  color: var(--muted-foreground);
   pointer-events: none;
   float: left;
   height: 0;
@@ -69,29 +223,20 @@ a:hover {
 
 .ProseMirror table td,
 .ProseMirror table th {
-  border: 1px solid #e4e4e7;
+  border: 1px solid var(--border);
   padding: 0.5rem 0.75rem;
   min-width: 80px;
 }
 
-.dark .ProseMirror table td,
-.dark .ProseMirror table th {
-  border-color: #3f3f46;
-}
-
 .ProseMirror table th {
-  background: #f4f4f5;
+  background: var(--muted);
   font-weight: 600;
 }
 
-.dark .ProseMirror table th {
-  background: #27272a;
-}
-
 .ProseMirror pre {
-  background: #18181b;
-  color: #e4e4e7;
-  border-radius: 0.5rem;
+  background: var(--color-zinc-900);
+  color: var(--color-zinc-200);
+  border-radius: var(--radius);
   padding: 1rem 1.25rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.875rem;
@@ -99,10 +244,10 @@ a:hover {
 }
 
 .ProseMirror blockquote {
-  border-left: 3px solid #f25011;
+  border-left: 3px solid var(--primary);
   margin-left: 0;
   padding-left: 1rem;
-  color: #71717a;
+  color: var(--muted-foreground);
   font-style: italic;
 }
 
@@ -110,7 +255,7 @@ a:hover {
   font-size: 1.375rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
-  color: #09090b;
+  color: var(--foreground);
 }
 
 .ProseMirror ul {
@@ -126,20 +271,12 @@ a:hover {
   display: list-item;
 }
 
-.dark .ProseMirror h2 {
-  color: #fafafa;
-}
-
 .ProseMirror h3 {
   font-size: 1.125rem;
   font-weight: 600;
   margin-top: 1.25rem;
   margin-bottom: 0.375rem;
-  color: #09090b;
-}
-
-.dark .ProseMirror h3 {
-  color: #fafafa;
+  color: var(--foreground);
 }
 
 .ProseMirror ul,
@@ -148,12 +285,8 @@ a:hover {
   margin: 0.5rem 0;
 }
 
-.ProseMirror li {
-  margin: 0.25rem 0;
-}
-
 .ProseMirror a {
-  color: #f25011;
+  color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

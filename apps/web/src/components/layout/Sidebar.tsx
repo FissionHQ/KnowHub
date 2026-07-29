@@ -8,12 +8,30 @@ import { createPortal } from "react-dom";
 import { spacesApi, activityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Space, Document } from "@wiki/types";
-import { Separator } from "@heroui/react";
-import { LogOut, Search, Settings, User, Zap, ChevronRight, ChevronDown, Clock, Star, RefreshCw, MoreHorizontal, Upload } from "lucide-react";
-import clsx from "clsx";
+import { Separator } from "@/components/ui/separator";
+import {
+  LogOut,
+  Search,
+  Settings,
+  User,
+  Zap,
+  ChevronRight,
+  ChevronDown,
+  Clock,
+  Star,
+  RefreshCw,
+  MoreHorizontal,
+  Upload,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { importDocumentFile } from "@/lib/importDocument";
-import { ThemeToggle } from "./ThemeToggle";
 import { SpaceDocTree } from "./SpaceDocTree";
+
+/** Fission sidebar nav item styles — match ui-design-system AppSidebar */
+const navItemBase =
+  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors";
+const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
+const navItemActive = "bg-sidebar-accent text-primary";
 
 function SpaceRow({
   space,
@@ -28,30 +46,30 @@ function SpaceRow({
 
   return (
     <div>
-      <div className="group/space flex items-center gap-0.5 rounded-lg pr-1 hover:bg-white/10 transition-colors">
+      <div className="group/space flex items-center gap-0.5 rounded-md pr-1">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="shrink-0 w-5 h-5 flex items-center justify-center text-zinc-400 hover:text-zinc-200 ml-1"
+          className="shrink-0 w-5 h-5 flex items-center justify-center text-sidebar-muted hover:text-sidebar-foreground ml-1 transition-colors"
         >
-          <ChevronRight size={12} className={clsx("transition-transform", open && "rotate-90")} />
+          <ChevronRight size={12} className={cn("transition-transform", open && "rotate-90")} />
         </button>
-        <Link href={`/spaces/${space.id}`} className="flex-1 min-w-0">
-          <div
-            className={clsx(
-              "flex items-center gap-2.5 px-2 py-2 text-sm transition-colors cursor-pointer",
-              isActive ? "font-semibold" : "text-zinc-300",
-            )}
-            style={isActive ? { color: "#f25011" } : {}}
-          >
-            <span className="truncate">{space.name}</span>
-          </div>
+        <Link
+          href={`/spaces/${space.id}`}
+          className={cn(
+            "flex-1 min-w-0",
+            navItemBase,
+            "gap-2.5 px-2",
+            isActive ? navItemActive : navItemIdle,
+          )}
+        >
+          <span className="truncate">{space.name}</span>
         </Link>
         <button
           type="button"
           onClick={onMenuOpen}
-          className={clsx(
-            "shrink-0 transition-opacity text-zinc-500 hover:text-[#f25011] w-5 h-5 flex items-center justify-center rounded",
+          className={cn(
+            "shrink-0 transition-opacity text-sidebar-muted hover:text-sidebar-foreground w-5 h-5 flex items-center justify-center rounded-md",
             space.accessLevel === "edit" ? "opacity-0 group-hover/space:opacity-100" : "hidden",
           )}
           title="More options"
@@ -59,9 +77,7 @@ function SpaceRow({
           <MoreHorizontal size={12} />
         </button>
       </div>
-      {open && (
-        <SpaceDocTree spaceId={space.id} canEdit={space.accessLevel === "edit"} />
-      )}
+      {open && <SpaceDocTree spaceId={space.id} canEdit={space.accessLevel === "edit"} />}
     </div>
   );
 }
@@ -72,7 +88,10 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const { data: spaces = [] } = useSWR<Space[]>(user ? "spaces" : null, spacesApi.list);
   const { data: recentDocs = [] } = useSWR<Document[]>(user ? "recent" : null, activityApi.getRecent);
-  const { data: recentlyUpdated = [] } = useSWR<Document[]>(user ? "recently-updated" : null, activityApi.getRecentlyUpdated);
+  const { data: recentlyUpdated = [] } = useSWR<Document[]>(
+    user ? "recently-updated" : null,
+    activityApi.getRecentlyUpdated,
+  );
   const { data: favDocs = [] } = useSWR<Document[]>(user ? "favorites" : null, activityApi.getFavorites);
 
   const [showBookmarks, setShowBookmarks] = useState(false);
@@ -93,14 +112,13 @@ export function Sidebar() {
     }
   }
 
-  // Detect active space from URL: /spaces/:spaceId/...
   const spaceMatch = pathname.match(/^\/spaces\/([^/]+)/);
   const activeSpaceId = spaceMatch?.[1] ?? null;
 
   return (
     <aside
-      className="fixed left-0 top-0 h-full flex flex-col border-r border-zinc-200 dark:border-zinc-800 z-20"
-      style={{ width: "var(--sidebar-width)", backgroundColor: "rgb(28, 30, 46)" }}
+      className="fixed left-0 top-0 h-full flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground z-20"
+      style={{ width: "var(--sidebar-width)" }}
     >
       <input
         ref={fileInputRef}
@@ -115,207 +133,206 @@ export function Sidebar() {
           e.target.value = "";
         }}
       />
+
       <div className="px-4 py-4 flex items-center gap-2.5">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#f25011] shadow-sm">
-          <Zap size={15} color="white" strokeWidth={2.5} />
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary shadow-sm">
+          <Zap size={15} className="text-primary-foreground" strokeWidth={2.5} />
         </div>
-        <Link href="/spaces" className="font-bold text-[15px] tracking-tight" style={{ color: "white" }}>
+        <Link
+          href="/spaces"
+          className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight text-sidebar-foreground hover:text-sidebar-foreground"
+        >
           KnowHub
         </Link>
       </div>
 
-      <Separator />
+      <Separator className="bg-sidebar-border" />
 
       <div className="px-3 pt-2 pb-1">
-        <Link href="/search">
-          <div
-            className={clsx(
-              "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer",
-              pathname === "/search"
-                ? "font-medium"
-                : "text-zinc-400 hover:bg-white/10",
-            )}
-            style={pathname === "/search" ? { color: "#f25011" } : {}}
-          >
-            <Search size={14} />
-            <span className="flex-1">Search</span>
-          </div>
+        <Link
+          href="/search"
+          className={cn(navItemBase, pathname === "/search" ? navItemActive : navItemIdle)}
+        >
+          <Search size={14} className="shrink-0" />
+          <span className="flex-1">Search</span>
         </Link>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-1">
-        {/* Spaces — always at top */}
-        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-2 pb-1">
+        <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted">
           Spaces
         </p>
         <div className="flex flex-col gap-0.5">
-          {spaces.map((space) => {
-            const isActive = activeSpaceId === space.id;
-            return (
-              <SpaceRow
-                key={space.id}
-                space={space}
-                isActive={isActive}
-                onMenuOpen={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (space.accessLevel !== "edit") return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setMenuPos({ top: rect.bottom + 4, left: rect.left });
-                  setSpaceMenu(spaceMenu === space.id ? null : space.id);
-                }}
-              />
-            );
-          })}
+          {spaces.map((space) => (
+            <SpaceRow
+              key={space.id}
+              space={space}
+              isActive={activeSpaceId === space.id}
+              onMenuOpen={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (space.accessLevel !== "edit") return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMenuPos({ top: rect.bottom + 4, left: rect.left });
+                setSpaceMenu(spaceMenu === space.id ? null : space.id);
+              }}
+            />
+          ))}
           {spaces.length === 0 && (
-            <p className="text-xs text-zinc-500 px-3 py-2">No spaces yet</p>
+            <p className="px-3 py-2 text-xs text-sidebar-muted">No spaces yet</p>
           )}
         </div>
 
-        {/* Bookmarks — collapsible */}
         <button
           type="button"
           onClick={() => setShowBookmarks((v) => !v)}
-          className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-4 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
+          className="flex w-full items-center gap-1 px-3 pt-4 pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted transition-colors hover:text-sidebar-foreground"
         >
           {showBookmarks ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
           Bookmarks
           {favDocs.length > 0 && (
-            <span className="ml-auto text-[9px] bg-white/10 text-zinc-500 px-1.5 py-0.5 rounded-full">{favDocs.length}</span>
+            <span className="ml-auto rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] text-sidebar-muted">
+              {favDocs.length}
+            </span>
           )}
         </button>
-        {showBookmarks && (
-          favDocs.length > 0 ? (
-            <div className="flex flex-col gap-0.5 mb-1">
+        {showBookmarks &&
+          (favDocs.length > 0 ? (
+            <div className="mb-1 flex flex-col gap-0.5">
               {favDocs.slice(0, 5).map((doc) => (
-                <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                  <div className="flex items-center gap-2 pl-6 pr-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
-                    <Star size={11} className="text-amber-400 fill-amber-400 shrink-0" />
-                    <span className="truncate">{doc.title}</span>
-                  </div>
+                <Link
+                  key={doc.id}
+                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
+                >
+                  <Star size={11} className="shrink-0 fill-amber-400 text-amber-400" />
+                  <span className="truncate">{doc.title}</span>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-[11px] text-zinc-600 px-3 py-1 mb-1">Click &quot;Bookmark&quot; on any page</p>
-          )
-        )}
+            <p className="mb-1 px-3 py-1 text-[11px] text-sidebar-muted">
+              Click &quot;Bookmark&quot; on any page
+            </p>
+          ))}
 
-        {/* Recently viewed — per user */}
         <button
           type="button"
           onClick={() => setShowRecentlyViewed((v) => !v)}
-          className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-3 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
+          className="flex w-full items-center gap-1 px-3 pt-3 pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted transition-colors hover:text-sidebar-foreground"
         >
           {showRecentlyViewed ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
           Recently viewed
           {recentDocs.length > 0 && (
-            <span className="ml-auto text-[9px] bg-white/10 text-zinc-500 px-1.5 py-0.5 rounded-full">{recentDocs.length}</span>
+            <span className="ml-auto rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] text-sidebar-muted">
+              {recentDocs.length}
+            </span>
           )}
         </button>
-        {showRecentlyViewed && (
-          recentDocs.length > 0 ? (
-            <div className="flex flex-col gap-0.5 mb-1">
+        {showRecentlyViewed &&
+          (recentDocs.length > 0 ? (
+            <div className="mb-1 flex flex-col gap-0.5">
               {recentDocs.slice(0, 5).map((doc) => (
-                <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                  <div className="flex items-center gap-2 pl-6 pr-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
-                    <Clock size={11} className="text-zinc-500 shrink-0" />
-                    <span className="truncate">{doc.title}</span>
-                  </div>
+                <Link
+                  key={doc.id}
+                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
+                >
+                  <Clock size={11} className="shrink-0 text-sidebar-muted" />
+                  <span className="truncate">{doc.title}</span>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-[11px] text-zinc-600 px-3 py-1 mb-1">Pages you open appear here</p>
-          )
-        )}
+            <p className="mb-1 px-3 py-1 text-[11px] text-sidebar-muted">Pages you open appear here</p>
+          ))}
 
-        {/* Recently updated — per user */}
         <button
           type="button"
           onClick={() => setShowRecentlyUpdated((v) => !v)}
-          className="flex items-center gap-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-3 pt-3 pb-1 w-full text-left hover:text-zinc-400 transition-colors"
+          className="flex w-full items-center gap-1 px-3 pt-3 pb-1 text-left text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted transition-colors hover:text-sidebar-foreground"
         >
           {showRecentlyUpdated ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
           Recently updated
           {recentlyUpdated.length > 0 && (
-            <span className="ml-auto text-[9px] bg-white/10 text-zinc-500 px-1.5 py-0.5 rounded-full">{recentlyUpdated.length}</span>
+            <span className="ml-auto rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] text-sidebar-muted">
+              {recentlyUpdated.length}
+            </span>
           )}
         </button>
-        {showRecentlyUpdated && (
-          recentlyUpdated.length > 0 ? (
-            <div className="flex flex-col gap-0.5 mb-1">
+        {showRecentlyUpdated &&
+          (recentlyUpdated.length > 0 ? (
+            <div className="mb-1 flex flex-col gap-0.5">
               {recentlyUpdated.slice(0, 5).map((doc) => (
-                <Link key={doc.id} href={`/spaces/${doc.spaceId}/docs/${doc.id}`}>
-                  <div className="flex items-center gap-2 pl-6 pr-3 py-1.5 rounded-lg text-[13px] text-zinc-300 hover:bg-white/10 transition-colors cursor-pointer truncate">
-                    <RefreshCw size={11} className="text-zinc-500 shrink-0" />
-                    <span className="truncate">{doc.title}</span>
-                  </div>
+                <Link
+                  key={doc.id}
+                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
+                >
+                  <RefreshCw size={11} className="shrink-0 text-sidebar-muted" />
+                  <span className="truncate">{doc.title}</span>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="text-[11px] text-zinc-600 px-3 py-1 mb-1">Pages you edit appear here</p>
-          )
-        )}
+            <p className="mb-1 px-3 py-1 text-[11px] text-sidebar-muted">Pages you edit appear here</p>
+          ))}
       </nav>
 
-      <Separator />
+      <Separator className="bg-sidebar-border" />
 
-      <div className="px-3 py-3 flex flex-col gap-1">
+      <div className="flex flex-col gap-1 px-3 py-3">
         {user && (
-          <div className="px-3 py-2 mb-1">
-            <div className="flex items-center gap-2 text-sm text-zinc-300">
-              <User size={14} className="text-zinc-500 shrink-0" />
+          <div className="mb-1 px-3 py-2">
+            <div className="flex items-center gap-2 text-sm text-sidebar-muted">
+              <User size={14} className="shrink-0 text-sidebar-muted" />
               <div className="min-w-0">
-                <p className="font-medium truncate">{user.name}</p>
-                <p className="text-xs text-zinc-500 truncate capitalize">{user.role}</p>
+                <p className="truncate font-medium text-sidebar-foreground">{user.name}</p>
+                <p className="truncate text-xs capitalize text-sidebar-muted">{user.role}</p>
               </div>
             </div>
           </div>
         )}
-        <ThemeToggle />
         {user?.role === "admin" && (
-          <Link href="/admin">
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-white/10 transition-colors cursor-pointer">
-              <Settings size={14} />
-              <span>Admin</span>
-            </div>
+          <Link
+            href="/admin"
+            className={cn(navItemBase, pathname.startsWith("/admin") ? navItemActive : navItemIdle)}
+          >
+            <Settings size={14} className="shrink-0" />
+            <span>Admin</span>
           </Link>
         )}
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-400 hover:bg-white/10 transition-colors w-full text-left"
-        >
-          <LogOut size={14} />
+        <button type="button" onClick={() => logout()} className={cn(navItemBase, "w-full text-left", navItemIdle)}>
+          <LogOut size={14} className="shrink-0" />
           <span>Sign out</span>
         </button>
       </div>
 
-      {spaceMenu && typeof window !== "undefined" && createPortal(
-        <>
-          <div className="fixed inset-0 z-[9999]" onClick={() => setSpaceMenu(null)} />
-          <div
-            style={{ top: menuPos.top, left: menuPos.left }}
-            className="fixed z-[9999] w-44 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 text-[13px]"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                uploadSpaceRef.current = spaceMenu;
-                setSpaceMenu(null);
-                fileInputRef.current?.click();
-              }}
-              className="w-full text-left px-3 py-2 text-zinc-200 hover:bg-white/10 transition-colors flex items-center gap-2"
+      {spaceMenu &&
+        typeof window !== "undefined" &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[9999]" onClick={() => setSpaceMenu(null)} />
+            <div
+              style={{ top: menuPos.top, left: menuPos.left }}
+              className="fixed z-[9999] w-44 rounded-md border border-sidebar-border bg-sidebar py-1 text-sm shadow-xl"
             >
-              <Upload size={14} />
-              Import document
-            </button>
-          </div>
-        </>,
-        document.body,
-      )}
+              <button
+                type="button"
+                onClick={() => {
+                  uploadSpaceRef.current = spaceMenu;
+                  setSpaceMenu(null);
+                  fileInputRef.current?.click();
+                }}
+                className={cn(navItemBase, "w-full text-left", navItemIdle)}
+              >
+                <Upload size={14} />
+                Import document
+              </button>
+            </div>
+          </>,
+          document.body,
+        )}
     </aside>
   );
 }

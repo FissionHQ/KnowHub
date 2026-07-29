@@ -187,7 +187,7 @@ export function BlockMenu({ editor, title = "document", documentId }: BlockMenuP
         type="button"
         onMouseDown={(e) => { e.preventDefault(); setOpen((v) => !v); }}
         style={{ position: "absolute", top: btnPos.top, left: btnPos.left + 24 }}
-        className="z-40 flex items-center justify-center w-5 h-5 text-zinc-900 dark:text-zinc-100 transition-colors"
+        className="z-40 flex items-center justify-center w-5 h-5 text-foreground transition-colors"
         aria-label="Insert block"
       >
         <Plus size={18} strokeWidth={2.5} />
@@ -198,11 +198,11 @@ export function BlockMenu({ editor, title = "document", documentId }: BlockMenuP
         <div
           ref={menuRef}
           style={{ position: "absolute", top: btnPos.top + 24, left: btnPos.left + 24 }}
-          className="z-50 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 overflow-y-auto max-h-80"
+          className="z-50 w-52 bg-card border border-border rounded-lg shadow-xl py-1 overflow-y-auto max-h-80"
         >
           {groups.map((group) => (
             <div key={group.label}>
-              <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.label}
               </p>
               {group.items.map((item) => (
@@ -213,8 +213,8 @@ export function BlockMenu({ editor, title = "document", documentId }: BlockMenuP
                   className={clsx(
                     "flex items-center gap-2.5 w-full px-3 py-1.5 text-sm text-left transition-colors",
                     item.active
-                      ? "text-[#f25011] bg-orange-50 dark:bg-orange-950/40"
-                      : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      ? "text-primary bg-orange-50 dark:bg-orange-950/40"
+                      : "text-foreground/80 hover:bg-accent"
                   )}
                 >
                   <span className="shrink-0">{item.icon}</span>

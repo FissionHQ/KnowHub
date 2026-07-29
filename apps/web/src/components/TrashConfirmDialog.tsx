@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@heroui/react";
-import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trash2, Loader2 } from "lucide-react";
 
 export function TrashConfirmDialog({
   title,
@@ -26,7 +26,7 @@ export function TrashConfirmDialog({
           role="dialog"
           aria-modal="true"
           aria-labelledby="trash-confirm-title"
-          className="pointer-events-auto w-full max-w-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl"
+          className="pointer-events-auto w-full max-w-sm rounded-xl border border-border bg-card text-card-foreground shadow-xl"
         >
           <div className="px-5 pt-5 pb-4">
             <div className="flex items-start gap-3">
@@ -36,37 +36,30 @@ export function TrashConfirmDialog({
               <div className="min-w-0">
                 <h2
                   id="trash-confirm-title"
-                  className="text-base font-semibold text-zinc-900 dark:text-zinc-100"
+                  className="text-base font-semibold text-foreground"
                 >
                   Move to trash?
                 </h2>
-                <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">{title}</span>{" "}
+                <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground/80">{title}</span>{" "}
                   will be moved to trash. An admin can restore it before the retention period
                   expires.
                 </p>
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-b-xl">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onPress={onCancel}
-              isDisabled={deleting}
-            >
+          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border bg-muted/50 rounded-b-xl">
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={deleting}>
               Cancel
             </Button>
             <Button
               type="button"
-              variant="primary"
+              variant="destructive"
               size="sm"
-              className="bg-red-600 hover:bg-red-700 text-white"
-              onPress={onConfirm}
-              isPending={deleting}
-              isDisabled={deleting}
+              onClick={onConfirm}
+              disabled={deleting}
             >
+              {deleting ? <Loader2 className="animate-spin" size={14} /> : null}
               Move to trash
             </Button>
           </div>

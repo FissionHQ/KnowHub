@@ -6,7 +6,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { documentsApi, spacesApi } from "@/lib/api";
 import type { Document, Space } from "@wiki/types";
-import { Button, Card, CardContent, Skeleton, Separator, Chip } from "@heroui/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { FileText, Plus, File, ChevronRight} from "lucide-react";
 import clsx from "clsx";
 import { importDocumentFile } from "@/lib/importDocument";
@@ -90,48 +94,48 @@ export function SpaceView({ spaceId }: Props) {
             className="group block cursor-pointer"
             style={{ paddingLeft: depth * 20 }}
           >
-            <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+            <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-transparent hover:border-border dark:hover:border-border hover:bg-accent transition-colors">
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); toggleExpand(doc.id); }}
-                className="shrink-0 w-4 h-4 flex items-center justify-center text-zinc-400 hover:text-zinc-600"
+                className="shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-muted-foreground"
               >
                 {children.length > 0 ? (
                   <ChevronRight size={12} className={clsx("transition-transform", isExpanded && "rotate-90")} />
                 ) : (
-                  <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600 block" />
+                  <span className="w-1 h-1 rounded-full bg-muted-foreground/40 block" />
                 )}
               </button>
               <div
                 className={
                   doc.type === "pdf"
                     ? "p-1 rounded-md bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
-                    : "p-1 rounded-md bg-orange-50 dark:bg-orange-950/40 text-[#f25011] shrink-0"
+                    : "p-1 rounded-md bg-orange-50 dark:bg-orange-950/40 text-primary shrink-0"
                 }
               >
-                {doc.type === "pdf" ? <File size={14} color="#f25011" /> : <FileText size={14} color="#f25011" />}
+                {doc.type === "pdf" ? <File size={14} color="var(--primary)" /> : <FileText size={14} color="var(--primary)" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-zinc-900 dark:text-zinc-100 text-sm truncate group-hover:text-[#f25011] transition-colors">
+                <p className="font-medium text-foreground text-sm truncate group-hover:text-primary transition-colors">
                   {doc.title}
                 </p>
               </div>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 hidden sm:inline">
+              <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">
                 {doc.ownerName ?? "Unknown"}
               </span>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0 whitespace-nowrap">
+              <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
                 {formatDateTime(doc.updatedAt)}
               </span>
               <div className="flex items-center gap-1.5 shrink-0">
                 {doc.tags.slice(0, 2).map((tag) => (
-                  <Chip key={tag} size="sm" variant="secondary" className="text-xs">
+                  <Badge key={tag} variant="secondary" className="text-xs">
                     {tag}
-                  </Chip>
+                  </Badge>
                 ))}
                 {doc.status === "draft" && (
-                  <Chip size="sm" color="warning" variant="soft" className="text-xs">
+                  <Badge variant="warning" className="text-xs">
                     Draft
-                  </Chip>
+                  </Badge>
                 )}
               </div>
             </div>
@@ -157,11 +161,11 @@ export function SpaceView({ spaceId }: Props) {
         ) : (
           <>
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
+              <h1 className="text-2xl font-bold text-foreground leading-tight">
                 {space?.name ?? "Space"}
               </h1>
               {space?.description && (
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-0.5 truncate">{space.description}</p>
+                <p className="text-muted-foreground text-sm mt-0.5 truncate">{space.description}</p>
               )}
             </div>
           </>
@@ -183,17 +187,17 @@ export function SpaceView({ spaceId }: Props) {
               variant="secondary"
               size="sm"
               className="shrink-0 flex items-center gap-1.5"
-              onPress={() => fileInputRef.current?.click()}
-              isDisabled={importing}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
             >
               <Upload size={14} />
               {importing ? "Importing…" : "Import"}
             </Button>
             <Link href={`/spaces/${spaceId}/new` as never}>
               <Button
-                variant="primary"
+                variant="default"
                 size="sm"
-                className="shrink-0 flex items-center gap-1.5 bg-[#f25011] text-white hover:bg-[#e0470f] active:bg-[#cf400d] transition-colors duration-200"
+                className="shrink-0 flex items-center gap-1.5 bg-primary text-white hover:bg-[#e0470f] active:bg-[#cf400d] transition-colors duration-200"
               >
                 <Plus size={14} />
                 New Page
@@ -206,7 +210,7 @@ export function SpaceView({ spaceId }: Props) {
       <Separator className="mb-6" />
       {/* Document count */}
       {!docsLoading && docs.length > 0 && (
-        <p className="text-xs text-zinc-400 mb-3">{docs.length} document{docs.length !== 1 ? "s" : ""}</p>
+        <p className="text-xs text-muted-foreground mb-3">{docs.length} document{docs.length !== 1 ? "s" : ""}</p>
       )}
 
       <div className="mb-6">
@@ -228,7 +232,7 @@ export function SpaceView({ spaceId }: Props) {
         </div>
       ) : docs.length === 0 ? (
         <Card>
-          <CardContent className="py-16 flex flex-col items-center gap-3 text-zinc-400 dark:text-zinc-500 p-5">
+          <CardContent className="py-16 flex flex-col items-center gap-3 text-muted-foreground p-5">
             <FileText size={40} className="opacity-30" />
             <p className="text-sm">
               {canEdit ? "No documents yet. Create the first page." : "No documents in this space yet."}

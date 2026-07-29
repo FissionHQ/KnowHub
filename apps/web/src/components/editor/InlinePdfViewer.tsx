@@ -15,9 +15,9 @@ export default function InlinePdfViewer({ url }: Props) {
     return (
       <div className="px-3 py-3 flex items-center gap-2">
         <AlertCircle size={12} className="text-amber-500" />
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           PDF preview unavailable.{" "}
-          <a href={url} target="_blank" rel="noopener noreferrer" className="text-[#f25011] hover:underline">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             Open in new tab
           </a>
         </p>
@@ -28,7 +28,7 @@ export default function InlinePdfViewer({ url }: Props) {
   return (
     <div className="p-2">
       {loading && (
-        <div className="flex items-center justify-center gap-2 py-12 text-zinc-400">
+        <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
           <Loader2 size={18} className="animate-spin" />
           <span className="text-sm">Loading preview…</span>
         </div>

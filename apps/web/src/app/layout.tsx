@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import { Providers } from "./providers";
-import { themeInitScript } from "@/lib/theme";
-import "@/styles/heroui.css";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], display: "swap" });
+/** Match Fission DS: Inter via next/font on <body> only (no antialiased). */
+const inter = Inter({
+  subsets: ["latin"],
+});
+
+/** Force light theme — clear any leftover dark-mode preference. */
+const lightThemeInitScript = `(function(){try{document.documentElement.classList.remove("dark");localStorage.removeItem("knowhub-theme");}catch(e){}})();`;
 
 export const metadata: Metadata = {
   title: "KnowHub",
@@ -18,11 +22,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.className}>
+    <html lang="en" suppressHydrationWarning data-theme="fission" className="light">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: lightThemeInitScript }} />
       </head>
-      <body className="bg-zinc-50 text-foreground antialiased dark:bg-zinc-950">
+      <body className={`${inter.className} min-h-screen bg-background text-foreground`}>
         <Providers>{children}</Providers>
       </body>
     </html>
