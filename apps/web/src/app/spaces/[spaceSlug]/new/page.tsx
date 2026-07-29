@@ -2,11 +2,11 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { NewPageView } from "./NewPageView";
 
 interface Props {
-  params: Promise<{ spaceId: string }>;
+  params: Promise<{ spaceSlug: string }>;
 }
 
 export default async function NewPageRoute({ params }: Props) {
-  const { spaceId } = await params;
+  const { spaceSlug } = await params;
 
   return (
     <div className="flex h-screen bg-background">
@@ -15,7 +15,7 @@ export default async function NewPageRoute({ params }: Props) {
         className="flex-1 overflow-y-auto"
         style={{ marginLeft: "var(--sidebar-width)" }}
       >
-        <NewPageView spaceId={spaceId} />
+        <NewPageView spaceSlug={spaceSlug} />
       </main>
     </div>
   );

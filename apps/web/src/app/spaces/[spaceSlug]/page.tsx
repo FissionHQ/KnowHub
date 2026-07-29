@@ -2,11 +2,11 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { SpaceView } from "./SpaceView";
 
 interface Props {
-  params: Promise<{ spaceId: string }>;
+  params: Promise<{ spaceSlug: string }>;
 }
 
 export default async function SpacePage({ params }: Props) {
-  const { spaceId } = await params;
+  const { spaceSlug } = await params;
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -14,7 +14,7 @@ export default async function SpacePage({ params }: Props) {
         className="flex-1 overflow-y-auto"
         style={{ marginLeft: "var(--sidebar-width)" }}
       >
-        <SpaceView spaceId={spaceId} />
+        <SpaceView spaceSlug={spaceSlug} />
       </main>
     </div>
   );

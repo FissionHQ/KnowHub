@@ -198,7 +198,7 @@ function SpaceRow({
         <div className="flex items-center gap-3 min-w-0">
           <div className="min-w-0">
             <Link
-              href={`/spaces/${space.id}`}
+              href={`/spaces/${space.slug}`}
               className="font-medium text-foreground hover:text-primary dark:hover:text-primary"
             >
               {space.name}

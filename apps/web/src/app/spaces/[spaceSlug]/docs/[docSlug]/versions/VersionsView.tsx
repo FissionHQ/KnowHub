@@ -2,27 +2,29 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { documentsApi } from "@/lib/api";
+import { documentsApi, spacesApi } from "@/lib/api";
+import { spaceDocPath } from "@/lib/spacePath";
 import { useAuth } from "@/lib/auth";
-import type { Document } from "@wiki/types";
+import type { Document, Space } from "@wiki/types";
 import { DocumentVersionHistory } from "@/components/DocumentVersionHistory";
 import { History, ChevronLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
-  spaceId: string;
-  docId: string;
+  spaceSlug: string;
+  docSlug: string;
 }
 
-export function VersionsView({ spaceId, docId }: Props) {
+export function VersionsView({ spaceSlug, docSlug }: Props) {
   const { user } = useAuth();
-  const { data: doc } = useSWR<Document>(`doc:${docId}`, () => documentsApi.get(docId));
+  const { data: space } = useSWR<Space>(`space:${spaceSlug}`, () => spacesApi.get(spaceSlug));
+  const { data: doc } = useSWR<Document>(`doc:${docSlug}`, () => documentsApi.get(docSlug));
   const canEdit = Boolean(user && (user.role === "admin" || doc?.accessLevel === "edit"));
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <Link
-        href={`/spaces/${spaceId}/docs/${docId}`}
+        href={(space && doc ? spaceDocPath(space, doc.slug) : `/spaces/${spaceSlug}/docs/${docSlug}`) as never}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
       >
         <ChevronLeft size={14} />
@@ -43,7 +45,7 @@ export function VersionsView({ spaceId, docId }: Props) {
       ) : (
         <div className="border border-border rounded-xl overflow-hidden">
           <DocumentVersionHistory
-            documentId={docId}
+            documentId={doc.id}
             currentVersion={doc.version}
             canEdit={canEdit}
             defaultOpen

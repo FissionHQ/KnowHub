@@ -1,9 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, inArray, ne } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import type { Db } from "@wiki/db";
-import { spaces, spacePermissions, groups, syncSpaceDocumentSearchIndex } from "@wiki/db";
+import {
+  spaces,
+  spacePermissions,
+  groups,
+  syncSpaceDocumentSearchIndex,
+  allocateSpaceSlug,
+  findSpaceByRef,
+} from "@wiki/db";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../lib/errors.js";
 import { resolveSpaceAccess } from "../access/permissionResolver.js";
 import { recordAudit } from "../../lib/audit.js";
@@ -45,6 +52,12 @@ export function createNavigationRouter(db: Db): Router {
     } catch (err) {
       logger.warn("Failed to reindex space documents for search", { err, orgId, spaceId });
     }
+  }
+
+  async function requireSpace(orgId: string, ref: string) {
+    const space = await findSpaceByRef(db, orgId, ref);
+    if (!space) throw new NotFoundError("Space");
+    return space;
   }
 
   // GET /spaces — list spaces visible to current user
@@ -104,12 +117,14 @@ export function createNavigationRouter(db: Db): Router {
     if (!body.success) throw new ValidationError(body.error.flatten());
 
     const spaceId = uuidv4();
+    const slug = await allocateSpaceSlug(db, req.tenant.orgId, body.data.name);
     const inserted = await db
       .insert(spaces)
       .values({
         id: spaceId,
         orgId: req.tenant.orgId,
         name: body.data.name,
+        slug,
         description: body.data.description ?? null,
         iconEmoji: body.data.iconEmoji ?? null,
         createdBy: req.tenant.userId,
@@ -137,6 +152,7 @@ export function createNavigationRouter(db: Db): Router {
       target: {
         spaceId,
         name: body.data.name,
+        slug,
         groupPermissions,
       },
       req,
@@ -159,41 +175,30 @@ export function createNavigationRouter(db: Db): Router {
     });
   });
 
-  // GET /spaces/:spaceId
+  // GET /spaces/:spaceId — spaceId may be UUID or slug
   router.get("/spaces/:spaceId", async (req, res) => {
     const { orgId, userRole, userId, groupIds } = req.tenant;
-    const { spaceId } = req.params;
+    const ref = req.params.spaceId ?? "";
+
+    const space = await requireSpace(orgId, ref);
 
     const accessLevel = await resolveSpaceAccess({
       db,
       userRole,
       userId,
       groupIds,
-      spaceId: spaceId ?? "",
+      spaceId: space.id,
     });
 
-    const rows = await db
-      .select()
-      .from(spaces)
-      .where(and(eq(spaces.id, spaceId ?? ""), eq(spaces.orgId, orgId)));
-
-    if (!rows.length) throw new NotFoundError("Space");
-    res.json({ data: { ...rows[0], accessLevel } });
+    res.json({ data: { ...space, accessLevel } });
   });
 
   // GET /spaces/:spaceId/permissions — space group ACL (admin only)
   router.get("/spaces/:spaceId/permissions", async (req, res) => {
     if (req.tenant.userRole !== "admin") throw new ForbiddenError();
 
-    const { spaceId } = req.params;
     const { orgId } = req.tenant;
-
-    const rows = await db
-      .select()
-      .from(spaces)
-      .where(and(eq(spaces.id, spaceId ?? ""), eq(spaces.orgId, orgId)));
-
-    if (!rows.length) throw new NotFoundError("Space");
+    const space = await requireSpace(orgId, req.params.spaceId ?? "");
 
     const perms = await db
       .select({
@@ -203,7 +208,7 @@ export function createNavigationRouter(db: Db): Router {
       })
       .from(spacePermissions)
       .innerJoin(groups, eq(spacePermissions.groupId, groups.id))
-      .where(eq(spacePermissions.spaceId, spaceId ?? ""));
+      .where(eq(spacePermissions.spaceId, space.id));
 
     res.json({ data: perms });
   });
@@ -215,24 +220,17 @@ export function createNavigationRouter(db: Db): Router {
     const body = updateSpacePermissionsSchema.safeParse(req.body);
     if (!body.success) throw new ValidationError(body.error.flatten());
 
-    const { spaceId } = req.params;
     const { orgId } = req.tenant;
-
-    const rows = await db
-      .select()
-      .from(spaces)
-      .where(and(eq(spaces.id, spaceId ?? ""), eq(spaces.orgId, orgId)));
-
-    if (!rows.length) throw new NotFoundError("Space");
+    const space = await requireSpace(orgId, req.params.spaceId ?? "");
 
     await db
       .delete(spacePermissions)
-      .where(eq(spacePermissions.spaceId, spaceId ?? ""));
+      .where(eq(spacePermissions.spaceId, space.id));
 
     if (body.data.groupPermissions.length) {
       await db.insert(spacePermissions).values(
         body.data.groupPermissions.map((p) => ({
-          spaceId: spaceId ?? "",
+          spaceId: space.id,
           groupId: p.groupId,
           accessLevel: p.accessLevel,
         })),
@@ -244,26 +242,26 @@ export function createNavigationRouter(db: Db): Router {
       actorId: req.tenant.userId,
       action: "space.permission_change",
       target: {
-        spaceId,
+        spaceId: space.id,
         groupPermissions: body.data.groupPermissions,
         operation: "replace",
       },
       req,
     });
 
-    await reindexSpaceDocuments(orgId, spaceId ?? "");
+    await reindexSpaceDocuments(orgId, space.id);
 
-    res.json({ data: { spaceId, groupPermissions: body.data.groupPermissions } });
+    res.json({ data: { spaceId: space.id, groupPermissions: body.data.groupPermissions } });
   });
 
   // DELETE /spaces/:spaceId
   router.delete("/spaces/:spaceId", async (req, res) => {
     if (req.tenant.userRole !== "admin") throw new ForbiddenError();
-    const { spaceId } = req.params;
+    const space = await requireSpace(req.tenant.orgId, req.params.spaceId ?? "");
 
     const deleted = await db
       .delete(spaces)
-      .where(and(eq(spaces.id, spaceId ?? ""), eq(spaces.orgId, req.tenant.orgId)))
+      .where(and(eq(spaces.id, space.id), eq(spaces.orgId, req.tenant.orgId)))
       .returning();
 
     if (!deleted.length) throw new NotFoundError("Space");
@@ -271,7 +269,7 @@ export function createNavigationRouter(db: Db): Router {
       orgId: req.tenant.orgId,
       actorId: req.tenant.userId,
       action: "space.delete",
-      target: { spaceId, name: deleted[0]!.name },
+      target: { spaceId: space.id, name: deleted[0]!.name, slug: deleted[0]!.slug },
       req,
     });
     res.json({ data: { deleted: true } });

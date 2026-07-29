@@ -16,6 +16,7 @@ import {
   spaces,
   users,
 } from "./schema.js";
+import { buildDocumentSlug } from "./documentSlug.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -128,6 +129,7 @@ async function main() {
       id: IDS.spaces.engineering,
       orgId: IDS.org,
       name: "Engineering",
+      slug: "engineering",
       description: "Technical docs, architecture, and runbooks",
       iconEmoji: "⚙️",
       createdBy: IDS.admin,
@@ -136,6 +138,7 @@ async function main() {
       id: IDS.spaces.product,
       orgId: IDS.org,
       name: "Product",
+      slug: "product",
       description: "Roadmaps, specs, and release notes",
       iconEmoji: "🚀",
       createdBy: IDS.admin,
@@ -144,6 +147,7 @@ async function main() {
       id: IDS.spaces.hr,
       orgId: IDS.org,
       name: "People & HR",
+      slug: "people-hr",
       description: "Onboarding, policies, and team handbook",
       iconEmoji: "👥",
       createdBy: IDS.admin,
@@ -210,6 +214,7 @@ async function main() {
       spaceId: doc.spaceId,
       type: "page",
       title: doc.title,
+      slug: buildDocumentSlug(doc.title, doc.id),
       contentRef: doc.content,
       ownerId: IDS.admin,
       status: "published",

@@ -4,21 +4,22 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { documentsApi, spacesApi } from "@/lib/api";
+import { spaceDocPath } from "@/lib/spacePath";
 import type { Space } from "@wiki/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
-  spaceId: string;
+  spaceSlug: string;
 }
 
-export function NewPageView({ spaceId }: Props) {
+export function NewPageView({ spaceSlug }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const { data: space, isLoading } = useSWR<Space>(
-    `space:${spaceId}`,
-    () => spacesApi.get(spaceId),
+    `space:${spaceSlug}`,
+    () => spacesApi.get(spaceSlug),
   );
 
   useEffect(() => {
@@ -33,14 +34,14 @@ export function NewPageView({ spaceId }: Props) {
     async function createPage() {
       try {
         const doc = await documentsApi.create({
-          spaceId,
+          spaceId: space!.id,
           type: "page",
           title: "Untitled",
           content: "",
         });
 
         if (!cancelled) {
-          router.replace(`/spaces/${spaceId}/docs/${doc.id}`);
+          router.replace(spaceDocPath(space!, doc.slug));
         }
       } catch (err) {
         if (!cancelled) {
@@ -54,7 +55,7 @@ export function NewPageView({ spaceId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [spaceId, router, space, isLoading]);
+  }, [spaceSlug, router, space, isLoading]);
 
   if (error) {
     return (
