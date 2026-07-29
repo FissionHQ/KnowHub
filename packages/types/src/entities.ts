@@ -54,6 +54,8 @@ export interface Space {
   id: string;
   orgId: string;
   name: string;
+  /** URL-safe unique-per-org identifier. */
+  slug: string;
   description?: string;
   iconEmoji?: string;
   createdBy: string;

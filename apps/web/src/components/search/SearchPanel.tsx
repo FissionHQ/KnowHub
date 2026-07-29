@@ -435,7 +435,7 @@ export function SearchPanel({
                   type="button"
                   className="group text-left w-full"
                   onClick={() =>
-                    router.push(`/spaces/${hit.spaceId}/docs/${hit.documentId}`)
+                    router.push(`/spaces/${hit.spaceSlug || hit.spaceId}/docs/${hit.documentId}`)
                   }
                 >
                   <Card className="transition-all hover:shadow-sm hover:border-primary/30 cursor-pointer">

@@ -13,6 +13,7 @@ export type SearchContext = {
 type SearchRow = {
   document_id: string;
   space_id: string;
+  space_slug: string;
   type: string;
   title: string;
   preview: string | null;
@@ -308,6 +309,7 @@ export async function searchDocuments(
     SELECT
       d.id AS document_id,
       d.space_id,
+      s.slug AS space_slug,
       d.type,
       coalesce(d.search_title, d.title) AS title,
       d.search_preview AS preview,
@@ -322,6 +324,7 @@ export async function searchDocuments(
         ELSE NULL
       END AS body_highlight
     FROM documents d
+    INNER JOIN spaces s ON s.id = d.space_id
     LEFT JOIN LATERAL (
       SELECT count(*)::int AS view_count
       FROM recently_viewed rv
@@ -344,6 +347,7 @@ export async function searchDocuments(
     const hit: SearchResponse["hits"][number] = {
       documentId: row.document_id,
       spaceId: row.space_id,
+      spaceSlug: row.space_slug,
       type: row.type as SearchResponse["hits"][number]["type"],
       title: row.title,
       highlight: {

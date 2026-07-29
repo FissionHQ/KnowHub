@@ -24,6 +24,7 @@ import {
   hasUnpublishedChanges,
   isTitleChanged,
   syncDocumentSearchIndex,
+  findSpaceByRef,
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64, isHtmlContentChanged } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
@@ -152,17 +153,18 @@ export function createContentRouter(
     }
   }
 
-  // GET /spaces/:spaceId/documents
+  // GET /spaces/:spaceId/documents — spaceId may be UUID or slug
   router.get("/spaces/:spaceId/documents", async (req, res) => {
-    const { userRole, userId, groupIds } = req.tenant;
-    const { spaceId } = req.params;
+    const { userRole, userId, groupIds, orgId } = req.tenant;
+    const space = await findSpaceByRef(db, orgId, req.params.spaceId ?? "");
+    if (!space) throw new NotFoundError("Space");
 
     await assertSpaceAccess({
       db,
       userRole,
       userId,
       groupIds,
-      spaceId: spaceId ?? "",
+      spaceId: space.id,
       required: "view",
     });
 
@@ -188,8 +190,8 @@ export function createContentRouter(
       .leftJoin(users, eq(documents.ownerId, users.id))
       .where(
         and(
-          eq(documents.spaceId, spaceId ?? ""),
-          eq(documents.orgId, req.tenant.orgId),
+          eq(documents.spaceId, space.id),
+          eq(documents.orgId, orgId),
           ne(documents.status, "trashed"),
         ),
       );

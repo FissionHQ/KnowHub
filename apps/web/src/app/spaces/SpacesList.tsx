@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowRight, MoreVertical, Upload, Clock, RefreshCw } from "lucide-react";
 import { importDocumentFile } from "@/lib/importDocument";
+import { spacePath } from "@/lib/spacePath";
 
 export function SpacesList() {
   const router = useRouter();
@@ -25,13 +26,15 @@ export function SpacesList() {
   const [uploading, setUploading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadSpaceRef = useRef<string>("");
+  const slugById = Object.fromEntries((spaces ?? []).map((s) => [s.id, s.slug]));
 
   async function handleFileUpload(spaceId: string, file: File) {
     setUploading(spaceId);
     setMenuOpen(null);
     try {
       const doc = await importDocumentFile(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const slug = slugById[spaceId] ?? spaceId;
+      router.push(`/spaces/${slug}/docs/${doc.id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     } finally {
@@ -110,7 +113,7 @@ export function SpacesList() {
                   {recentDocs.slice(0, 5).map((doc) => (
                     <Link
                       key={doc.id}
-                      href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                      href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
                       className="text-sm text-muted-foreground hover:text-primary truncate py-1"
                     >
                       {doc.title}
@@ -131,7 +134,7 @@ export function SpacesList() {
                   {recentlyUpdated.slice(0, 5).map((doc) => (
                     <Link
                       key={doc.id}
-                      href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                      href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
                       className="text-sm text-muted-foreground hover:text-primary truncate py-1"
                     >
                       {doc.title}
@@ -147,7 +150,7 @@ export function SpacesList() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {spaces.map((space) => (
           <div key={space.id} className="relative group">
-            <Link href={`/spaces/${space.id}`} className="block">
+            <Link href={spacePath(space)} className="block">
               <Card className="h-full transition-all duration-200 hover:shadow-md hover:border-primary/30 cursor-pointer">
                 <CardContent className="p-5 flex flex-col gap-3 h-full">
                   <div className="flex items-start justify-between">

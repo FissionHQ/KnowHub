@@ -225,6 +225,7 @@ export interface SearchQuery {
 export interface SearchHit {
   documentId: string;
   spaceId: string;
+  spaceSlug: string;
   type: DocumentType;
   title: string;
   highlight: {

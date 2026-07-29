@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { spaceDocPath, spacePath } from "@/lib/spacePath";
 
 const PdfViewer = dynamic(
   () => import("@/components/pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -66,15 +67,15 @@ function editorContent(doc: Document): string {
 }
 
 interface Props {
-  spaceId: string;
+  spaceSlug: string;
   docId: string;
 }
 
-export function DocumentView({ spaceId, docId }: Props) {
+export function DocumentView({ spaceSlug, docId }: Props) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { data: doc, mutate } = useSWR<Document>(`doc:${docId}`, () => documentsApi.get(docId));
-  const { data: space } = useSWR<Space>(`space:${spaceId}`, () => spacesApi.get(spaceId));
+  const { data: space } = useSWR<Space>(`space:${spaceSlug}`, () => spacesApi.get(spaceSlug));
   const { data: parentDoc } = useSWR<Document>(
     doc?.parentId ? `doc:${doc.parentId}` : null,
     () => documentsApi.get(doc!.parentId!),
@@ -243,7 +244,7 @@ export function DocumentView({ spaceId, docId }: Props) {
     setDeleting(true);
     try {
       await documentsApi.delete(docId);
-      router.push(`/spaces/${spaceId}`);
+      router.push(space ? spacePath(space) : `/spaces/${spaceSlug}`);
     } finally {
       setDeleting(false);
     }
@@ -293,7 +294,7 @@ export function DocumentView({ spaceId, docId }: Props) {
       const updated = await documentsApi.update(docId, { title: trimmed });
       mutate(updated, false);
       if (updated.hasUnpublishedChanges) setLocalDraft(true);
-      void globalMutate(`space:${spaceId}:docs`);
+      void globalMutate(space ? `space:${space.id}:docs` : `space:${spaceSlug}:docs`);
       void globalMutate("favorites");
       void globalMutate("recently-updated");
       setSaveStatus("saved");
@@ -342,7 +343,7 @@ export function DocumentView({ spaceId, docId }: Props) {
           </Link>
           <span aria-hidden="true">/</span>
           <Link
-            href={`/spaces/${spaceId}`}
+            href={(space ? spacePath(space) : `/spaces/${spaceSlug}`) as never}
             className="text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors truncate max-w-[160px]"
           >
             {space?.name ?? "Space"}
@@ -351,7 +352,7 @@ export function DocumentView({ spaceId, docId }: Props) {
           {parentDoc && (
             <>
               <Link
-                href={`/spaces/${spaceId}/docs/${parentDoc.id}`}
+                href={(space ? spaceDocPath(space, parentDoc.id) : `/spaces/${spaceSlug}/docs/${parentDoc.id}`) as never}
                 className="text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors truncate max-w-[160px]"
               >
                 {parentDoc.title}

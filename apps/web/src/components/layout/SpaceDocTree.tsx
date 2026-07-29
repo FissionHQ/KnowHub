@@ -9,6 +9,7 @@ import { documentsApi } from "@/lib/api";
 import type { Document } from "@wiki/types";
 import { FileText, Plus, ChevronRight, MoreHorizontal, Trash2, PenIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { TrashConfirmDialog } from "@/components/TrashConfirmDialog";
 
 const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
@@ -18,12 +19,14 @@ interface NodeProps {
   doc: Document;
   allDocs: Document[];
   spaceId: string;
+  spaceSlug: string;
   depth: number;
   mutate: () => void;
   canEdit: boolean;
 }
 
-function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
+function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: NodeProps) {
+  const spaceRef = { slug: spaceSlug };
   const pathname = usePathname();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -73,8 +76,8 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
       await documentsApi.delete(doc.id);
       mutate();
       setTrashConfirmOpen(false);
-      if (pathname === `/spaces/${spaceId}/docs/${doc.id}`) {
-        router.push(`/spaces/${spaceId}`);
+      if (pathname === spaceDocPath(spaceRef, doc.id)) {
+        router.push(spacePath(spaceRef));
       }
     } finally {
       setDeleting(false);
@@ -95,7 +98,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
 
   const idSet = new Set(allDocs.map((d) => d.id));
   const children = allDocs.filter((d) => d.parentId === doc.id && idSet.has(d.id));
-  const isActive = pathname === `/spaces/${spaceId}/docs/${doc.id}`;
+  const isActive = pathname === spaceDocPath(spaceRef, doc.id);
 
   async function handleCreate(e: React.MouseEvent) {
     e.preventDefault();
@@ -110,7 +113,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
         content: "",
       });
       mutate();
-      router.push(`/spaces/${spaceId}/docs/${created.id}`);
+      router.push(spaceDocPath(spaceRef, created.id));
     } finally {
       setCreating(false);
     }
@@ -151,7 +154,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
           </form>
         ) : (
           <Link
-            href={`/spaces/${spaceId}/docs/${doc.id}`}
+            href={spaceDocPath(spaceRef, doc.id)}
             className={cn(
               "flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-md px-1 py-1.5 text-sm font-medium transition-colors",
               isActive ? navItemActive : navItemIdle,
@@ -242,6 +245,7 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
               doc={child}
               allDocs={allDocs}
               spaceId={spaceId}
+              spaceSlug={spaceSlug}
               depth={depth + 1}
               mutate={mutate}
               canEdit={canEdit}
@@ -255,10 +259,11 @@ function DocNode({ doc, allDocs, spaceId, depth, mutate, canEdit }: NodeProps) {
 
 interface Props {
   spaceId: string;
+  spaceSlug: string;
   canEdit?: boolean;
 }
 
-export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
+export function SpaceDocTree({ spaceId, spaceSlug, canEdit = false }: Props) {
   const router = useRouter();
   const { data: docs = [], mutate } = useSWR<Document[]>(
     `space:${spaceId}:docs`,
@@ -277,7 +282,7 @@ export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
       content: "",
     });
     mutate();
-    router.push(`/spaces/${spaceId}/docs/${created.id}`);
+    router.push(spaceDocPath({ slug: spaceSlug }, created.id));
   }
 
   return (
@@ -288,6 +293,7 @@ export function SpaceDocTree({ spaceId, canEdit = false }: Props) {
           doc={doc}
           allDocs={docs}
           spaceId={spaceId}
+          spaceSlug={spaceSlug}
           depth={0}
           mutate={mutate}
           canEdit={canEdit}

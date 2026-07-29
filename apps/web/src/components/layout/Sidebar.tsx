@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { importDocumentFile } from "@/lib/importDocument";
+import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { SpaceDocTree } from "./SpaceDocTree";
 
 /** Fission sidebar nav item styles — match ui-design-system AppSidebar */
@@ -55,7 +56,7 @@ function SpaceRow({
           <ChevronRight size={12} className={cn("transition-transform", open && "rotate-90")} />
         </button>
         <Link
-          href={`/spaces/${space.id}`}
+          href={spacePath(space)}
           className={cn(
             "flex-1 min-w-0",
             navItemBase,
@@ -77,7 +78,13 @@ function SpaceRow({
           <MoreHorizontal size={12} />
         </button>
       </div>
-      {open && <SpaceDocTree spaceId={space.id} canEdit={space.accessLevel === "edit"} />}
+      {open && (
+        <SpaceDocTree
+          spaceId={space.id}
+          spaceSlug={space.slug}
+          canEdit={space.accessLevel === "edit"}
+        />
+      )}
     </div>
   );
 }
@@ -102,18 +109,19 @@ export function Sidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadSpaceRef = useRef<string>("");
 
-  async function handleFileImport(spaceId: string, file: File) {
+  async function handleFileImport(space: Space, file: File) {
     setSpaceMenu(null);
     try {
-      const doc = await importDocumentFile(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const doc = await importDocumentFile(space.id, file);
+      router.push(spaceDocPath(space, doc.id));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
   }
 
   const spaceMatch = pathname.match(/^\/spaces\/([^/]+)/);
-  const activeSpaceId = spaceMatch?.[1] ?? null;
+  const activeSpaceRef = spaceMatch?.[1] ?? null;
+  const slugById = Object.fromEntries(spaces.map((s) => [s.id, s.slug]));
 
   return (
     <aside
@@ -127,8 +135,9 @@ export function Sidebar() {
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file && uploadSpaceRef.current) {
-            handleFileImport(uploadSpaceRef.current, file);
+          const space = spaces.find((s) => s.id === uploadSpaceRef.current);
+          if (file && space) {
+            void handleFileImport(space, file);
           }
           e.target.value = "";
         }}
@@ -167,7 +176,7 @@ export function Sidebar() {
             <SpaceRow
               key={space.id}
               space={space}
-              isActive={activeSpaceId === space.id}
+              isActive={activeSpaceRef === space.slug || activeSpaceRef === space.id}
               onMenuOpen={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -202,7 +211,7 @@ export function Sidebar() {
               {favDocs.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <Star size={11} className="shrink-0 fill-amber-400 text-amber-400" />
@@ -235,7 +244,7 @@ export function Sidebar() {
               {recentDocs.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <Clock size={11} className="shrink-0 text-sidebar-muted" />
@@ -266,7 +275,7 @@ export function Sidebar() {
               {recentlyUpdated.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <RefreshCw size={11} className="shrink-0 text-sidebar-muted" />

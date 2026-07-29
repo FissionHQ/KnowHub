@@ -2,11 +2,11 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { DocumentView } from "./DocumentView";
 
 interface Props {
-  params: Promise<{ spaceId: string; docId: string }>;
+  params: Promise<{ spaceSlug: string; docId: string }>;
 }
 
 export default async function DocumentPage({ params }: Props) {
-  const { spaceId, docId } = await params;
+  const { spaceSlug, docId } = await params;
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -14,7 +14,7 @@ export default async function DocumentPage({ params }: Props) {
         className="flex-1 overflow-y-auto"
         style={{ marginLeft: "var(--sidebar-width)" }}
       >
-        <DocumentView spaceId={spaceId} docId={docId} />
+        <DocumentView spaceSlug={spaceSlug} docId={docId} />
       </main>
     </div>
   );
