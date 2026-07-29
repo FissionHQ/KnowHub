@@ -21,6 +21,7 @@ const documentFields = {
   parentId: documents.parentId,
   type: documents.type,
   title: documents.title,
+  slug: documents.slug,
   contentRef: documents.contentRef,
   ownerId: documents.ownerId,
   status: documents.status,

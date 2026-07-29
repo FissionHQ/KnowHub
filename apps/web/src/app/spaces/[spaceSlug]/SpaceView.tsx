@@ -41,8 +41,8 @@ export function SpaceView({ spaceSlug }: Props) {
     () => spacesApi.get(spaceSlug),
   );
   const { data: docs = [], isLoading: docsLoading } = useSWR<Document[]>(
-    space ? `space:${space.id}:docs` : null,
-    () => documentsApi.listBySpace(space!.id),
+    space ? `space:${space.slug}:docs` : null,
+    () => documentsApi.listBySpace(space!.slug),
     { revalidateOnFocus: false },
   );
 
@@ -51,7 +51,7 @@ export function SpaceView({ spaceSlug }: Props) {
     setImporting(true);
     try {
       const doc = await importDocumentFile(space.id, file);
-      router.push(spaceDocPath(space, doc.id));
+      router.push(spaceDocPath(space, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     } finally {
@@ -86,7 +86,7 @@ export function SpaceView({ spaceSlug }: Props) {
     return items.map((doc) => {
       const children = getChildren(doc.id);
       const isExpanded = expandedIds.has(doc.id);
-      const href = space ? spaceDocPath(space, doc.id) : `/spaces/${spaceSlug}/docs/${doc.id}`;
+      const href = space ? spaceDocPath(space, doc.slug) : `/spaces/${spaceSlug}/docs/${doc.slug}`;
       return (
         <div key={doc.id}>
           <div

@@ -8,9 +8,11 @@ export function spacePath(
   return `${base}/${segments.join("/")}`;
 }
 
+/** Build `/spaces/{spaceSlug}/docs/{docSlug}`. Accepts a doc object or slug string. */
 export function spaceDocPath(
   space: { slug: string },
-  docId: string,
+  docOrSlug: { slug: string } | string,
 ): string {
-  return spacePath(space, "docs", docId);
+  const docSlug = typeof docOrSlug === "string" ? docOrSlug : docOrSlug.slug;
+  return spacePath(space, "docs", String(docSlug));
 }

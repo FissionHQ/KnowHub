@@ -25,6 +25,8 @@ import {
   isTitleChanged,
   syncDocumentSearchIndex,
   findSpaceByRef,
+  allocateDocumentSlug,
+  findDocumentByRef,
 } from "@wiki/db";
 import { encodeHtmlAsYjsStateBase64, isHtmlContentChanged } from "@wiki/doc-collab";
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from "../../lib/errors.js";
@@ -88,6 +90,7 @@ type DocRowForClient = {
   parentId: string | null;
   type: string;
   title: string;
+  slug: string;
   contentRef: string | null;
   ownerId: string;
   ownerName?: string | null;
@@ -176,6 +179,7 @@ export function createContentRouter(
         parentId: documents.parentId,
         type: documents.type,
         title: documents.title,
+        slug: documents.slug,
         contentRef: documents.contentRef,
         ownerId: documents.ownerId,
         ownerName: users.name,
@@ -275,6 +279,7 @@ export function createContentRouter(
       docType === "pdf"
         ? body.data.content || null
         : body.data.content || "";
+    const slug = await allocateDocumentSlug(db, orgId, body.data.title, docId);
 
     const inserted = await db
       .insert(documents)
@@ -285,6 +290,7 @@ export function createContentRouter(
         parentId: body.data.parentId ?? null,
         type: docType,
         title: body.data.title,
+        slug,
         contentRef,
         ownerId: userId,
         status: "draft",
@@ -299,10 +305,13 @@ export function createContentRouter(
     res.status(201).json({ data: shapeDocumentResponse(inserted[0]!, "edit") });
   });
 
-  // GET /documents/:documentId
+  // GET /documents/:documentId — documentId may be UUID or slug
   router.get("/documents/:documentId", async (req, res) => {
     const { orgId, userRole, userId, groupIds } = req.tenant;
     const { documentId } = req.params;
+
+    const resolved = await findDocumentByRef(db, orgId, documentId ?? "");
+    if (!resolved) throw new NotFoundError("Document");
 
     const rows = await db
       .select({
@@ -312,6 +321,7 @@ export function createContentRouter(
         parentId: documents.parentId,
         type: documents.type,
         title: documents.title,
+        slug: documents.slug,
         contentRef: documents.contentRef,
         ownerId: documents.ownerId,
         ownerName: users.name,
@@ -329,7 +339,7 @@ export function createContentRouter(
       })
       .from(documents)
       .leftJoin(users, eq(documents.ownerId, users.id))
-      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+      .where(and(eq(documents.id, resolved.id), eq(documents.orgId, orgId)));
 
     if (!rows.length) throw new NotFoundError("Document");
     const doc = rows[0]!;
@@ -419,7 +429,7 @@ export function createContentRouter(
     });
   });
 
-  // PATCH /documents/:documentId
+  // PATCH /documents/:documentId — documentId may be UUID or slug
   router.patch("/documents/:documentId", async (req, res) => {
     const body = updateDocSchema.safeParse(req.body);
     if (!body.success) throw new ValidationError(body.error.flatten());
@@ -427,13 +437,9 @@ export function createContentRouter(
     const { orgId, userRole, userId, groupIds } = req.tenant;
     const { documentId } = req.params;
 
-    const rows = await db
-      .select()
-      .from(documents)
-      .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
-
-    if (!rows.length) throw new NotFoundError("Document");
-    const doc = rows[0]!;
+    const doc = await findDocumentByRef(db, orgId, documentId ?? "");
+    if (!doc) throw new NotFoundError("Document");
+    const resolvedId = doc.id;
 
     if (doc.status === "trashed") {
       throw new ConflictError("Document is in trash");
@@ -495,7 +501,7 @@ export function createContentRouter(
       metadataUpdates.status = body.data.status;
     }
 
-    const updated = await db.transaction(async (tx) => {
+    let updated = await db.transaction(async (tx) => {
       await setTenantContext(tx, orgId);
 
       const docRow = {
@@ -539,14 +545,14 @@ export function createContentRouter(
             draftUpdatedBy: null,
             updatedAt: new Date(),
           })
-          .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+          .where(and(eq(documents.id, resolvedId), eq(documents.orgId, orgId)));
 
         if (Object.keys(metadataUpdates).length > 0) {
           metadataUpdates.updatedAt = new Date();
           await tx
             .update(documents)
             .set(metadataUpdates)
-            .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+            .where(and(eq(documents.id, resolvedId), eq(documents.orgId, orgId)));
         }
       } else {
         if (titleWillChange || contentWillChange) {
@@ -563,16 +569,35 @@ export function createContentRouter(
           await tx
             .update(documents)
             .set(metadataUpdates)
-            .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+            .where(and(eq(documents.id, resolvedId), eq(documents.orgId, orgId)));
         }
       }
 
       const result = await tx
         .select()
         .from(documents)
-        .where(and(eq(documents.id, documentId ?? ""), eq(documents.orgId, orgId)));
+        .where(and(eq(documents.id, resolvedId), eq(documents.orgId, orgId)));
       return result[0]!;
     });
+
+    // Keep URL slug in sync with the published/working title.
+    if (updated.title !== doc.title) {
+      const nextSlug = await allocateDocumentSlug(
+        db,
+        orgId,
+        updated.title,
+        updated.id,
+        updated.id,
+      );
+      if (nextSlug !== updated.slug) {
+        const slugRows = await db
+          .update(documents)
+          .set({ slug: nextSlug })
+          .where(and(eq(documents.id, updated.id), eq(documents.orgId, orgId)))
+          .returning();
+        updated = slugRows[0]!;
+      }
+    }
 
     const contentOrMetadataChanged =
       publishing || titleWillChange || contentWillChange || hasMetadata;
@@ -583,17 +608,17 @@ export function createContentRouter(
       (titleWillChange || contentWillChange);
 
     if (contentOrMetadataChanged && !draftEditOnPublished) {
-      await syncSearchIndex(documentId ?? "", orgId, "upsert");
-      await recordRecentlyUpdated(db, userId, documentId ?? "");
+      await syncSearchIndex(resolvedId, orgId, "upsert");
+      await recordRecentlyUpdated(db, userId, resolvedId);
     } else if (titleWillChange || contentWillChange) {
-      await recordRecentlyUpdated(db, userId, documentId ?? "");
+      await recordRecentlyUpdated(db, userId, resolvedId);
     }
 
     // Align collab Yjs with newly published body so reconnect doesn't recreate a draft.
     if (publishing && (updated.type === "page" || updated.contentRef)) {
       await resetCollabStateAfterContentChange(
         orgId,
-        documentId ?? "",
+        resolvedId,
         updated.contentRef ?? "",
       );
     }

@@ -68,18 +68,19 @@ function editorContent(doc: Document): string {
 
 interface Props {
   spaceSlug: string;
-  docId: string;
+  docSlug: string;
 }
 
-export function DocumentView({ spaceSlug, docId }: Props) {
+export function DocumentView({ spaceSlug, docSlug }: Props) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const { data: doc, mutate } = useSWR<Document>(`doc:${docId}`, () => documentsApi.get(docId));
+  const { data: doc, mutate } = useSWR<Document>(`doc:${docSlug}`, () => documentsApi.get(docSlug));
   const { data: space } = useSWR<Space>(`space:${spaceSlug}`, () => spacesApi.get(spaceSlug));
   const { data: parentDoc } = useSWR<Document>(
     doc?.parentId ? `doc:${doc.parentId}` : null,
     () => documentsApi.get(doc!.parentId!),
   );
+  const documentId = doc?.id;
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [content, setContent] = useState("");
@@ -99,14 +100,14 @@ export function DocumentView({ spaceSlug, docId }: Props) {
   const suppressDraftBanner = useRef(false);
 
   const { data: favData, mutate: mutateFav } = useSWR(
-    doc && user ? `fav:${docId}` : null,
-    () => activityApi.isFavorited(docId),
+    documentId && user ? `fav:${documentId}` : null,
+    () => activityApi.isFavorited(documentId!),
   );
   const isFavorited = favData?.favorited ?? false;
 
   const { data: comments = [] } = useSWR<Comment[]>(
-    `comments:${docId}`,
-    () => commentsApi.list(docId),
+    documentId ? `comments:${documentId}` : null,
+    () => commentsApi.list(documentId!),
   );
   const commentCount = comments.filter((c) => !c.parentId).length;
 
@@ -114,13 +115,20 @@ export function DocumentView({ spaceSlug, docId }: Props) {
 
   const collab = useCollaboration({
     orgId: user?.orgId ?? doc?.orgId ?? "",
-    documentId: docId,
+    documentId: documentId ?? "",
     userId: user?.id ?? "",
     userName: user?.name ?? "You",
     canEdit,
     // Viewers must not join the shared draft room — they see published HTML only.
-    enabled: Boolean(user && doc && isEditableDoc(doc) && canEdit && !useFallbackEditor),
+    enabled: Boolean(user && doc && documentId && isEditableDoc(doc) && canEdit && !useFallbackEditor),
   });
+
+  // Canonicalize UUID / stale-slug URLs to the current document slug.
+  useEffect(() => {
+    if (!space || !doc?.slug) return;
+    if (docSlug === doc.slug) return;
+    router.replace(spaceDocPath(space, doc.slug) as never);
+  }, [space, doc, docSlug, router]);
 
   useEffect(() => {
     if (!doc) return;
@@ -145,8 +153,9 @@ export function DocumentView({ spaceSlug, docId }: Props) {
   }, [doc?.editableTitle, doc?.title]);
 
   useEffect(() => {
-    activityApi.recordView(docId).catch(() => {});
-  }, [docId]);
+    if (!documentId) return;
+    activityApi.recordView(documentId).catch(() => {});
+  }, [documentId]);
 
   // If collab never reaches "connected" (port conflict, auth failure, etc.),
   // drop to the REST editor so contentRef still renders.
@@ -190,7 +199,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
     return () => {
       if (followUp) clearTimeout(followUp);
     };
-  }, [collab.saveStatus, useFallbackEditor, docId, mutate, doc?.status]);
+  }, [collab.saveStatus, useFallbackEditor, documentId, mutate, doc?.status]);
 
   const loadPdfUrl = useCallback(async () => {
     if (!doc?.id) return;
@@ -227,7 +236,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
       }
       setSaveStatus("saving");
       try {
-        const updated = await documentsApi.update(docId, { content: html });
+        const updated = await documentsApi.update(documentId!, { content: html });
         setSaveStatus("saved");
         mutate(updated, false);
         // Keep banner while saving; only drop if server confirms no draft.
@@ -236,14 +245,14 @@ export function DocumentView({ spaceSlug, docId }: Props) {
         setSaveStatus("unsaved");
       }
     },
-    [doc, docId, mutate],
+    [doc, documentId, mutate],
   );
 
   async function handleMoveToTrash() {
     if (!doc) return;
     setDeleting(true);
     try {
-      await documentsApi.delete(docId);
+      await documentsApi.delete(documentId!);
       router.push(space ? spacePath(space) : `/spaces/${spaceSlug}`);
     } finally {
       setDeleting(false);
@@ -291,13 +300,16 @@ export function DocumentView({ spaceSlug, docId }: Props) {
     if (currentDoc.status === "published") setLocalDraft(true);
     setSaveStatus("saving");
     try {
-      const updated = await documentsApi.update(docId, { title: trimmed });
+      const updated = await documentsApi.update(documentId!, { title: trimmed });
       mutate(updated, false);
       if (updated.hasUnpublishedChanges) setLocalDraft(true);
-      void globalMutate(space ? `space:${space.id}:docs` : `space:${spaceSlug}:docs`);
+      void globalMutate(space ? `space:${space.slug}:docs` : `space:${spaceSlug}:docs`);
       void globalMutate("favorites");
       void globalMutate("recently-updated");
       setSaveStatus("saved");
+      if (space && updated.slug && updated.slug !== docSlug) {
+        router.replace(spaceDocPath(space, updated.slug) as never);
+      }
     } catch {
       setSaveStatus("unsaved");
     }
@@ -310,7 +322,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
     setLocalDraft(false);
     setDiscarding(true);
     try {
-      const result = await documentsApi.discardDraft(docId);
+      const result = await documentsApi.discardDraft(documentId!);
       mutate(result.document, false);
       setTitle(result.document.title);
       window.setTimeout(() => window.location.reload(), 400);
@@ -352,7 +364,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
           {parentDoc && (
             <>
               <Link
-                href={(space ? spaceDocPath(space, parentDoc.id) : `/spaces/${spaceSlug}/docs/${parentDoc.id}`) as never}
+                href={(space && parentDoc ? spaceDocPath(space, parentDoc.slug) : `/spaces/${spaceSlug}/docs/${parentDoc.slug}`) as never}
                 className="text-muted-foreground hover:text-primary dark:hover:text-primary transition-colors truncate max-w-[160px]"
               >
                 {parentDoc.title}
@@ -409,7 +421,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
               <button
                 type="button"
                 onClick={async () => {
-                  await activityApi.toggleFavorite(docId);
+                  await activityApi.toggleFavorite(documentId!);
                   mutateFav();
                   void globalMutate("favorites");
                 }}
@@ -435,7 +447,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
                   mutate(updated, false);
                   if (opts?.published) {
                     setLocalDraft(false);
-                    void globalMutate(`doc-versions:${docId}`);
+                    void globalMutate(`doc-versions:${documentId}`);
                   }
                 }}
                 onMoveToTrash={handleMoveToTrash}
@@ -510,7 +522,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
                   ydoc={collab.ydoc}
                   provider={collab.provider}
                   readOnly={!canEdit}
-                  documentId={docId}
+                  documentId={documentId!}
                 />
             ) : showFallback ? (
               <RichTextEditor
@@ -519,7 +531,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
                   {...(canEdit ? { onAutoSave: handleAutoSave } : {})}
                   readOnly={!canEdit}
                   title={editorTitle(doc)}
-                  documentId={docId}
+                  documentId={documentId!}
                 />
             ) : null}
           </div>
@@ -529,7 +541,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
             onChange={() => {}}
             readOnly
             title={doc.title}
-            documentId={docId}
+            documentId={documentId!}
           />
         ) : null}
       </div>
@@ -567,7 +579,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
           </span>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <CommentsPanel documentId={docId} defaultOpen />
+          <CommentsPanel documentId={documentId!} defaultOpen />
         </div>
       </div>
 
@@ -599,7 +611,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
           </span>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <DocumentPermissionsPanel documentId={docId} />
+          <DocumentPermissionsPanel documentId={documentId!} />
         </div>
       </div>
       {versionsOpen && (
@@ -625,7 +637,7 @@ export function DocumentView({ spaceSlug, docId }: Props) {
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           <DocumentVersionHistory
-            documentId={docId}
+            documentId={documentId!}
             currentVersion={doc.version}
             canEdit={canEdit}
             defaultOpen

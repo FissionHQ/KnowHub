@@ -34,7 +34,7 @@ export function SpacesList() {
     try {
       const doc = await importDocumentFile(spaceId, file);
       const slug = slugById[spaceId] ?? spaceId;
-      router.push(`/spaces/${slug}/docs/${doc.id}`);
+      router.push(`/spaces/${slug}/docs/${doc.slug}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     } finally {
@@ -113,7 +113,7 @@ export function SpacesList() {
                   {recentDocs.slice(0, 5).map((doc) => (
                     <Link
                       key={doc.id}
-                      href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
+                      href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                       className="text-sm text-muted-foreground hover:text-primary truncate py-1"
                     >
                       {doc.title}
@@ -134,7 +134,7 @@ export function SpacesList() {
                   {recentlyUpdated.slice(0, 5).map((doc) => (
                     <Link
                       key={doc.id}
-                      href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
+                      href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                       className="text-sm text-muted-foreground hover:text-primary truncate py-1"
                     >
                       {doc.title}

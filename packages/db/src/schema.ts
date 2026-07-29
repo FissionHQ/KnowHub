@@ -167,6 +167,8 @@ export const documents = pgTable(
     parentId: uuid("parent_id"),
     type: documentTypeEnum("type").notNull().default("page"),
     title: text("title").notNull(),
+    /** URL-safe unique-per-org identifier (`{title-slug}-{shortId}`). */
+    slug: text("slug").notNull(),
     contentRef: text("content_ref"),
     ownerId: uuid("owner_id")
       .notNull()
@@ -212,6 +214,7 @@ export const documents = pgTable(
     index("documents_owner_id_idx").on(t.ownerId),
     index("documents_status_idx").on(t.status),
     index("documents_trashed_at_idx").on(t.trashedAt),
+    unique("documents_org_slug_unique").on(t.orgId, t.slug),
   ],
 );
 

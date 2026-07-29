@@ -113,7 +113,7 @@ export function Sidebar() {
     setSpaceMenu(null);
     try {
       const doc = await importDocumentFile(space.id, file);
-      router.push(spaceDocPath(space, doc.id));
+      router.push(spaceDocPath(space, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -211,7 +211,7 @@ export function Sidebar() {
               {favDocs.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <Star size={11} className="shrink-0 fill-amber-400 text-amber-400" />
@@ -244,7 +244,7 @@ export function Sidebar() {
               {recentDocs.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <Clock size={11} className="shrink-0 text-sidebar-muted" />
@@ -275,7 +275,7 @@ export function Sidebar() {
               {recentlyUpdated.slice(0, 5).map((doc) => (
                 <Link
                   key={doc.id}
-                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.id}`}
+                  href={`/spaces/${slugById[doc.spaceId] ?? doc.spaceId}/docs/${doc.slug}`}
                   className={cn(navItemBase, "gap-2 pl-6 pr-3 py-1.5", navItemIdle)}
                 >
                   <RefreshCw size={11} className="shrink-0 text-sidebar-muted" />

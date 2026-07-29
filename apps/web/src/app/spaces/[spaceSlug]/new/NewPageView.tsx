@@ -41,7 +41,7 @@ export function NewPageView({ spaceSlug }: Props) {
         });
 
         if (!cancelled) {
-          router.replace(spaceDocPath(space!, doc.id));
+          router.replace(spaceDocPath(space!, doc.slug));
         }
       } catch (err) {
         if (!cancelled) {

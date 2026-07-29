@@ -16,6 +16,7 @@ import {
   spaces,
   users,
 } from "./schema.js";
+import { buildDocumentSlug } from "./documentSlug.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -213,6 +214,7 @@ async function main() {
       spaceId: doc.spaceId,
       type: "page",
       title: doc.title,
+      slug: buildDocumentSlug(doc.title, doc.id),
       contentRef: doc.content,
       ownerId: IDS.admin,
       status: "published",

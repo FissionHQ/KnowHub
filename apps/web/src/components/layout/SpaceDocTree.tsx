@@ -76,7 +76,7 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
       await documentsApi.delete(doc.id);
       mutate();
       setTrashConfirmOpen(false);
-      if (pathname === spaceDocPath(spaceRef, doc.id)) {
+      if (pathname === spaceDocPath(spaceRef, doc.slug)) {
         router.push(spacePath(spaceRef));
       }
     } finally {
@@ -88,17 +88,23 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
     e.preventDefault();
     const trimmed = renameValue.trim();
     if (trimmed && trimmed !== doc.title) {
-      await documentsApi.update(doc.id, { title: trimmed });
+      const wasActive = pathname === spaceDocPath(spaceRef, doc.slug);
+      const updated = await documentsApi.update(doc.id, { title: trimmed });
       mutate();
       void globalMutate(`doc:${doc.id}`);
+      void globalMutate(`doc:${doc.slug}`);
+      void globalMutate(`doc:${updated.slug}`);
       void globalMutate("favorites");
+      if (wasActive) {
+        router.replace(spaceDocPath(spaceRef, updated.slug) as never);
+      }
     }
     setRenaming(false);
   }
 
   const idSet = new Set(allDocs.map((d) => d.id));
   const children = allDocs.filter((d) => d.parentId === doc.id && idSet.has(d.id));
-  const isActive = pathname === spaceDocPath(spaceRef, doc.id);
+  const isActive = pathname === spaceDocPath(spaceRef, doc.slug);
 
   async function handleCreate(e: React.MouseEvent) {
     e.preventDefault();
@@ -113,7 +119,7 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
         content: "",
       });
       mutate();
-      router.push(spaceDocPath(spaceRef, created.id));
+      router.push(spaceDocPath(spaceRef, created.slug));
     } finally {
       setCreating(false);
     }
@@ -154,7 +160,7 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
           </form>
         ) : (
           <Link
-            href={spaceDocPath(spaceRef, doc.id)}
+            href={spaceDocPath(spaceRef, doc.slug)}
             className={cn(
               "flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-md px-1 py-1.5 text-sm font-medium transition-colors",
               isActive ? navItemActive : navItemIdle,
@@ -266,8 +272,8 @@ interface Props {
 export function SpaceDocTree({ spaceId, spaceSlug, canEdit = false }: Props) {
   const router = useRouter();
   const { data: docs = [], mutate } = useSWR<Document[]>(
-    `space:${spaceId}:docs`,
-    () => documentsApi.listBySpace(spaceId),
+    `space:${spaceSlug}:docs`,
+    () => documentsApi.listBySpace(spaceSlug),
     { revalidateOnFocus: false },
   );
 
@@ -282,7 +288,7 @@ export function SpaceDocTree({ spaceId, spaceSlug, canEdit = false }: Props) {
       content: "",
     });
     mutate();
-    router.push(spaceDocPath({ slug: spaceSlug }, created.id));
+    router.push(spaceDocPath({ slug: spaceSlug }, created.slug));
   }
 
   return (

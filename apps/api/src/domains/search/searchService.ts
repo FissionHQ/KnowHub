@@ -12,6 +12,7 @@ export type SearchContext = {
 
 type SearchRow = {
   document_id: string;
+  document_slug: string;
   space_id: string;
   space_slug: string;
   type: string;
@@ -308,6 +309,7 @@ export async function searchDocuments(
   const rows = await db.execute<SearchRow>(sql`
     SELECT
       d.id AS document_id,
+      d.slug AS document_slug,
       d.space_id,
       s.slug AS space_slug,
       d.type,
@@ -346,6 +348,7 @@ export async function searchDocuments(
 
     const hit: SearchResponse["hits"][number] = {
       documentId: row.document_id,
+      documentSlug: row.document_slug,
       spaceId: row.space_id,
       spaceSlug: row.space_slug,
       type: row.type as SearchResponse["hits"][number]["type"],

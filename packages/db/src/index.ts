@@ -11,3 +11,4 @@ export * from "./htmlToPlainText.js";
 export * from "./resolveIndexAcl.js";
 export * from "./syncDocumentSearchIndex.js";
 export * from "./spaceSlug.js";
+export * from "./documentSlug.js";
