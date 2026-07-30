@@ -36,9 +36,11 @@ function aclFilter(ctx: SearchContext): SQL {
   if (!ctx.groupIds.length) {
     return sql`d.search_acl_user_ids @> ARRAY[${ctx.userId}::uuid]`;
   }
+  // Drizzle/postgres.js cannot bind JS arrays as uuid[]; use a PG array literal.
+  const groupIdsLiteral = `{${ctx.groupIds.join(",")}}`;
   return sql`(
     d.search_acl_user_ids @> ARRAY[${ctx.userId}::uuid]
-    OR d.search_acl_group_ids && ${ctx.groupIds}::uuid[]
+    OR d.search_acl_group_ids && ${groupIdsLiteral}::uuid[]
   )`;
 }
 
