@@ -245,7 +245,20 @@ export function UsersSection() {
                           variant="secondary"
                           size="sm"
                           onClick={() => {
-                            void navigator.clipboard.writeText(publicInviteUrl(invite.inviteUrl));
+                            const url = publicInviteUrl(invite.inviteUrl);
+                            if (navigator.clipboard?.writeText) {
+                              void navigator.clipboard.writeText(url).then(() => toast("Link copied", "success")).catch(() => toast("Failed to copy", "error"));
+                            } else {
+                              const el = document.createElement("textarea");
+                              el.value = url;
+                              el.style.position = "fixed";
+                              el.style.opacity = "0";
+                              document.body.appendChild(el);
+                              el.select();
+                              document.execCommand("copy");
+                              document.body.removeChild(el);
+                              toast("Link copied", "success");
+                            }
                           }}
                         >
                           Copy link
