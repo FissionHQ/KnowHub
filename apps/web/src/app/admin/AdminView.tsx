@@ -40,7 +40,7 @@ export function AdminView() {
 
   if (isLoading) {
     return (
-      <div className="p-8 max-w-5xl mx-auto space-y-4">
+      <div className="p-8 max-w-8xl mx-auto space-y-4">
         <Skeleton className="w-48 h-8 rounded-lg" />
         <Skeleton className="w-full h-64 rounded-xl" />
       </div>
@@ -71,7 +71,7 @@ export function AdminView() {
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 max-w-8xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Administration</h1>
         <p className="text-muted-foreground text-sm mt-1">

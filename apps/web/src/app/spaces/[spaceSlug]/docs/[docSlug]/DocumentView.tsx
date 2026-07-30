@@ -39,6 +39,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { spaceDocPath, spacePath } from "@/lib/spacePath";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const PdfViewer = dynamic(
   () => import("@/components/pdf/PdfViewer").then((m) => ({ default: m.PdfViewer })),
@@ -95,6 +96,7 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
   const loadedDocId = useRef<string | null>(null);
   const prevCollabSaveStatus = useRef<SaveStatus>("saved");
   const [discarding, setDiscarding] = useState(false);
+  const { toast } = useToast();
   /** Optimistic draft UI — Discard always resets collab + reloads, so this is safe. */
   const [localDraft, setLocalDraft] = useState(false);
   const suppressDraftBanner = useRef(false);
@@ -253,7 +255,14 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
     setDeleting(true);
     try {
       await documentsApi.delete(documentId!);
+      void globalMutate(space ? `space:${space.slug}:docs` : `space:${spaceSlug}:docs`);
+      void globalMutate("recently-updated");
+      void globalMutate("recent");
+      void globalMutate("admin:trash");
+      toast(`"${doc.title}" moved to trash`, "success");
       router.push(space ? spacePath(space) : `/spaces/${spaceSlug}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to move to trash", "error");
     } finally {
       setDeleting(false);
     }
@@ -421,9 +430,14 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
               <button
                 type="button"
                 onClick={async () => {
-                  await activityApi.toggleFavorite(documentId!);
-                  mutateFav();
-                  void globalMutate("favorites");
+                  try {
+                    await activityApi.toggleFavorite(documentId!);
+                    mutateFav();
+                    void globalMutate("favorites");
+                    toast(isFavorited ? "Removed from bookmarks" : "Bookmarked", "success");
+                  } catch {
+                    toast("Failed to update bookmark", "error");
+                  }
                 }}
                 title={isFavorited ? "Remove from bookmarks" : "Bookmark this page"}
                 className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
@@ -731,6 +745,8 @@ function DocumentActionsMenu({
     }
   }
 
+  const { toast } = useToast();
+
   async function handlePublish() {
     setPublishing(true);
     setOpen(false);
@@ -747,6 +763,9 @@ function DocumentActionsMenu({
           : {}),
       });
       onUpdate(updated, { published: true });
+      toast("Document published", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to publish", "error");
     } finally {
       setPublishing(false);
     }

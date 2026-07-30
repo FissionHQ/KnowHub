@@ -33,7 +33,7 @@ import { SpaceDocTree } from "./SpaceDocTree";
 const navItemBase =
   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors";
 const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
-const navItemActive = "bg-sidebar-accent text-primary";
+const navItemActive = "text-primary";
 
 /** Survives Sidebar remounts when navigating between pages. */
 const expandedSpaceIds = new Set<string>();

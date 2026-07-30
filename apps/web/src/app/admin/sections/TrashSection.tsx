@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import { documentsApi } from "@/lib/api";
 import type { TrashedDocument } from "@wiki/types";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,9 @@ export function TrashSection() {
     try {
       await documentsApi.restore(item.id);
       await mutate();
+      void globalMutate((key: string) => typeof key === "string" && key.endsWith(":docs"), undefined, { revalidate: true });
+      void globalMutate("recently-updated");
+      void globalMutate("recent");
       toast(`"${item.title}" restored to ${item.spaceName}`, "success");
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to restore document", "error");

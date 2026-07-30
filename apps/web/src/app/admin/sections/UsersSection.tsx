@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
 import { groupsApi, usersApi } from "@/lib/api";
 import { UserGroupChips, GroupSelectChips } from "@/components/admin/GroupMembershipChips";
@@ -10,6 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/Select";
 import { Pagination } from "@/components/ui/Pagination";
+import { useToast } from "@/components/ui/ToastProvider";
+import { UserX, Loader2 } from "lucide-react";
 
 const USERS_PAGE_SIZE = 10;
 const INVITES_PAGE_SIZE = 10;
@@ -47,6 +50,9 @@ export function UsersSection() {
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [usersPage, setUsersPage] = useState(0);
   const [invitesPage, setInvitesPage] = useState(0);
+  const [deactivateTarget, setDeactivateTarget] = useState<User | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
+  const { toast } = useToast();
 
   const pagedUsers = users.slice(usersPage * USERS_PAGE_SIZE, (usersPage + 1) * USERS_PAGE_SIZE);
   const pagedInvites = invites.slice(invitesPage * INVITES_PAGE_SIZE, (invitesPage + 1) * INVITES_PAGE_SIZE);
@@ -59,10 +65,14 @@ export function UsersSection() {
     try {
       if (isMember) {
         await groupsApi.removeMember(groupId, userId);
+        toast("Removed from group", "success");
       } else {
         await groupsApi.addMembers(groupId, [userId]);
+        toast("Added to group", "success");
       }
       await mutateMemberships();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update group", "error");
     } finally {
       setBusyUserId(null);
     }
@@ -83,29 +93,54 @@ export function UsersSection() {
       await mutate();
       await mutateInvites();
       await mutateMemberships();
+      toast(`Invitation sent to ${email}`, "success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to invite user");
+      toast(err instanceof Error ? err.message : "Failed to invite user", "error");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function changeRole(user: User, nextRole: UserRole) {
-    await usersApi.changeRole(user.id, nextRole);
-    await mutate();
+    try {
+      await usersApi.changeRole(user.id, nextRole);
+      await mutate();
+      toast(`${user.name}'s role updated to ${nextRole}`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update role", "error");
+    }
   }
 
   async function deactivate(user: User) {
-    if (!confirm(`Deactivate ${user.email}?`)) return;
-    await usersApi.deactivate(user.id);
-    await mutate();
-    await mutateInvites();
+    setDeactivateTarget(user);
+  }
+
+  async function confirmDeactivate() {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      await usersApi.deactivate(deactivateTarget.id);
+      await mutate();
+      await mutateInvites();
+      toast(`${deactivateTarget.name} deactivated`, "success");
+      setDeactivateTarget(null);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to deactivate user", "error");
+    } finally {
+      setDeactivating(false);
+    }
   }
 
   async function resendInvite(userId: string) {
-    const result = await usersApi.resendInvite(userId);
-    setLastInviteUrl(publicInviteUrl(result.inviteUrl));
-    await mutateInvites();
+    try {
+      const result = await usersApi.resendInvite(userId);
+      setLastInviteUrl(publicInviteUrl(result.inviteUrl));
+      await mutateInvites();
+      toast("Invitation resent", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to resend invite", "error");
+    }
   }
 
   function toggleGroup(groupId: string) {
@@ -329,6 +364,60 @@ export function UsersSection() {
           />
         </CardContent>
       </Card>
+
+      {deactivateTarget && typeof window !== "undefined" && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[10000] bg-black/40 backdrop-blur-[1px]"
+            onClick={deactivating ? undefined : () => setDeactivateTarget(null)}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4 pointer-events-none">
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="pointer-events-auto w-full max-w-sm rounded-xl border border-border bg-card text-card-foreground shadow-xl"
+            >
+              <div className="px-5 pt-5 pb-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shrink-0">
+                    <UserX size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold text-foreground">Deactivate user?</h2>
+                    <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                      <span className="font-medium text-foreground/80">{deactivateTarget.name}</span>
+                      {" "}({deactivateTarget.email}) will lose access to the platform. This can be reversed by re-inviting them.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-border bg-muted/50 rounded-b-xl">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDeactivateTarget(null)}
+                  disabled={deactivating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => void confirmDeactivate()}
+                  disabled={deactivating}
+                >
+                  {deactivating ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Deactivate
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>,
+        document.body,
+      )}
     </div>
   );
 }

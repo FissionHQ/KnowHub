@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Users, User as UserIcon, Globe, Lock } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import type { DocumentVisibility } from "@wiki/types";
+import { useToast } from "@/components/ui/ToastProvider";
 
 function canGrantDocumentPermissionToUser(
   actorRole: UserRole,
@@ -34,6 +35,7 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("view");
   const [submitting, setSubmitting] = useState(false);
   const [savingVisibility, setSavingVisibility] = useState(false);
+  const { toast } = useToast();
 
   const { data, error, mutate, isLoading } = useSWR(
     `doc-perms:${documentId}`,
@@ -56,6 +58,9 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
     try {
       const updated = await documentsApi.update(documentId, { visibility: next });
       await mutateDoc(updated, false);
+      toast(`Access mode set to ${next}`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update access mode", "error");
     } finally {
       setSavingVisibility(false);
     }
@@ -102,20 +107,33 @@ export function DocumentPermissionsPanel({ documentId }: Props) {
       });
       setGranteeId("");
       await mutate();
+      toast("Permission added", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to add permission", "error");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleAccessChange(permissionId: string, level: AccessLevel) {
-    await documentsApi.updatePermission(documentId, permissionId, level);
-    await mutate();
+    try {
+      await documentsApi.updatePermission(documentId, permissionId, level);
+      await mutate();
+      toast("Permission updated", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update permission", "error");
+    }
   }
 
   async function handleRemove(permissionId: string, label: string) {
     if (!confirm(`Remove permission override for ${label}?`)) return;
-    await documentsApi.deletePermission(documentId, permissionId);
-    await mutate();
+    try {
+      await documentsApi.deletePermission(documentId, permissionId);
+      await mutate();
+      toast("Permission removed", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to remove permission", "error");
+    }
   }
 
   return (
