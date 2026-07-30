@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { documentsApi } from "@/lib/api";
 import type { DocumentVersionListItem } from "@wiki/types";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Eye } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 
 interface Props {
@@ -49,10 +49,26 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
     () => documentsApi.getVersions(documentId),
   );
   const [restoring, setRestoring] = useState<number | null>(null);
+  const sessionKey = `viewing-version:${documentId}`;
+  const [viewingVersion, setViewingVersion] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = sessionStorage.getItem(sessionKey);
+    return stored ? Number(stored) : null;
+  });
+  const prevCurrentVersion = useRef(currentVersion);
 
   useEffect(() => {
     void mutate();
   }, [mutate]);
+
+  // Clear eye only when currentVersion actually advances (new publish happened)
+  useEffect(() => {
+    if (prevCurrentVersion.current !== currentVersion) {
+      prevCurrentVersion.current = currentVersion;
+      setViewingVersion(null);
+      sessionStorage.removeItem(sessionKey);
+    }
+  }, [currentVersion, sessionKey]);
 
   const effectiveCurrentVersion =
     versions.length > 0
@@ -64,6 +80,8 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
     try {
       const result = await documentsApi.restoreVersion(documentId, version.versionNumber);
       await mutate();
+      setViewingVersion(version.versionNumber);
+      sessionStorage.setItem(sessionKey, String(version.versionNumber));
       toast(
         result.document.hasUnpublishedChanges
           ? `Version ${version.versionNumber} loaded into draft — publish when ready`
@@ -89,6 +107,7 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
     <ul className="divide-y divide-border">
       {versions.map((version) => {
         const isCurrent = version.versionNumber === effectiveCurrentVersion;
+        const isViewing = viewingVersion !== null && version.versionNumber === viewingVersion && !isCurrent;
         return (
           <li
             key={version.id ?? `v${version.versionNumber}`}
@@ -111,6 +130,9 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
                 <span className="text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-medium">
                   current
                 </span>
+              )}
+              {isViewing && !isCurrent && (
+                <Eye size={13} className="text-primary shrink-0" />
               )}
               {canEdit && !isCurrent && (
                 <Tooltip>
