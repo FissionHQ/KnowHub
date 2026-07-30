@@ -51,7 +51,7 @@ export function SettingsSection() {
         <h2 className="text-lg font-semibold text-foreground mb-4">
           Organization settings
         </h2>
-        <form onSubmit={handleSave} className="flex flex-col gap-4 max-w-lg">
+        <form onSubmit={handleSave} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-sm text-muted-foreground">Organization name</span>
             <input

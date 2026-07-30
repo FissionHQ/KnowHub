@@ -137,12 +137,9 @@ export function SpaceView({ spaceSlug }: Props) {
                 type="button"
                 onClick={(e) => { e.stopPropagation(); toggleExpand(doc.id); }}
                 className="shrink-0 w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-muted-foreground"
+                style={{ visibility: children.length > 0 ? "visible" : "hidden" }}
               >
-                {children.length > 0 ? (
-                  <ChevronRight size={12} className={clsx("transition-transform", isExpanded && "rotate-90")} />
-                ) : (
-                  <span className="w-1 h-1 rounded-full bg-muted-foreground/40 block" />
-                )}
+                <ChevronRight size={12} className={clsx("transition-transform", isExpanded && "rotate-90")} />
               </button>
               <div
                 className={

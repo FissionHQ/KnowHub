@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Users } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import { Pagination } from "@/components/ui/Pagination";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const PAGE_SIZE = 10;
 
@@ -24,6 +25,7 @@ export function SpacesSection() {
   const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(0);
   const pagedSpaces = spaces.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const { toast } = useToast();
 
   const defaultGroup = groups.find((g) => g.isDefault) ?? groups[0];
   const defaultGroupId = groupId || defaultGroup?.id || "";
@@ -43,6 +45,9 @@ export function SpacesSection() {
       setDescription("");
       setIconEmoji("📄");
       await mutate();
+      toast(`Space "${name}" created`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to create space", "error");
     } finally {
       setSubmitting(false);
     }
@@ -50,8 +55,13 @@ export function SpacesSection() {
 
   async function handleDelete(spaceId: string, spaceName: string) {
     if (!confirm(`Delete space "${spaceName}"? This removes all documents in it.`)) return;
-    await spacesApi.delete(spaceId);
-    await mutate();
+    try {
+      await spacesApi.delete(spaceId);
+      await mutate();
+      toast(`Space "${spaceName}" deleted`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to delete space", "error");
+    }
   }
 
   return (
@@ -141,6 +151,7 @@ function SpaceRow({
   groups: Array<{ id: string; name: string }>;
   onDelete: () => void;
 }) {
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState<SpacePermissionRecord[] | null>(null);
   const [addGroupId, setAddGroupId] = useState("");
@@ -184,6 +195,9 @@ function SpaceRow({
       });
       setDraft(null);
       await mutate();
+      toast("Space access updated", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to save access", "error");
     } finally {
       setSaving(false);
     }

@@ -11,9 +11,10 @@ import { FileText, Plus, ChevronRight, MoreHorizontal, Trash2, PenIcon } from "l
 import { cn } from "@/lib/utils";
 import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { TrashConfirmDialog } from "@/components/TrashConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
-const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
-const navItemActive = "bg-sidebar-accent text-primary";
+const navItemIdle = "text-sidebar-muted";
+const navItemActive = "text-primary";
 
 interface NodeProps {
   doc: Document;
@@ -29,6 +30,7 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
   const spaceRef = { slug: spaceSlug };
   const pathname = usePathname();
   const router = useRouter();
+  const { toast } = useToast();
   const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -75,10 +77,17 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
     try {
       await documentsApi.delete(doc.id);
       mutate();
+      void globalMutate(`space:${spaceSlug}:docs`);
+      void globalMutate("recently-updated");
+      void globalMutate("recent");
+      void globalMutate("admin:trash");
       setTrashConfirmOpen(false);
+      toast(`"${doc.title}" moved to trash`, "success");
       if (pathname === spaceDocPath(spaceRef, doc.slug)) {
         router.push(spacePath(spaceRef));
       }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to move to trash", "error");
     } finally {
       setDeleting(false);
     }
@@ -95,6 +104,8 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
       void globalMutate(`doc:${doc.slug}`);
       void globalMutate(`doc:${updated.slug}`);
       void globalMutate("favorites");
+      void globalMutate("recently-updated");
+      void globalMutate("recent");
       if (wasActive) {
         router.replace(spaceDocPath(spaceRef, updated.slug) as never);
       }
@@ -128,7 +139,7 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
   return (
     <div>
       <div
-        className="group flex items-center gap-1 rounded-md pr-1 transition-colors hover:bg-white/5"
+        className="group flex items-center gap-1 rounded-md pr-1 transition-colors hover:bg-white/5 hover:[&_a]:text-sidebar-foreground"
         style={{ paddingLeft: `${16 + depth * 16}px` }}
       >
         {/* expand/collapse toggle */}
@@ -136,15 +147,9 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
           type="button"
           onClick={() => setExpanded((v) => !v)}
           className="flex h-4 w-4 shrink-0 items-center justify-center text-sidebar-muted transition-colors hover:text-sidebar-foreground"
+          style={{ visibility: children.length > 0 ? "visible" : "hidden" }}
         >
-          {children.length > 0 ? (
-            <ChevronRight
-              size={11}
-              className={cn("transition-transform", expanded && "rotate-90")}
-            />
-          ) : (
-            <span className="block h-1 w-1 rounded-full bg-sidebar-muted" />
-          )}
+          <ChevronRight size={12} className={cn("transition-transform", expanded && "rotate-90")} />
         </button>
 
         {renaming ? (
@@ -162,7 +167,7 @@ function DocNode({ doc, allDocs, spaceId, spaceSlug, depth, mutate, canEdit }: N
           <Link
             href={spaceDocPath(spaceRef, doc.slug)}
             className={cn(
-              "flex min-w-0 flex-1 items-center gap-1.5 truncate rounded-md px-1 py-1.5 text-sm font-medium transition-colors",
+              "flex min-w-0 flex-1 items-center gap-1.5 truncate px-1 py-1.5 text-sm font-medium transition-colors",
               isActive ? navItemActive : navItemIdle,
             )}
           >

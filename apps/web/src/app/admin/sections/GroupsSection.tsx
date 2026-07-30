@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import clsx from "clsx";
 import { Select } from "@/components/ui/Select";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export function GroupsSection() {
   const { data: groups = [], mutate: mutateGroups } = useSWR("admin:groups", groupsApi.list);
@@ -23,6 +24,7 @@ export function GroupsSection() {
   const [submitting, setSubmitting] = useState(false);
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const { toast } = useToast();
 
   async function refreshMembership() {
     await mutateMemberships();
@@ -39,6 +41,9 @@ export function GroupsSection() {
       setName("");
       setDescription("");
       await mutateGroups();
+      toast(`Group "${name}" created`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to create group", "error");
     } finally {
       setSubmitting(false);
     }
@@ -48,10 +53,15 @@ export function GroupsSection() {
     if (!confirm(`Delete group "${groupName}"? Members will lose access granted via this group.`)) {
       return;
     }
-    await groupsApi.delete(groupId);
-    await mutateGroups();
-    await refreshMembership();
-    if (expandedGroupId === groupId) setExpandedGroupId(null);
+    try {
+      await groupsApi.delete(groupId);
+      await mutateGroups();
+      await refreshMembership();
+      if (expandedGroupId === groupId) setExpandedGroupId(null);
+      toast(`Group "${groupName}" deleted`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to delete group", "error");
+    }
   }
 
   async function handleAddMember(groupId: string, userId: string) {
@@ -59,6 +69,9 @@ export function GroupsSection() {
     try {
       await groupsApi.addMembers(groupId, [userId]);
       await refreshMembership();
+      toast("Member added", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to add member", "error");
     } finally {
       setBusyKey(null);
     }
@@ -70,6 +83,9 @@ export function GroupsSection() {
     try {
       await groupsApi.removeMember(groupId, userId);
       await refreshMembership();
+      toast(`${userName} removed from group`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to remove member", "error");
     } finally {
       setBusyKey(null);
     }
