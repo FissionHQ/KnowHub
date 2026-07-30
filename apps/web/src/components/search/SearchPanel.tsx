@@ -283,7 +283,7 @@ export function SearchPanel({
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder={placeholder}
-            className="w-full h-11 pl-9 pr-4 text-sm border border-border rounded-xl bg-card text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-colors"
+            className="w-full h-13 pl-9 pr-4 text-sm border border-border rounded-xl bg-card text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-colors"
           />
           {showSuggestions && (
             <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
@@ -305,7 +305,7 @@ export function SearchPanel({
           type="button"
           variant="outline"
           onClick={() => setShowFilters(!showFilters)}
-          className={`h-11 px-3 border-border relative ${
+          className={`h-13 px-3 border-border relative ${
             hasActiveFilters ? "border-primary/50 text-primary" : ""
           }`}
         >

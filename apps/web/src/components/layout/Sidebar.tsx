@@ -24,7 +24,8 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { importDocumentFile } from "@/lib/importDocument";
+import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
+import { PdfImportModal } from "@/components/PdfImportModal";
 import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { SpaceDocTree } from "./SpaceDocTree";
 
@@ -141,12 +142,45 @@ export function Sidebar() {
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadSpaceRef = useRef<string>("");
+  const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
+  const [pdfModalSpaceId, setPdfModalSpaceId] = useState<string>("");
 
   async function handleFileImport(space: Space, file: File) {
     setSpaceMenu(null);
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      setPdfModalSpaceId(space.id);
+      setPdfModalFile(file);
+      return;
+    }
     try {
       const doc = await importDocumentFile(space.id, file);
       router.push(spaceDocPath(space, doc.slug));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
+    }
+  }
+
+  async function handlePdfConvert() {
+    if (!pdfModalFile) return;
+    const spaceId = pdfModalSpaceId;
+    const file = pdfModalFile;
+    setPdfModalFile(null);
+    try {
+      const doc = await importDocumentFile(spaceId, file);
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to import file");
+    }
+  }
+
+  async function handlePdfAttach() {
+    if (!pdfModalFile) return;
+    const spaceId = pdfModalSpaceId;
+    const file = pdfModalFile;
+    setPdfModalFile(null);
+    try {
+      const doc = await importPdfAsViewer(spaceId, file);
+      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -349,6 +383,15 @@ export function Sidebar() {
           <span>Sign out</span>
         </button>
       </div>
+
+      {pdfModalFile && typeof window !== "undefined" && (
+        <PdfImportModal
+          fileName={pdfModalFile.name}
+          onConvert={() => { void handlePdfConvert(); }}
+          onAttach={() => { void handlePdfAttach(); }}
+          onCancel={() => setPdfModalFile(null)}
+        />
+      )}
 
       {spaceMenu &&
         typeof window !== "undefined" &&
