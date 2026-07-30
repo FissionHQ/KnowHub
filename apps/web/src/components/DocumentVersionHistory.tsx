@@ -134,7 +134,7 @@ export function DocumentVersionHistory({ documentId, currentVersion, canEdit }: 
               {isViewing && !isCurrent && (
                 <Eye size={13} className="text-primary shrink-0" />
               )}
-              {canEdit && !isCurrent && (
+              {canEdit && !isViewing && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button

@@ -833,7 +833,7 @@ export function createContentRouter(
       ownerId: doc.ownerId,
     });
 
-    if (versionNumber === doc.version) {
+    if (versionNumber === doc.version && !hasUnpublishedChanges(doc)) {
       throw new ConflictError("Cannot restore the current version");
     }
 
