@@ -51,4 +51,6 @@ USER wikiapi
 ENV NODE_ENV=production
 EXPOSE 3001
 
+# Migrations (run against RDS before/at deploy — do NOT use pnpm inside this image):
+#   docker run --rm -e DATABASE_URL=... knowhub-api node packages/db/dist/migrate.js
 CMD ["node", "apps/api/dist/server.js"]

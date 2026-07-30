@@ -309,8 +309,25 @@ docker build -f apps/web/Dockerfile -t knowhub-web \
 ### Deploy steps
 
 1. Set environment variables from `.env.example` (omit LocalStack/MailHog endpoints in prod).
-2. `pnpm install --frozen-lockfile && pnpm build` (or use Docker images above).
-3. Run migrations: `DATABASE_URL=<prod-url> pnpm db:migrate`
+2. Build Docker images (see above) — or `pnpm install --frozen-lockfile && pnpm build` on a full checkout.
+3. Run migrations **before** rolling API (either method):
+
+   **Preferred — from the API image (no pnpm / no interactive Corepack):**
+   ```bash
+   docker run --rm -e DATABASE_URL=<prod-url> knowhub-api \
+     node packages/db/dist/migrate.js
+   ```
+
+   **Alternative — from a full repo checkout (not inside the API container):**
+   ```bash
+   corepack enable && corepack prepare pnpm@9.15.0 --activate
+   pnpm install --frozen-lockfile
+   DATABASE_URL=<prod-url> pnpm db:migrate
+   ```
+
+   Do **not** run `pnpm install` / `pnpm db:migrate` inside the production API container —
+   that image is not a full pnpm workspace and will fail with `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`.
+
 4. Backfill search index: `DATABASE_URL=<prod-url> pnpm --filter @wiki/db db:reindex`
 5. Start all four services. **Do not** run `pnpm db:seed` in production.
 
