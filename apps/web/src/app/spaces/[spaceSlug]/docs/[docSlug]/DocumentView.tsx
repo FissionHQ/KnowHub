@@ -159,18 +159,13 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
     activityApi.recordView(documentId).catch(() => {});
   }, [documentId]);
 
-  // If collab never reaches "connected" (port conflict, auth failure, etc.),
-  // drop to the REST editor so contentRef still renders.
+  // Fall back to REST only after collab has failed — not while still connecting.
   useEffect(() => {
     if (!doc || !isEditableDoc(doc) || useFallbackEditor) return;
-    if (collab.status === "connected") return;
+    if (collab.status !== "disconnected") return;
 
     const timer = setTimeout(() => {
-      setUseFallbackEditor((prev) => {
-        if (prev) return prev;
-        // Capture may be stale; falling back when still not connected is safe.
-        return true;
-      });
+      setUseFallbackEditor((prev) => (prev ? prev : true));
     }, 4000);
 
     return () => clearTimeout(timer);
@@ -547,7 +542,14 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
                   title={editorTitle(doc)}
                   documentId={documentId!}
                 />
-            ) : null}
+            ) : (
+              <Card>
+                <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-muted-foreground p-5">
+                  <Clock size={18} className="animate-pulse" />
+                  <span className="text-sm">Connecting to collaborative editor…</span>
+                </CardContent>
+              </Card>
+            )}
           </div>
         ) : showPublishedReadonly ? (
           <RichTextEditor

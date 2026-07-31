@@ -37,19 +37,30 @@ function countPresence(
   const editors = new Set<string>();
   const viewers = new Set<string>();
 
-  states.forEach((state) => {
+  for (const state of states.values()) {
     const user = state.user as CollabAwarenessUser | undefined;
-    if (!user?.id) return;
+    if (!user?.id) continue;
     if (user.mode === "edit") editors.add(user.id);
     else viewers.add(user.id);
-  });
+  }
 
-  if (editors.size === 0 && viewers.size === 0 && isConnected) {
-    if (self.canEdit) editors.add(self.userId);
-    else viewers.add(self.userId);
+  // Count self while awareness is still propagating (unique per user, not per tab).
+  if (isConnected && self.canEdit && !editors.has(self.userId)) {
+    editors.add(self.userId);
+  } else if (isConnected && !self.canEdit && !viewers.has(self.userId)) {
+    viewers.add(self.userId);
   }
 
   return { editors: editors.size, viewers: viewers.size };
+}
+
+function clearLocalAwareness(provider: HocuspocusProvider | null): void {
+  if (!provider?.awareness) return;
+  try {
+    provider.awareness.setLocalState(null);
+  } catch {
+    // Provider may already be torn down.
+  }
 }
 
 export function useCollaboration({
@@ -62,22 +73,27 @@ export function useCollaboration({
 }: Options) {
   const [status, setStatus] = useState<CollabStatus>("connecting");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
-  const [presence, setPresence] = useState<PresenceCounts>({ editors: 0, viewers: 1 });
-
-  // stable holds the last successfully synced pair — never cleared on navigation,
-  // so the old editor stays visible while the new one is connecting.
+  const [presence, setPresence] = useState<PresenceCounts>({ editors: 0, viewers: 0 });
   const [stable, setStable] = useState<StablePair | null>(null);
 
   const pendingYdoc = useMemo(() => new Y.Doc(), [documentId]);
   const userColor = useMemo(() => colorForUser(userId), [userId]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canEditRef = useRef(canEdit);
+  const documentIdRef = useRef(documentId);
 
-  useEffect(() => { canEditRef.current = canEdit; }, [canEdit]);
-
-  // Sync awareness when stable provider or user identity changes
   useEffect(() => {
-    if (!stable?.provider) return;
+    canEditRef.current = canEdit;
+  }, [canEdit]);
+
+  useEffect(() => {
+    documentIdRef.current = documentId;
+  }, [documentId]);
+
+  // Publish local awareness only for the active document's provider.
+  useEffect(() => {
+    if (!stable?.provider || stable.documentId !== documentId) return;
+
     stable.provider.setAwarenessField("user", {
       id: userId,
       name: userName,
@@ -86,13 +102,16 @@ export function useCollaboration({
     } satisfies CollabAwarenessUser);
 
     const states = stable.provider.awareness?.getStates() ?? new Map();
-    setPresence(countPresence(states, { userId, canEdit }, stable.provider.isConnected));
-  }, [stable, userId, userName, userColor, canEdit]);
+    setPresence(
+      countPresence(states, { userId, canEdit }, stable.provider.isConnected),
+    );
+  }, [stable, documentId, userId, userName, userColor, canEdit]);
 
   useEffect(() => {
     if (!enabled || !orgId || !documentId || !userId) {
       setStatus("disconnected");
-      setPresence(canEdit ? { editors: 1, viewers: 0 } : { editors: 0, viewers: 1 });
+      setStable(null);
+      setPresence({ editors: 0, viewers: 0 });
       return;
     }
 
@@ -101,6 +120,11 @@ export function useCollaboration({
     let onDocUpdate: ((_update: Uint8Array, origin: unknown) => void) | null = null;
     let markSynced: (() => void) | null = null;
     let refreshPresence: (() => void) | null = null;
+
+    setStatus("connecting");
+    setStable(null);
+    setSaveStatus("saved");
+    setPresence({ editors: 0, viewers: 0 });
 
     void (async () => {
       const token = await fetchCollaborationToken();
@@ -124,7 +148,8 @@ export function useCollaboration({
           if (!cancelled) setStatus("disconnected");
         },
         onStatus: ({ status: next }) => {
-          if (!cancelled) setStatus(next === "connected" ? "connected" : "connecting");
+          if (cancelled) return;
+          setStatus(next === "connected" ? "connected" : "connecting");
         },
         onAuthenticationFailed: () => {
           if (cancelled) return;
@@ -133,7 +158,7 @@ export function useCollaboration({
         },
         onSynced: () => {
           if (cancelled || !collabProvider) return;
-          // Atomically promote pending → stable only after sync
+          if (documentIdRef.current !== documentId) return;
           setStable({ ydoc: pendingYdoc, provider: collabProvider, documentId });
           setSaveStatus("saved");
         },
@@ -141,6 +166,7 @@ export function useCollaboration({
 
       markSynced = () => {
         if (cancelled || !collabProvider) return;
+        if (documentIdRef.current !== documentId) return;
         setStable({ ydoc: pendingYdoc, provider: collabProvider, documentId });
         setSaveStatus("saved");
       };
@@ -149,10 +175,14 @@ export function useCollaboration({
       if (collabProvider.isSynced) markSynced();
 
       refreshPresence = () => {
-        if (!collabProvider) return;
+        if (!collabProvider || cancelled) return;
         const states = collabProvider.awareness?.getStates() ?? new Map();
         setPresence(
-          countPresence(states, { userId, canEdit: canEditRef.current }, collabProvider.isConnected),
+          countPresence(
+            states,
+            { userId, canEdit: canEditRef.current },
+            collabProvider.isConnected,
+          ),
         );
       };
 
@@ -177,13 +207,13 @@ export function useCollaboration({
       if (collabProvider) {
         if (markSynced) collabProvider.off("synced", markSynced);
         if (refreshPresence) collabProvider.awareness?.off("change", refreshPresence);
+        clearLocalAwareness(collabProvider);
         collabProvider.destroy();
       }
-      // Do NOT clear stable — keep old editor visible during navigation
+      setStable(null);
     };
   }, [enabled, orgId, documentId, userId, pendingYdoc]);
 
-  // Expose stable pair if it matches current documentId, else null
   const currentStable = stable?.documentId === documentId ? stable : null;
 
   return {

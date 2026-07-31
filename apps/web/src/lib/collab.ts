@@ -65,7 +65,7 @@ export function formatPresenceLabel(
   if (parts.length > 0) return parts.join(", ");
 
   if (status === "disconnected") {
-    return canEdit ? "1 editing" : "1 viewing";
+    return canEdit ? "Offline" : "Offline";
   }
 
   return canEdit ? "1 editing" : "1 viewing";

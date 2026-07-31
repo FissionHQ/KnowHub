@@ -27,7 +27,7 @@ const redisSubscriber = new Redis(env.REDIS_URL);
 
 const server = Server.configure({
   port: env.COLLAB_PORT,
-  extensions: [new RedisExtension({ redis })],
+  extensions: [new RedisExtension({ redis, prefix: "knowhub-collab" })],
 
   async onRequest({ request, response }) {
     const path = request.url?.split("?")[0];
@@ -68,6 +68,7 @@ const server = Server.configure({
     try {
       await loadCollabDocument(
         db,
+        redis,
         context.orgId as string,
         context.documentId as string,
         document,
@@ -90,7 +91,7 @@ const server = Server.configure({
     const userId = (context.user as { id?: string } | undefined)?.id;
 
     if (orgId && documentId) {
-      recordLastEditor(orgId, documentId, userId);
+      recordLastEditor(redis, orgId, documentId, userId);
     }
   },
 
@@ -99,7 +100,7 @@ const server = Server.configure({
     const documentId = context.documentId as string;
 
     await storeCollabYjsState(db, orgId, documentId, document);
-    scheduleHtmlPersist(db, orgId, documentId, document);
+    scheduleHtmlPersist(db, redis, orgId, documentId, document);
   },
 });
 

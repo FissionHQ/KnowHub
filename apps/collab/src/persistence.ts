@@ -1,5 +1,6 @@
 import * as Y from "yjs";
 import { eq, and } from "drizzle-orm";
+import type { Redis } from "ioredis";
 import type { Db } from "@wiki/db";
 import {
   documents,
@@ -61,12 +62,13 @@ async function seedFromHtml(
 
 export async function loadCollabDocument(
   db: Db,
+  redis: Redis,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
 ): Promise<void> {
   // No editor yet — reconnect/load must not create a draft from serialize noise.
-  clearLastEditor(orgId, documentId);
+  clearLastEditor(redis, orgId, documentId);
 
   await setTenantContext(db, orgId);
 
@@ -114,6 +116,7 @@ export async function storeCollabYjsState(
 
 export function scheduleHtmlPersist(
   db: Db,
+  redis: Redis,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -126,7 +129,7 @@ export function scheduleHtmlPersist(
     key,
     setTimeout(() => {
       persistTimers.delete(key);
-      void persistHtmlAndIndex(db, orgId, documentId, ydoc).catch((err) => {
+      void persistHtmlAndIndex(db, redis, orgId, documentId, ydoc).catch((err) => {
         logger.error("Failed to persist collaborative document", {
           documentId,
           orgId,
@@ -139,6 +142,7 @@ export function scheduleHtmlPersist(
 
 async function persistHtmlAndIndex(
   db: Db,
+  redis: Redis,
   orgId: string,
   documentId: string,
   ydoc: Y.Doc,
@@ -148,7 +152,7 @@ async function persistHtmlAndIndex(
     return;
   }
 
-  const editedBy = getLastEditor(orgId, documentId);
+  const editedBy = await getLastEditor(redis, orgId, documentId);
 
   const saved = await db.transaction(async (tx) => {
     await setTenantContext(tx, orgId);
