@@ -42,7 +42,8 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: http://api:3001
-        NEXT_PUBLIC_COLLAB_WS_URL: ws://localhost:3003
+        # Browser-facing URL — must match the host you open in the browser (not localhost on remote deploy).
+        NEXT_PUBLIC_COLLAB_WS_URL: ${NEXT_PUBLIC_COLLAB_WS_URL:-ws://localhost:3003}
     environment:
       NEXT_PUBLIC_API_URL: http://api:3001
     ports:

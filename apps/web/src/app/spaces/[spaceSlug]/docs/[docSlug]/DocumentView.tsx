@@ -17,6 +17,7 @@ import { ydocToHtml } from "@wiki/doc-collab";
 import { formatPresenceLabel } from "@/lib/collab";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle2,
@@ -161,7 +162,7 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
 
   // Fall back to REST only after collab has failed — not while still connecting.
   useEffect(() => {
-    if (!doc || !isEditableDoc(doc) || useFallbackEditor) return;
+    if (!doc || !isEditableDoc(doc) || useFallbackEditor || collab.connectionError) return;
     if (collab.status !== "disconnected") return;
 
     const timer = setTimeout(() => {
@@ -169,7 +170,7 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
     }, 4000);
 
     return () => clearTimeout(timer);
-  }, [doc?.id, doc?.type, useFallbackEditor, collab.status]);
+  }, [doc?.id, doc?.type, useFallbackEditor, collab.status, collab.connectionError]);
 
   useEffect(() => {
     if (useFallbackEditor || suppressDraftBanner.current) return;
@@ -276,7 +277,13 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
   const currentDoc = doc;
   const showPageEditor = isEditableDoc(currentDoc) && Boolean(user) && canEdit;
   const showPublishedReadonly = isEditableDoc(currentDoc) && Boolean(user) && !canEdit;
-  const showFallback = showPageEditor && (useFallbackEditor || (!collab.provider && !authLoading && !collab.status.startsWith("connect")));
+  const showFallback =
+    showPageEditor &&
+    (useFallbackEditor ||
+      (!collab.provider &&
+        !authLoading &&
+        !collab.connectionError &&
+        !collab.status.startsWith("connect")));
   const activeSaveStatus = showFallback ? saveStatus : collab.saveStatus;
   // Fallback editor is always "online". For collab, only treat a true disconnect as
   // reconnecting — initial "connecting" should not flash the amber warning.
@@ -444,7 +451,7 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
                 <Star size={15} className={isFavorited ? "fill-amber-500" : ""} />
               </button>
             )}
-            {isEditableDoc(doc) && user && canEdit && (
+            {isEditableDoc(doc) && user && canEdit && (!collab.connectionError || useFallbackEditor) && (
               <SaveIndicator status={activeSaveStatus} connectionStatus={connectionStatus} />
             )}
             {canEdit && (
@@ -533,6 +540,30 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
                   readOnly={!canEdit}
                   documentId={documentId!}
                 />
+            ) : collab.connectionError && !useFallbackEditor ? (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-4 py-12 px-5 text-center">
+                  <AlertCircle size={28} className="text-destructive" />
+                  <div className="space-y-1 max-w-md">
+                    <p className="text-sm font-medium text-foreground">
+                      Collaborative editing unavailable
+                    </p>
+                    <p className="text-sm text-muted-foreground">{collab.connectionError}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={collab.retry}>
+                      Retry connection
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setUseFallbackEditor(true)}
+                    >
+                      Edit without collaboration
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ) : showFallback ? (
               <RichTextEditor
                   content={content}

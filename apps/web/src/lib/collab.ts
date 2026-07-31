@@ -2,6 +2,26 @@ export function getCollabWsUrl(): string {
   return process.env["NEXT_PUBLIC_COLLAB_WS_URL"] ?? "ws://localhost:3003";
 }
 
+/** User-facing hint when the browser cannot reach the collab WebSocket server. */
+export function getCollabConnectionErrorMessage(): string {
+  const wsUrl = getCollabWsUrl();
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const isRemotePage = host !== "localhost" && host !== "127.0.0.1";
+    const wsIsLocalhost = /localhost|127\.0\.0\.1/.test(wsUrl);
+    if (isRemotePage && wsIsLocalhost) {
+      return (
+        "Collaboration is configured for localhost, but you are accessing this app remotely. " +
+        "Set NEXT_PUBLIC_COLLAB_WS_URL to your server address (e.g. ws://YOUR_IP:3003) and rebuild the web image."
+      );
+    }
+  }
+  return (
+    "Could not connect to the collaboration server. " +
+    "Check that it is running and reachable, then try again."
+  );
+}
+
 export function getCollaborationToken(): string | undefined {
   // wiki_token is httpOnly — use fetchCollaborationToken() in the browser.
   if (typeof window === "undefined") return undefined;
