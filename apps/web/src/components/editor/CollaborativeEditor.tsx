@@ -36,27 +36,30 @@ export function CollaborativeEditor({
   readOnly = false,
   documentId,
 }: Props) {
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({ codeBlock: false, history: false }),
-      Placeholder.configure({ placeholder }),
-      Underline,
-      Image,
-      Link.configure({ openOnClick: false }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      CodeBlockLowlight.configure({ lowlight }),
-      FileEmbedExtension,
-      Collaboration.configure({ document: ydoc, field: "default" }),
-    ],
-    editable: !readOnly,
-    editorProps: {
-      attributes: { class: "prose prose-sm max-w-none focus:outline-none" },
+  const editor = useEditor(
+    {
+      immediatelyRender: false,
+      extensions: [
+        StarterKit.configure({ codeBlock: false, history: false }),
+        Placeholder.configure({ placeholder }),
+        Underline,
+        Image,
+        Link.configure({ openOnClick: false }),
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableCell,
+        TableHeader,
+        CodeBlockLowlight.configure({ lowlight }),
+        FileEmbedExtension,
+        Collaboration.configure({ document: ydoc, field: "default" }),
+      ],
+      editable: !readOnly,
+      editorProps: {
+        attributes: { class: "prose prose-sm max-w-none focus:outline-none" },
+      },
     },
-  });
+    [ydoc, readOnly, placeholder],
+  );
 
   useEffect(() => {
     if (editor) editor.setEditable(!readOnly);
