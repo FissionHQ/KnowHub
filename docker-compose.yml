@@ -15,7 +15,8 @@ x-app-env: &app-env
   S3_QUARANTINE_BUCKET: ${S3_QUARANTINE_BUCKET:?set in .env}
   S3_SERVED_BUCKET: ${S3_SERVED_BUCKET:?set in .env}
   SQS_ENDPOINT: http://localstack:4566
-  SQS_PDF_QUEUE_URL: http://localstack:4566/000000000000/wiki-pdf-processing
+  # LocalStack 3 path-strategy URL (see SQS_ENDPOINT_STRATEGY=path on localstack service)
+  SQS_PDF_QUEUE_URL: http://localstack:4566/queue/us-east-1/000000000000/wiki-pdf-processing
   BASE_DOMAIN: localhost
   # Public web URL used in invite links (and similar emails). Must be the URL
   # users open in the browser — not an internal compose hostname.
@@ -136,6 +137,9 @@ services:
       - SERVICES=s3,sqs,ses
       - DEFAULT_REGION=us-east-1
       - AWS_DEFAULT_REGION=us-east-1
+      # Keep path-style queue URLs (http://localstack:4566/000000000000/…) so
+      # docker-compose SQS_PDF_QUEUE_URL works without DNS for sqs.*.localstack.cloud.
+      - SQS_ENDPOINT_STRATEGY=path
     ports:
       - "4566:4566"
     volumes:

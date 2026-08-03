@@ -15,7 +15,7 @@ const querySchema = z
   .object({
     q: z.string().max(500).optional().default(""),
     spaceId: z.string().uuid().optional(),
-    type: z.enum(["page", "pdf"]).optional(),
+    type: z.enum(["page", "pdf", "pptx"]).optional(),
     authorId: z.string().uuid().optional(),
     tags: z
       .string()

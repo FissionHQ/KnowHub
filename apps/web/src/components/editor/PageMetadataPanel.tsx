@@ -112,7 +112,7 @@ export function PageMetadataPanel({ doc, onUpdate }: Props) {
           </div>
 
           {/* Restrict Download (PDF-6) */}
-          {doc.type === "pdf" && (
+          { (doc.type === "pdf" || doc.type === "pptx") && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <ShieldAlert size={13} className="shrink-0" />
               <span className="text-muted-foreground flex-1">Restrict download/print:</span>

@@ -1,4 +1,6 @@
 import { extractPdfAsHtml } from "./pdfImporter";
+import { extractPptxAsHtml } from "./pptxImporter";
+import { extractPptAsHtml } from "./pptImporter";
 import mammoth from "mammoth";
 
 export async function parseFileToHtml(file: File): Promise<string> {
@@ -6,6 +8,14 @@ export async function parseFileToHtml(file: File): Promise<string> {
 
   if (name.endsWith(".pdf")) {
     return extractPdfAsHtml(file);
+  }
+
+  if (name.endsWith(".pptx")) {
+    return extractPptxAsHtml(file);
+  }
+
+  if (name.endsWith(".ppt")) {
+    return extractPptAsHtml(file);
   }
 
   if (name.endsWith(".docx") || name.endsWith(".doc")) {

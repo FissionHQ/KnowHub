@@ -47,17 +47,30 @@ const PdfViewer = dynamic(
   { ssr: false },
 );
 
+const PptxViewer = dynamic(
+  () => import("@/components/pptx/PptxViewer").then((m) => ({ default: m.PptxViewer })),
+  { ssr: false },
+);
+
 type SaveStatus = "saved" | "saving" | "unsaved";
 
-/** Attachment-backed PDFs have no HTML body; imported PDFs store converted HTML. */
+/** Attachment-backed PDFs/PPTX have no HTML body; imported files store converted HTML. */
 function isPdfViewerDoc(doc: Pick<Document, "type" | "contentRef" | "editableContentRef">): boolean {
   const body = doc.editableContentRef ?? doc.contentRef;
   return doc.type === "pdf" && !body;
 }
 
+function isPptxViewerDoc(doc: Pick<Document, "type" | "contentRef" | "editableContentRef">): boolean {
+  const body = doc.editableContentRef ?? doc.contentRef;
+  return doc.type === "pptx" && !body;
+}
+
 function isEditableDoc(doc: Pick<Document, "type" | "contentRef" | "editableContentRef">): boolean {
   const body = doc.editableContentRef ?? doc.contentRef;
-  return doc.type === "page" || (doc.type === "pdf" && Boolean(body));
+  return (
+    doc.type === "page" ||
+    ((doc.type === "pdf" || doc.type === "pptx") && Boolean(body))
+  );
 }
 
 function editorTitle(doc: Document): string {
@@ -85,6 +98,8 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
   const documentId = doc?.id;
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pptxUrl, setPptxUrl] = useState<string | null>(null);
+  const [pptxFilename, setPptxFilename] = useState<string | null>(null);
   const [content, setContent] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [useFallbackEditor, setUseFallbackEditor] = useState(false);
@@ -209,6 +224,17 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
     }
   }, [doc?.id]);
 
+  const loadPptxUrl = useCallback(async () => {
+    if (!doc?.id) return;
+    const items = await attachmentsApi.listByDocument(doc.id).catch(() => []);
+    const att = items[0];
+    if (!att) return;
+    if (att.ready) {
+      setPptxUrl(attachmentsApi.viewProxyUrl(att.attachmentId));
+      setPptxFilename(att.originalName ?? `${doc.title}.pptx`);
+    }
+  }, [doc?.id, doc?.title]);
+
   useEffect(() => {
     if (!doc || !isPdfViewerDoc(doc) || pdfUrl) return;
 
@@ -225,6 +251,23 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
       clearInterval(interval);
     };
   }, [doc?.type, doc?.id, pdfUrl, loadPdfUrl]);
+
+  useEffect(() => {
+    if (!doc || !isPptxViewerDoc(doc) || pptxUrl) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      await loadPptxUrl();
+    };
+
+    void poll();
+    const interval = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [doc?.type, doc?.id, pptxUrl, loadPptxUrl]);
 
   const handleAutoSave = useCallback(
     async (html: string) => {
@@ -527,6 +570,21 @@ export function DocumentView({ spaceSlug, docSlug }: Props) {
               <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-muted-foreground p-5">
                 <Clock size={18} className="animate-pulse" />
                 <span className="text-sm">PDF is being processed…</span>
+              </CardContent>
+            </Card>
+          )
+        ) : isPptxViewerDoc(doc) ? (
+          pptxUrl ? (
+            <PptxViewer
+              url={pptxUrl}
+              filename={pptxFilename ?? doc.title}
+              restrictDownload={doc.restrictDownload}
+            />
+          ) : (
+            <Card>
+              <CardContent className="flex flex-row items-center gap-3 py-12 justify-center text-muted-foreground p-5">
+                <Clock size={18} className="animate-pulse" />
+                <span className="text-sm">Presentation is being processed…</span>
               </CardContent>
             </Card>
           )

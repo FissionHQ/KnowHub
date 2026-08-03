@@ -24,8 +24,8 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
-import { PdfImportModal } from "@/components/PdfImportModal";
+import { importDocumentFile, importPdfAsViewer, importPptxAsViewer } from "@/lib/importDocument";
+import { FileImportModal, type ImportFileKind } from "@/components/FileImportModal";
 import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { SpaceDocTree } from "./SpaceDocTree";
 
@@ -34,6 +34,13 @@ const navItemBase =
   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors";
 const navItemIdle = "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground";
 const navItemActive = "text-primary";
+
+function importKindForFile(file: File): ImportFileKind | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "pdf";
+  if (name.endsWith(".pptx") || name.endsWith(".ppt")) return "pptx";
+  return null;
+}
 
 /** Survives Sidebar remounts when navigating between pages. */
 const expandedSpaceIds = new Set<string>();
@@ -147,7 +154,8 @@ export function Sidebar() {
 
   async function handleFileImport(space: Space, file: File) {
     setSpaceMenu(null);
-    if (file.name.toLowerCase().endsWith(".pdf")) {
+    const kind = importKindForFile(file);
+    if (kind) {
       setPdfModalSpaceId(space.id);
       setPdfModalFile(file);
       return;
@@ -167,7 +175,8 @@ export function Sidebar() {
     setPdfModalFile(null);
     try {
       const doc = await importDocumentFile(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const space = spaces.find((s) => s.id === spaceId);
+      router.push(space ? spaceDocPath(space, doc.slug) : `/spaces/${spaceId}/docs/${doc.slug}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -177,10 +186,15 @@ export function Sidebar() {
     if (!pdfModalFile) return;
     const spaceId = pdfModalSpaceId;
     const file = pdfModalFile;
+    const kind = importKindForFile(file);
     setPdfModalFile(null);
     try {
-      const doc = await importPdfAsViewer(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const doc =
+        kind === "pptx"
+          ? await importPptxAsViewer(spaceId, file)
+          : await importPdfAsViewer(spaceId, file);
+      const space = spaces.find((s) => s.id === spaceId);
+      router.push(space ? spaceDocPath(space, doc.slug) : `/spaces/${spaceId}/docs/${doc.slug}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -198,7 +212,7 @@ export function Sidebar() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.doc,.docx,.txt,.md"
+        accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -391,7 +405,8 @@ export function Sidebar() {
       </div>
 
       {pdfModalFile && typeof window !== "undefined" && (
-        <PdfImportModal
+        <FileImportModal
+          kind={importKindForFile(pdfModalFile) ?? "pdf"}
           fileName={pdfModalFile.name}
           onConvert={() => { void handlePdfConvert(); }}
           onAttach={() => { void handlePdfAttach(); }}

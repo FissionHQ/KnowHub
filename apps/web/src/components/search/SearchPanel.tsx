@@ -364,6 +364,7 @@ export function SearchPanel({
                   { value: "", label: "All types" },
                   { value: "page", label: "Page" },
                   { value: "pdf", label: "PDF" },
+                  { value: "pptx", label: "PowerPoint" },
                 ]}
               />
             </div>
@@ -442,12 +443,12 @@ export function SearchPanel({
                     <CardContent className="flex flex-row items-start gap-3 p-4">
                       <div
                         className={
-                          hit.type === "pdf"
+                          hit.type === "pdf" || hit.type === "pptx"
                             ? "p-2 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0 mt-0.5"
                             : "p-2 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-primary shrink-0 mt-0.5"
                         }
                       >
-                        {hit.type === "pdf" ? (
+                        {hit.type === "pdf" || hit.type === "pptx" ? (
                           <File size={15} />
                         ) : (
                           <FileText size={15} />
