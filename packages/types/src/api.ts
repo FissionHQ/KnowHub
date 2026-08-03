@@ -170,6 +170,20 @@ export interface ChangeRoleBody {
 export interface CreateGroupBody {
   name: string;
   description?: string;
+  canCreateSpaces?: boolean;
+  canManageGroups?: boolean;
+}
+
+export interface UpdateGroupBody {
+  name?: string;
+  description?: string | null;
+  canCreateSpaces?: boolean;
+  canManageGroups?: boolean;
+}
+
+export interface GrantSpacePermissionBody {
+  groupId: string;
+  accessLevel: AccessLevel;
 }
 
 export interface AddGroupMembersBody {

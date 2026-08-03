@@ -99,6 +99,8 @@ export const authApi = {
 
 export const spacesApi = {
   list: () => apiFetch<Space[]>(`${BASE}/spaces`),
+  /** Admin: all spaces. Others: spaces they created. */
+  listOwned: () => apiFetch<Space[]>(`${BASE}/spaces?scope=owned`),
   get: (id: string) => apiFetch<Space>(`${BASE}/spaces/${id}`),
   create: (body: CreateSpaceBody) =>
     apiFetch<Space>(`${BASE}/spaces`, { method: "POST", body: JSON.stringify(body) }),
@@ -108,6 +110,19 @@ export const spacesApi = {
     apiFetch<{ spaceId: string; groupPermissions: UpdateSpacePermissionsBody["groupPermissions"] }>(
       `${BASE}/spaces/${id}/permissions`,
       { method: "PATCH", body: JSON.stringify(body) },
+    ),
+  grantPermission: (
+    id: string,
+    body: { groupId: string; accessLevel: AccessLevel },
+  ) =>
+    apiFetch<{ spaceId: string; groupId: string; accessLevel: AccessLevel }>(
+      `${BASE}/spaces/${id}/permissions/grant`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  revokePermission: (id: string, groupId: string) =>
+    apiFetch<{ removed: boolean; spaceId: string; groupId: string }>(
+      `${BASE}/spaces/${id}/permissions/${groupId}`,
+      { method: "DELETE" },
     ),
   delete: (id: string) =>
     apiFetch<{ deleted: boolean }>(`${BASE}/spaces/${id}`, { method: "DELETE" }),
@@ -232,9 +247,25 @@ export const attachmentsApi = {
 
 export const groupsApi = {
   list: () => apiFetch<Group[]>(`${BASE}/groups`),
+  /** Admin: all groups. Others with manage permission: only groups they created. */
+  listManageable: () => apiFetch<Group[]>(`${BASE}/groups?scope=manageable`),
   listMemberships: () => apiFetch<GroupMembershipEntry[]>(`${BASE}/groups/memberships`),
-  create: (body: { name: string; description?: string }) =>
-    apiFetch<Group>(`${BASE}/groups`, { method: "POST", body: JSON.stringify(body) }),
+  create: (body: {
+    name: string;
+    description?: string;
+    canCreateSpaces?: boolean;
+    canManageGroups?: boolean;
+  }) => apiFetch<Group>(`${BASE}/groups`, { method: "POST", body: JSON.stringify(body) }),
+  update: (
+    id: string,
+    body: {
+      name?: string;
+      description?: string | null;
+      canCreateSpaces?: boolean;
+      canManageGroups?: boolean;
+    },
+  ) =>
+    apiFetch<Group>(`${BASE}/groups/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   delete: (id: string) =>
     apiFetch<{ deleted: boolean }>(`${BASE}/groups/${id}`, { method: "DELETE" }),
   addMembers: (groupId: string, userIds: string[]) =>

@@ -54,8 +54,11 @@ export async function sendInviteEmail(
       }),
     );
   } catch (err) {
-    logger.warn(`Failed to send invite email to ${opts.toEmail}: ${String(err)}`);
-    if (process.env["NODE_ENV"] !== "development") throw err;
+    // Invite row/token are already created — never fail the invite API on mail outage.
+    // Admin can copy inviteUrl from the response / pending invites list.
+    logger.warn(`Failed to send invite email to ${opts.toEmail}: ${String(err)}`, {
+      inviteUrl,
+    });
   }
 }
 

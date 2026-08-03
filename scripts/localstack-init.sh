@@ -13,4 +13,8 @@ awslocal sqs create-queue --queue-name wiki-search-indexing-dlq || true
 awslocal sqs create-queue --queue-name wiki-pdf-processing || true
 awslocal sqs create-queue --queue-name wiki-search-indexing || true
 
+echo "Verifying SES sender identity for local invites..."
+awslocal ses verify-email-identity --email-address noreply@wiki.example.com || true
+awslocal ses verify-email-identity --email-address noreply@localhost || true
+
 echo "LocalStack init complete."

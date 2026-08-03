@@ -112,6 +112,8 @@ async function main() {
       name: "Editors",
       description: "Can create and edit pages in Engineering and Product",
       isDefault: false,
+      canCreateSpaces: true,
+      canManageGroups: true,
     },
   ]);
 

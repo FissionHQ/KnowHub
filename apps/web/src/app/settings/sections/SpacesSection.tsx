@@ -3,7 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { groupsApi, spacesApi } from "@/lib/api";
+import { groupsApi, spacesApi, usersApi } from "@/lib/api";
 import type { AccessLevel, Space, SpacePermissionRecord } from "@wiki/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,8 +15,12 @@ import { useToast } from "@/components/ui/ToastProvider";
 const PAGE_SIZE = 10;
 
 export function SpacesSection() {
-  const { data: spaces = [], mutate } = useSWR("admin:spaces", spacesApi.list);
-  const { data: groups = [] } = useSWR("admin:groups", groupsApi.list);
+  const { data: me } = useSWR("users:me", usersApi.me);
+  const isAdmin = me?.role === "admin";
+  const canCreate = Boolean(isAdmin || me?.canCreateSpaces);
+
+  const { data: spaces = [], mutate } = useSWR("settings:spaces-owned", spacesApi.listOwned);
+  const { data: groups = [] } = useSWR("settings:groups", groupsApi.list);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [iconEmoji, setIconEmoji] = useState("📄");
@@ -66,76 +70,92 @@ export function SpacesSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Create space
-          </h2>
-          <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              placeholder="Space name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
-              required
-            />
-            <input
-              placeholder="Icon emoji"
-              value={iconEmoji}
-              onChange={(e) => setIconEmoji(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
-              maxLength={4}
-            />
-            <input
-              placeholder="Description (optional)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-border bg-card text-sm md:col-span-2"
-            />
-            <Select
-              value={defaultGroupId}
-              onChange={setGroupId}
-              options={groups.map((g) => ({ value: g.id, label: g.name }))}
-              className="h-10"
-            />
-            <Select
-              value={accessLevel}
-              onChange={(v) => setAccessLevel(v as AccessLevel)}
-              options={[{ value: "view", label: "View access" }, { value: "edit", label: "Edit access" }]}
-              className="h-10"
-            />
-            <div className="md:col-span-2">
-              <Button
-                type="submit"
-                variant="default"
-                size="sm"
-                disabled={submitting || !defaultGroupId}
-              >
-                Create space
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      {canCreate && isAdmin && (
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              Create space
+            </h2>
+            <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                placeholder="Space name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
+                required
+              />
+              <input
+                placeholder="Icon emoji"
+                value={iconEmoji}
+                onChange={(e) => setIconEmoji(e.target.value)}
+                className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
+                maxLength={4}
+              />
+              <input
+                placeholder="Description (optional)"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="h-10 px-3 rounded-lg border border-border bg-card text-sm md:col-span-2"
+              />
+              <Select
+                value={defaultGroupId}
+                onChange={setGroupId}
+                options={groups.map((g) => ({ value: g.id, label: g.name }))}
+                className="h-10"
+              />
+              <Select
+                value={accessLevel}
+                onChange={(v) => setAccessLevel(v as AccessLevel)}
+                options={[{ value: "view", label: "View access" }, { value: "edit", label: "Edit access" }]}
+                className="h-10"
+              />
+              <div className="md:col-span-2">
+                <Button
+                  type="submit"
+                  variant="default"
+                  size="sm"
+                  disabled={submitting || !defaultGroupId}
+                >
+                  Create space
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isAdmin && (
+        <p className="text-sm text-muted-foreground">
+          Spaces you created. You can manage group access or delete them. Create new spaces from the Spaces page.
+        </p>
+      )}
 
       <Card>
         <CardContent className="p-0 divide-y divide-border">
-          {pagedSpaces.map((space) => (
-            <SpaceRow
-              key={space.id}
-              space={space}
-              groups={groups}
-              onDelete={() => handleDelete(space.id, space.name)}
-            />
-          ))}
-          <Pagination
-            page={page}
-            totalPages={Math.ceil(spaces.length / PAGE_SIZE)}
-            total={spaces.length}
-            pageSize={PAGE_SIZE}
-            onChange={setPage}
-            label="spaces"
-          />
+          {spaces.length === 0 ? (
+            <p className="px-4 py-8 text-sm text-muted-foreground text-center">
+              {isAdmin ? "No spaces yet." : "You have not created any spaces yet."}
+            </p>
+          ) : (
+            <>
+              {pagedSpaces.map((space) => (
+                <SpaceRow
+                  key={space.id}
+                  space={space}
+                  groups={groups}
+                  onDelete={() => handleDelete(space.id, space.name)}
+                />
+              ))}
+              <Pagination
+                page={page}
+                totalPages={Math.ceil(spaces.length / PAGE_SIZE)}
+                total={spaces.length}
+                pageSize={PAGE_SIZE}
+                onChange={setPage}
+                label="spaces"
+              />
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -159,7 +179,7 @@ function SpaceRow({
   const [saving, setSaving] = useState(false);
 
   const { data: permissions = [], mutate } = useSWR(
-    expanded ? `admin:space-perms:${space.id}` : null,
+    expanded ? `settings:space-perms:${space.id}` : null,
     () => spacesApi.getPermissions(space.id),
   );
 

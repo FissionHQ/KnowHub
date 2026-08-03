@@ -21,6 +21,7 @@ const ACTION_META: Record<AuditAction, { label: string; category: Exclude<Catego
   "user.deactivate":          { label: "Deactivated",      category: "users",     color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
   "user.role_change":         { label: "Role changed",     category: "users",     color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   "group.create":             { label: "Group created",    category: "users",     color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  "group.update":             { label: "Group updated",    category: "users",     color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   "group.delete":             { label: "Group deleted",    category: "users",     color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
   "group.member_add":         { label: "Member added",     category: "users",     color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
   "group.member_remove":      { label: "Member removed",   category: "users",     color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },

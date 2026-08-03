@@ -369,13 +369,19 @@ export function Sidebar() {
             </div>
           </div>
         )}
-        {user?.role === "admin" && (
+        {user &&
+          (user.role === "admin" || user.canManageGroups || user.canCreateSpaces) && (
           <Link
-            href="/admin"
-            className={cn(navItemBase, pathname.startsWith("/admin") ? navItemActive : navItemIdle)}
+            href="/settings"
+            className={cn(
+              navItemBase,
+              pathname.startsWith("/settings") || pathname.startsWith("/admin")
+                ? navItemActive
+                : navItemIdle,
+            )}
           >
             <Settings size={14} className="shrink-0" />
-            <span>Admin</span>
+            <span>Settings</span>
           </Link>
         )}
         <button type="button" onClick={() => logout()} className={cn(navItemBase, "w-full text-left", navItemIdle)}>
