@@ -36,10 +36,17 @@ const acceptInviteSchema = z.object({
   name: z.string().min(1).max(200).optional(),
 });
 
+function cookieSecure(): boolean {
+  const raw = process.env["COOKIE_SECURE"]?.trim().toLowerCase();
+  if (raw === "true" || raw === "1") return true;
+  if (raw === "false" || raw === "0") return false;
+  return process.env["NODE_ENV"] === "production";
+}
+
 function setTokenCookie(res: import("express").Response, token: string): void {
   res.cookie(TOKEN_COOKIE, token, {
     httpOnly: true,
-    secure: process.env["NODE_ENV"] === "production",
+    secure: cookieSecure(),
     sameSite: "lax",
     maxAge: TOKEN_MAX_AGE_MS,
     path: "/",

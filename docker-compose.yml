@@ -21,6 +21,8 @@ x-app-env: &app-env
   # Public web URL used in invite links (and similar emails). Must be the URL
   # users open in the browser — not an internal compose hostname.
   APP_URL: ${APP_URL:-http://localhost:3000}
+  # Plain HTTP (IP:3000) needs false so the browser keeps wiki_token.
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
   # Required — set in .env (gitignored); see .env.example
   JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
   # LocalStack SES API (not MailHog — MailHog is SMTP-only on the tools profile).
@@ -47,6 +49,9 @@ services:
         NEXT_PUBLIC_COLLAB_WS_URL: ${NEXT_PUBLIC_COLLAB_WS_URL:-ws://localhost:3003}
     environment:
       NEXT_PUBLIC_API_URL: http://api:3001
+      # Must be false for http://IP:3000 or Secure cookies never stick.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      NODE_ENV: production
     ports:
       - "3000:3000"
     depends_on:
