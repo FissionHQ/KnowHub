@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PAGE_PREFIXES = ["/login", "/invite"];
+const PUBLIC_PAGE_PREFIXES = ["/login", "/invite", "/vendor"];
 const TOKEN_COOKIE = "wiki_token";
 
 export function middleware(request: NextRequest) {
@@ -36,5 +36,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Static vendor assets (e.g. pptx-react-viewer CSS for Shadow DOM) skip auth.
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|favicon\\.svg|vendor/).*)"],
 };
