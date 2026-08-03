@@ -7,17 +7,20 @@ import { useRouter } from "next/navigation";
 import { spacesApi, activityApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Space, Document } from "@wiki/types";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, MoreVertical, Upload, Clock, RefreshCw } from "lucide-react";
+import { ArrowRight, MoreVertical, Upload, Clock, RefreshCw, Plus } from "lucide-react";
 import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
 import { PdfImportModal } from "@/components/PdfImportModal";
 import { spacePath } from "@/lib/spacePath";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export function SpacesList() {
   const router = useRouter();
   const { user } = useAuth();
-  const { data: spaces, isLoading, error } = useSWR<Space[]>("spaces", spacesApi.list);
+  const { toast } = useToast();
+  const { data: spaces, isLoading, error, mutate } = useSWR<Space[]>("spaces", spacesApi.list);
   const { data: recentDocs = [] } = useSWR<Document[]>(user ? "recent" : null, activityApi.getRecent);
   const { data: recentlyUpdated = [] } = useSWR<Document[]>(
     user ? "recently-updated" : null,
@@ -29,7 +32,35 @@ export function SpacesList() {
   const uploadSpaceRef = useRef<string>("");
   const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
   const [pdfModalSpaceId, setPdfModalSpaceId] = useState<string>("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [creating, setCreating] = useState(false);
+  const canCreateSpaces = Boolean(user?.canCreateSpaces || user?.role === "admin");
   const slugById = Object.fromEntries((spaces ?? []).map((s) => [s.id, s.slug]));
+
+  async function handleCreateSpace(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const space = await spacesApi.create({
+        name: newName.trim(),
+        groupPermissions: [],
+        ...(newDescription.trim() ? { description: newDescription.trim() } : {}),
+      });
+      setNewName("");
+      setNewDescription("");
+      setCreateOpen(false);
+      await mutate();
+      toast(`Space "${space.name}" created`, "success");
+      router.push(spacePath(space));
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to create space", "error");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function handleFileUpload(spaceId: string, file: File) {
     if (file.name.toLowerCase().endsWith(".pdf")) {
@@ -116,12 +147,30 @@ export function SpacesList() {
 
   if (!spaces?.length) {
     return (
-      <Card>
-        <CardContent className="py-16 flex flex-col items-center gap-3 text-muted-foreground p-5">
-          <span className="text-4xl">🌌</span>
-          <p className="text-sm">No spaces yet. Ask an admin to create one.</p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-4">
+        {canCreateSpaces && (
+          <CreateSpaceCard
+            open={createOpen}
+            onToggle={() => setCreateOpen((o) => !o)}
+            name={newName}
+            description={newDescription}
+            creating={creating}
+            onNameChange={setNewName}
+            onDescriptionChange={setNewDescription}
+            onSubmit={handleCreateSpace}
+          />
+        )}
+        <Card>
+          <CardContent className="py-16 flex flex-col items-center gap-3 text-muted-foreground p-5">
+            <span className="text-4xl">🌌</span>
+            <p className="text-sm">
+              {canCreateSpaces
+                ? "No spaces yet. Create one to get started."
+                : "No spaces yet. Ask an admin to create one."}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -134,6 +183,21 @@ export function SpacesList() {
         className="hidden"
         onChange={handleFileChange}
       />
+
+      {canCreateSpaces && (
+        <div className="mb-6">
+          <CreateSpaceCard
+            open={createOpen}
+            onToggle={() => setCreateOpen((o) => !o)}
+            name={newName}
+            description={newDescription}
+            creating={creating}
+            onNameChange={setNewName}
+            onDescriptionChange={setNewDescription}
+            onSubmit={handleCreateSpace}
+          />
+        </div>
+      )}
 
       {(recentDocs.length > 0 || recentlyUpdated.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -259,5 +323,71 @@ export function SpacesList() {
         />
       )}
     </>
+  );
+}
+
+function CreateSpaceCard({
+  open,
+  onToggle,
+  name,
+  description,
+  creating,
+  onNameChange,
+  onDescriptionChange,
+  onSubmit,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  name: string;
+  description: string;
+  creating: boolean;
+  onNameChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  if (!open) {
+    return (
+      <Button type="button" variant="default" size="sm" onClick={onToggle} className="gap-1.5">
+        <Plus size={14} />
+        Create space
+      </Button>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-foreground">Create space</h2>
+            <button
+              type="button"
+              onClick={onToggle}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+          <input
+            placeholder="Space name"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
+            required
+          />
+          <input
+            placeholder="Description (optional)"
+            value={description}
+            onChange={(e) => onDescriptionChange(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-border bg-card text-sm"
+          />
+          <div>
+            <Button type="submit" variant="default" size="sm" disabled={creating || !name.trim()}>
+              {creating ? "Creating…" : "Create"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

@@ -18,6 +18,7 @@ export type AuditAction =
   | "user.deactivate"
   | "user.role_change"
   | "group.create"
+  | "group.update"
   | "group.delete"
   | "group.member_add"
   | "group.member_remove"

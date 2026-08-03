@@ -34,6 +34,16 @@ export interface User {
   status: UserStatus;
   cognitoSub?: string;
   createdAt: Date;
+  /**
+   * Present on GET /users/me.
+   * True when the user is an admin or belongs to a group with canCreateSpaces.
+   */
+  canCreateSpaces?: boolean;
+  /**
+   * Present on GET /users/me.
+   * True when the user is an admin or belongs to a group with canManageGroups.
+   */
+  canManageGroups?: boolean;
 }
 
 export interface Group {
@@ -42,6 +52,11 @@ export interface Group {
   name: string;
   description?: string;
   isDefault: boolean;
+  /** Members may create spaces (workspaces). */
+  canCreateSpaces: boolean;
+  /** Members may create/manage groups and grant them space access. */
+  canManageGroups: boolean;
+  createdBy?: string | null;
   createdAt: Date;
 }
 

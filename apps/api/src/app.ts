@@ -41,11 +41,25 @@ export function createApp(
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(cors({
     origin: (origin, cb) => {
-      if (!origin || origin.endsWith(`.${env.BASE_DOMAIN}`) || env.NODE_ENV === "development") {
+      if (!origin || env.NODE_ENV === "development") {
         cb(null, true);
-      } else {
-        cb(new Error("CORS: origin not allowed"));
+        return;
       }
+      try {
+        const { hostname, origin: normalized } = new URL(origin);
+        const appUrl = process.env["APP_URL"];
+        const allowed =
+          hostname === env.BASE_DOMAIN ||
+          hostname.endsWith(`.${env.BASE_DOMAIN}`) ||
+          (appUrl != null && normalized === new URL(appUrl).origin);
+        if (allowed) {
+          cb(null, true);
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      cb(new Error("CORS: origin not allowed"));
     },
     credentials: true,
   }));

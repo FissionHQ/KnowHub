@@ -27,8 +27,5 @@
     "overrides": {
       "@types/express": "^4.17.25"
     }
-  },
-  "dependencies": {
-    "pnpm": "^11.10.0"
   }
 }

@@ -3,9 +3,10 @@ import { z } from "zod";
 import * as jose from "jose";
 import { eq, and, isNull, gt } from "drizzle-orm";
 import type { Db } from "@wiki/db";
-import { users, organizations, inviteTokens } from "@wiki/db";
+import { users, organizations, inviteTokens, groupMemberships } from "@wiki/db";
 import type { ApiEnv } from "@wiki/config";
 import type { SESClient } from "@aws-sdk/client-ses";
+import type { UserRole } from "@wiki/types";
 import {
   ValidationError,
   NotFoundError,
@@ -15,6 +16,10 @@ import {
 import { hashPassword, verifyPassword, validatePasswordPolicy } from "../../lib/password.js";
 import { issueAccessToken } from "../../lib/jwt.js";
 import { recordAudit } from "../../lib/audit.js";
+import {
+  userCanCreateSpaces,
+  userCanManageGroups,
+} from "../access/groupCapabilities.js";
 
 const TOKEN_COOKIE = "wiki_token";
 const TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -48,6 +53,24 @@ function clearTokenCookie(res: import("express").Response): void {
 function sanitizeUser(user: typeof users.$inferSelect) {
   const { passwordHash: _passwordHash, ...safe } = user;
   return safe;
+}
+
+async function userWithCapabilities(
+  db: Db,
+  user: typeof users.$inferSelect,
+  orgId: string,
+) {
+  const memberships = await db
+    .select({ groupId: groupMemberships.groupId })
+    .from(groupMemberships)
+    .where(eq(groupMemberships.userId, user.id));
+  const groupIds = memberships.map((m) => m.groupId);
+  const role = user.role as UserRole;
+  const [canCreateSpaces, canManageGroups] = await Promise.all([
+    userCanCreateSpaces(db, { orgId, userRole: role, groupIds }),
+    userCanManageGroups(db, { orgId, userRole: role, groupIds }),
+  ]);
+  return { ...sanitizeUser(user), canCreateSpaces, canManageGroups };
 }
 
 async function resolveOrgBySlug(db: Db, orgSlug: string) {
@@ -138,7 +161,7 @@ export function createAuthRouter(db: Db, env: ApiEnv, _ses: SESClient): Router {
       req,
     });
 
-    res.json({ data: { token, user: sanitizeUser(user) } });
+    res.json({ data: { token, user: await userWithCapabilities(db, user, org.id) } });
   });
 
   // POST /auth/logout
@@ -294,7 +317,9 @@ export function createAuthRouter(db: Db, env: ApiEnv, _ses: SESClient): Router {
       req,
     });
 
-    res.json({ data: { token, user: sanitizeUser(user) } });
+    res.json({
+      data: { token, user: await userWithCapabilities(db, user, invite.orgId) },
+    });
   });
 
   return router;

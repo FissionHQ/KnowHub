@@ -11,13 +11,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Plus, File, ChevronRight} from "lucide-react";
+import { FileText, Plus, File, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
 import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { SearchPanel } from "@/components/search/SearchPanel";
 import { PdfImportModal } from "@/components/PdfImportModal";
 import { Pagination } from "@/components/ui/Pagination";
+import { SpaceGroupAccessPanel } from "@/components/SpaceGroupAccessPanel";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const PAGE_SIZE = 10;
 
@@ -37,7 +40,10 @@ function formatDateTime(date: Date) {
 
 export function SpaceView({ spaceSlug }: Props) {
   const router = useRouter();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [, setImporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
 
@@ -112,6 +118,24 @@ export function SpaceView({ spaceSlug }: Props) {
   const rootDocs = docs.filter((d) => !d.parentId || !idSet.has(d.parentId));
   const pagedRootDocs = rootDocs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const canEdit = space?.accessLevel === "edit";
+  const canManageSpaceAccess = Boolean(
+    user && space && (user.role === "admin" || space.createdBy === user.id),
+  );
+
+  async function handleDeleteSpace() {
+    if (!space) return;
+    if (!confirm(`Delete space "${space.name}"? This removes all documents in it.`)) return;
+    setDeleting(true);
+    try {
+      await spacesApi.delete(space.id);
+      toast(`Space "${space.name}" deleted`, "success");
+      router.push("/spaces");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to delete space", "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function getChildren(parentId: string): Document[] {
     return docs.filter((d) => d.parentId === parentId);
@@ -203,6 +227,17 @@ export function SpaceView({ spaceSlug }: Props) {
                 <p className="text-muted-foreground text-sm mt-0.5 truncate">{space.description}</p>
               )}
             </div>
+            {canManageSpaceAccess && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                disabled={deleting}
+                onClick={() => void handleDeleteSpace()}
+              >
+                {deleting ? "Deleting…" : "Delete space"}
+              </Button>
+            )}
           </>
         )}
         {canEdit && (
@@ -243,6 +278,11 @@ export function SpaceView({ spaceSlug }: Props) {
       </div>
 
       <Separator className="mb-6" />
+
+      {canManageSpaceAccess && space && (
+        <SpaceGroupAccessPanel space={space} />
+      )}
+
       {/* Document count */}
       {!docsLoading && docs.length > 0 && (
         <p className="text-xs text-muted-foreground mb-3">{docs.length} document{docs.length !== 1 ? "s" : ""}</p>

@@ -12,6 +12,10 @@ import { invalidateGroupCache } from "../../middleware/tenantContext.js";
 import { recordAudit } from "../../lib/audit.js";
 import { sendInviteEmail, getAppBaseUrl } from "../../lib/email.js";
 import { ensureDefaultGroup } from "../access/defaultGroup.js";
+import {
+  userCanCreateSpaces,
+  userCanManageGroups,
+} from "../access/groupCapabilities.js";
 
 const inviteSchema = z.object({
   email: z.string().min(3).regex(/^[^\s@]+@[^\s@]+$/, "Invalid email"),
@@ -39,13 +43,19 @@ export function createIdentityRouter(
 
   // GET /users/me — current user profile
   router.get("/users/me", async (req, res) => {
-    const { orgId, userId } = req.tenant;
+    const { orgId, userId, userRole, groupIds } = req.tenant;
     const rows = await db
       .select()
       .from(users)
       .where(and(eq(users.id, userId), eq(users.orgId, orgId)));
     if (!rows.length) throw new NotFoundError("User");
-    res.json({ data: sanitizeUser(rows[0]!) });
+    const [canCreateSpaces, canManageGroups] = await Promise.all([
+      userCanCreateSpaces(db, { orgId, userRole, groupIds }),
+      userCanManageGroups(db, { orgId, userRole, groupIds }),
+    ]);
+    res.json({
+      data: { ...sanitizeUser(rows[0]!), canCreateSpaces, canManageGroups },
+    });
   });
 
   // GET /users — list org users (directory for permission assignment, etc.)

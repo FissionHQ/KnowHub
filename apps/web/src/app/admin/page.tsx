@@ -1,19 +1,6 @@
-import { Suspense } from "react";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { AdminView } from "./AdminView";
+import { redirect } from "next/navigation";
 
-export default function AdminPage() {
-  return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <main
-        className="flex-1 overflow-y-auto"
-        style={{ marginLeft: "var(--sidebar-width)" }}
-      >
-        <Suspense fallback={null}>
-          <AdminView />
-        </Suspense>
-      </main>
-    </div>
-  );
+/** Legacy /admin URL — Settings lives at /settings. */
+export default function AdminRedirectPage() {
+  redirect("/settings");
 }

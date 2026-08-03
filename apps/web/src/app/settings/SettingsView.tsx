@@ -14,29 +14,56 @@ import { SettingsSection } from "./sections/SettingsSection";
 import { AuditLogSection } from "./sections/AuditLogSection";
 import { TrashSection } from "./sections/TrashSection";
 import clsx from "clsx";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-const TABS = [
-  { id: "settings", label: "Organization" },
-  { id: "users", label: "Users" },
-  { id: "groups", label: "Groups" },
-  { id: "spaces", label: "Spaces" },
-  { id: "trash", label: "Trash" },
-  { id: "audit", label: "Audit log" },
+const ALL_TABS = [
+  { id: "settings", label: "Organization", adminOnly: true },
+  { id: "users", label: "Users", adminOnly: true },
+  { id: "groups", label: "Groups", adminOnly: false },
+  { id: "spaces", label: "Spaces", adminOnly: false },
+  { id: "trash", label: "Trash", adminOnly: true },
+  { id: "audit", label: "Audit log", adminOnly: true },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type TabId = (typeof ALL_TABS)[number]["id"];
 
-export function AdminView() {
+function isTabId(value: string | null): value is TabId {
+  return ALL_TABS.some((tab) => tab.id === value);
+}
+
+export function SettingsView() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
-  const [tab, setTab] = useState<TabId>(
-    initialTab === "trash" || initialTab === "users" || initialTab === "groups" || initialTab === "spaces" || initialTab === "audit" || initialTab === "settings"
-      ? initialTab
-      : "settings",
-  );
   const { data: me, isLoading, error } = useSWR("users:me", usersApi.me);
+
+  const isAdmin = me?.role === "admin";
+  const canManageGroups = Boolean(isAdmin || me?.canManageGroups);
+  const canCreateSpaces = Boolean(isAdmin || me?.canCreateSpaces);
+  const canAccessSettings = Boolean(isAdmin || canManageGroups || canCreateSpaces);
+
+  const availableTabs = useMemo(() => {
+    if (!me) return [] as typeof ALL_TABS[number][];
+    return ALL_TABS.filter((tab) => {
+      if (tab.adminOnly) return isAdmin;
+      if (tab.id === "groups") return canManageGroups;
+      if (tab.id === "spaces") return canCreateSpaces || isAdmin;
+      return true;
+    });
+  }, [me, isAdmin, canManageGroups, canCreateSpaces]);
+
+  const [tab, setTab] = useState<TabId | null>(
+    isTabId(initialTab) ? initialTab : null,
+  );
+
+  useEffect(() => {
+    if (!availableTabs.length) return;
+    if (tab && availableTabs.some((item) => item.id === tab)) return;
+    const fromQuery = isTabId(initialTab)
+      ? availableTabs.find((item) => item.id === initialTab)
+      : undefined;
+    setTab(fromQuery?.id ?? availableTabs[0]!.id);
+  }, [availableTabs, tab, initialTab]);
 
   if (isLoading) {
     return (
@@ -47,17 +74,17 @@ export function AdminView() {
     );
   }
 
-  if (error || !me || me.role !== "admin") {
+  if (error || !me || !canAccessSettings) {
     return (
       <div className="p-8 max-w-lg mx-auto mt-16">
         <Card className="border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30">
           <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
             <ShieldAlert className="text-amber-600 dark:text-amber-400" size={32} />
             <h1 className="text-lg font-semibold text-foreground">
-              Admin access required
+              Settings access required
             </h1>
             <p className="text-sm text-muted-foreground">
-              You need an admin account to manage organization settings, users, and spaces.
+              You need permission to manage spaces or groups, or an admin account, to open Settings.
             </p>
             <Link href="/spaces">
               <Button variant="secondary" size="sm">
@@ -73,14 +100,16 @@ export function AdminView() {
   return (
     <div className="p-8 max-w-8xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Administration</h1>
+        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Manage organization settings, users, groups, spaces, trash, and audit history.
+          {isAdmin
+            ? "Manage organization settings, users, groups, spaces, trash, and audit history."
+            : "Manage the spaces and groups you own."}
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6 border-b border-border pb-3">
-        {TABS.map((item) => (
+        {availableTabs.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -97,12 +126,12 @@ export function AdminView() {
         ))}
       </div>
 
-      {tab === "settings" && <SettingsSection />}
-      {tab === "users" && <UsersSection />}
-      {tab === "groups" && <GroupsSection />}
-      {tab === "spaces" && <SpacesSection />}
-      {tab === "trash" && <TrashSection />}
-      {tab === "audit" && <AuditLogSection />}
+      {tab === "settings" && isAdmin && <SettingsSection />}
+      {tab === "users" && isAdmin && <UsersSection />}
+      {tab === "groups" && canManageGroups && <GroupsSection />}
+      {tab === "spaces" && (canCreateSpaces || isAdmin) && <SpacesSection />}
+      {tab === "trash" && isAdmin && <TrashSection />}
+      {tab === "audit" && isAdmin && <AuditLogSection />}
     </div>
   );
 }

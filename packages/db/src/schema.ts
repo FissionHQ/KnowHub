@@ -86,6 +86,14 @@ export const groups = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     isDefault: boolean("is_default").notNull().default(false),
+    /** Members of this group may create spaces (workspaces). Admins always can. */
+    canCreateSpaces: boolean("can_create_spaces").notNull().default(false),
+    /**
+     * Members may create groups, manage groups they created, and grant those
+     * groups access to spaces they can edit. Admins always can.
+     */
+    canManageGroups: boolean("can_manage_groups").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

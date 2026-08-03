@@ -106,6 +106,20 @@
       "when": 1785100000000,
       "tag": "0015_document_slug",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785200000000,
+      "tag": "0016_group_can_create_spaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785300000000,
+      "tag": "0017_group_can_manage_groups",
+      "breakpoints": true
     }
   ]
 }
