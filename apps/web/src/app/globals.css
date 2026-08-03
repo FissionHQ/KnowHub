@@ -315,3 +315,5 @@ summary {
   white-space: nowrap;
   z-index: 10;
 }
+
+/* PPTX preview uses a Shadow DOM + /vendor/pptx-viewer.css (see PptxIsolatedShell). */

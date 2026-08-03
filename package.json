@@ -26,6 +26,14 @@
   "pnpm": {
     "overrides": {
       "@types/express": "^4.17.25"
+    },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "lucide-react": "*",
+        "@ai-sdk/react": "*",
+        "ai": "*"
+      },
+      "ignoreMissing": ["@ai-sdk/react", "ai"]
     }
   }
 }
