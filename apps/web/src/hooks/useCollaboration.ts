@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import {
   getCollabWsUrl,
+  getCollabConnectionErrorMessage,
   fetchCollaborationToken,
   colorForUser,
   type CollabAwarenessUser,
   type PresenceCounts,
 } from "@/lib/collab";
+
+const CONNECT_TIMEOUT_MS = 15_000;
 
 export type CollabStatus = "connecting" | "connected" | "disconnected";
 export type SaveStatus = "saved" | "saving";
@@ -75,6 +78,8 @@ export function useCollaboration({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [presence, setPresence] = useState<PresenceCounts>({ editors: 0, viewers: 0 });
   const [stable, setStable] = useState<StablePair | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const pendingYdoc = useMemo(() => new Y.Doc(), [documentId]);
   const userColor = useMemo(() => colorForUser(userId), [userId]);
@@ -107,11 +112,17 @@ export function useCollaboration({
     );
   }, [stable, documentId, userId, userName, userColor, canEdit]);
 
+  const retry = useCallback(() => {
+    setConnectionError(null);
+    setRetryNonce((n) => n + 1);
+  }, []);
+
   useEffect(() => {
     if (!enabled || !orgId || !documentId || !userId) {
       setStatus("disconnected");
       setStable(null);
       setPresence({ editors: 0, viewers: 0 });
+      setConnectionError(null);
       return;
     }
 
@@ -120,18 +131,47 @@ export function useCollaboration({
     let onDocUpdate: ((_update: Uint8Array, origin: unknown) => void) | null = null;
     let markSynced: (() => void) | null = null;
     let refreshPresence: (() => void) | null = null;
+    let connectTimer: ReturnType<typeof setTimeout> | null = null;
+    let synced = false;
+
+    const failConnection = (message: string) => {
+      if (cancelled || synced) return;
+      if (connectTimer) clearTimeout(connectTimer);
+      setConnectionError(message);
+      setStatus("disconnected");
+      if (collabProvider) {
+        clearLocalAwareness(collabProvider);
+        collabProvider.destroy();
+        collabProvider = null;
+      }
+    };
+
+    const promoteStable = (provider: HocuspocusProvider) => {
+      if (cancelled || synced) return;
+      if (documentIdRef.current !== documentId) return;
+      synced = true;
+      if (connectTimer) clearTimeout(connectTimer);
+      setConnectionError(null);
+      setStable({ ydoc: pendingYdoc, provider, documentId });
+      setSaveStatus("saved");
+    };
 
     setStatus("connecting");
     setStable(null);
     setSaveStatus("saved");
     setPresence({ editors: 0, viewers: 0 });
+    setConnectionError(null);
+
+    connectTimer = setTimeout(() => {
+      failConnection(getCollabConnectionErrorMessage());
+    }, CONNECT_TIMEOUT_MS);
 
     void (async () => {
       const token = await fetchCollaborationToken();
       if (cancelled) return;
 
       if (!token) {
-        setStatus("disconnected");
+        failConnection("Could not start a collaboration session. Try signing in again.");
         setPresence(canEditRef.current ? { editors: 1, viewers: 0 } : { editors: 0, viewers: 1 });
         return;
       }
@@ -153,22 +193,17 @@ export function useCollaboration({
         },
         onAuthenticationFailed: () => {
           if (cancelled) return;
-          setStatus("disconnected");
-          collabProvider?.disconnect();
+          failConnection("Collaboration authentication failed. Try signing in again.");
         },
         onSynced: () => {
           if (cancelled || !collabProvider) return;
-          if (documentIdRef.current !== documentId) return;
-          setStable({ ydoc: pendingYdoc, provider: collabProvider, documentId });
-          setSaveStatus("saved");
+          promoteStable(collabProvider);
         },
       });
 
       markSynced = () => {
         if (cancelled || !collabProvider) return;
-        if (documentIdRef.current !== documentId) return;
-        setStable({ ydoc: pendingYdoc, provider: collabProvider, documentId });
-        setSaveStatus("saved");
+        promoteStable(collabProvider);
       };
 
       collabProvider.on("synced", markSynced);
@@ -202,6 +237,7 @@ export function useCollaboration({
 
     return () => {
       cancelled = true;
+      if (connectTimer) clearTimeout(connectTimer);
       if (saveTimer.current) clearTimeout(saveTimer.current);
       if (onDocUpdate) pendingYdoc.off("update", onDocUpdate);
       if (collabProvider) {
@@ -212,7 +248,7 @@ export function useCollaboration({
       }
       setStable(null);
     };
-  }, [enabled, orgId, documentId, userId, pendingYdoc]);
+  }, [enabled, orgId, documentId, userId, pendingYdoc, retryNonce]);
 
   const currentStable = stable?.documentId === documentId ? stable : null;
 
@@ -222,5 +258,7 @@ export function useCollaboration({
     status,
     saveStatus,
     presence,
+    connectionError,
+    retry,
   };
 }
