@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { TOKEN_COOKIE, authCookieOptions } from "@/lib/authCookie";
 
 const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:3001";
-const TOKEN_COOKIE = "wiki_token";
 
 export async function POST() {
   const cookieStore = await cookies();
@@ -17,11 +17,8 @@ export async function POST() {
 
   const response = NextResponse.json({ data: { loggedOut: true } });
   response.cookies.set(TOKEN_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...authCookieOptions(),
     maxAge: 0,
-    path: "/",
   });
   return response;
 }

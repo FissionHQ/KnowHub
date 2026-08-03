@@ -55,11 +55,13 @@ function extractTenantContext(
     throw new UnauthorizedError("Token missing required claims");
   }
 
-  // Verify subdomain matches token — prevents cross-org token reuse in multi-tenant hosting
-  const host = req.headers.host ?? "";
+  // Verify subdomain matches token — prevents cross-org token reuse in multi-tenant hosting.
+  // Skip for localhost and raw IP hosts (e.g. http://3.15.148.16:3000).
+  const host = (req.headers.host ?? "").split(":")[0] ?? "";
+  const isIpHost = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
   const subdomain = host.split(".")[0] ?? "";
 
-  if (baseDomain !== "localhost" && subdomain !== orgSlug) {
+  if (baseDomain !== "localhost" && !isIpHost && subdomain !== orgSlug) {
     throw new UnauthorizedError("Token org mismatch");
   }
 
