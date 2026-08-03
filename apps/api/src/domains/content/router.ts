@@ -47,7 +47,7 @@ import type { Redis } from "ioredis";
 const createDocSchema = z.object({
   spaceId: z.string().uuid(),
   parentId: z.string().uuid().optional(),
-  type: z.enum(["page", "pdf"]).default("page"),
+  type: z.enum(["page", "pdf", "pptx"]).default("page"),
   title: z.string().min(1).max(500),
   content: z.string().default(""),
   tags: z.array(z.string()).default([]),
@@ -274,9 +274,9 @@ export function createContentRouter(
 
     const docId = uuidv4();
     const docType = body.data.type;
-    // PDF attachment docs omit content; imported PDFs send converted HTML with type pdf.
+    // PDF/PPTX attachment docs omit content; imported files send converted HTML with the same type.
     const contentRef =
-      docType === "pdf"
+      docType === "pdf" || docType === "pptx"
         ? body.data.content || null
         : body.data.content || "";
     const slug = await allocateDocumentSlug(db, orgId, body.data.title, docId);

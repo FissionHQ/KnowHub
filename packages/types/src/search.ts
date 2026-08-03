@@ -4,7 +4,7 @@ export interface SearchIndexDocument {
   org_id: string;
   document_id: string;
   space_id: string;
-  type: "page" | "pdf";
+  type: "page" | "pdf" | "pptx";
   /** True for native pages and imported PDFs converted to editable HTML. */
   is_editable: boolean;
   title: string;

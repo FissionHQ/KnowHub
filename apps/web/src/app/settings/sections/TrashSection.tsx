@@ -77,12 +77,12 @@ export function TrashSection() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className={
-                      item.type === "pdf"
+                      item.type === "pdf" || item.type === "pptx"
                         ? "p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
                         : "p-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-primary dark:text-orange-400 shrink-0"
                     }
                   >
-                    {item.type === "pdf" ? <File size={16} /> : <FileText size={16} />}
+                    {item.type === "pdf" || item.type === "pptx" ? <File size={16} /> : <FileText size={16} />}
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">

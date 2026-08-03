@@ -13,6 +13,7 @@ import { attachments, recordAudit, syncDocumentSearchIndex } from "@wiki/db";
 import type { PdfProcessingMessage } from "@wiki/types";
 import { logger } from "./logger.js";
 import { VirusScanner } from "./virusScanner.js";
+import { extractPptText, extractPptxText } from "./officeTextExtract.js";
 
 export class PdfProcessor {
   private virusScanner: VirusScanner;
@@ -42,9 +43,12 @@ export class PdfProcessor {
       .set({ scanStatus: "scanning" })
       .where(eq(attachments.id, attachmentId));
 
-    let pdfText = "";
+    let extractedText = "";
     let fileBuffer: Buffer;
-    const isPdf = originalName.toLowerCase().endsWith(".pdf");
+    const lowerName = originalName.toLowerCase();
+    const isPdf = lowerName.endsWith(".pdf");
+    const isPptx = lowerName.endsWith(".pptx");
+    const isPpt = lowerName.endsWith(".ppt") && !isPptx;
 
     try {
       const obj = await this.s3.send(
@@ -86,9 +90,19 @@ export class PdfProcessor {
 
         try {
           const parsed = await pdfParse(fileBuffer);
-          pdfText = parsed.text;
+          extractedText = parsed.text;
         } catch (err) {
           logger.warn("PDF text extraction failed (continuing with empty text)", { err });
+        }
+      } else if (isPptx) {
+        extractedText = extractPptxText(fileBuffer);
+        if (!extractedText) {
+          logger.warn("PPTX text extraction returned empty (continuing)", { attachmentId });
+        }
+      } else if (isPpt) {
+        extractedText = extractPptText(fileBuffer);
+        if (!extractedText) {
+          logger.warn("PPT text extraction returned empty (continuing)", { attachmentId });
         }
       }
     } catch (err) {
@@ -118,7 +132,7 @@ export class PdfProcessor {
     );
 
     const thumbnailKey = `thumbnails/${orgId}/${attachmentId}.txt`;
-    const preview = pdfText.slice(0, 500).replace(/\s+/g, " ").trim();
+    const preview = extractedText.slice(0, 500).replace(/\s+/g, " ").trim();
     if (preview) {
       await this.s3.send(
         new PutObjectCommand({
@@ -140,9 +154,9 @@ export class PdfProcessor {
       .set({ scanStatus: "clean", s3Key: servedKey })
       .where(eq(attachments.id, attachmentId));
 
-    if (isPdf) {
+    if (isPdf || isPptx || isPpt) {
       await syncDocumentSearchIndex(this.db, documentId, orgId, "upsert", {
-        bodyOverride: pdfText,
+        bodyOverride: extractedText,
       });
     }
 

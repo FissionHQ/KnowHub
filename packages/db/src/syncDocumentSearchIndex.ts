@@ -72,8 +72,13 @@ export async function syncDocumentSearchIndex(
   const searchable = await resolveSearchIndexContent(db, doc);
   let body = opts?.bodyOverride ?? searchable.body;
 
-  // Attachment-backed PDFs: preserve extracted text when content resolver is empty.
-  if (!opts?.bodyOverride && doc.type === "pdf" && !doc.contentRef && !body.trim()) {
+  // Attachment-backed PDFs/PPTX: preserve extracted text when content resolver is empty.
+  if (
+    !opts?.bodyOverride &&
+    (doc.type === "pdf" || doc.type === "pptx") &&
+    !doc.contentRef &&
+    !body.trim()
+  ) {
     const existingBody = doc.searchBody;
     if (typeof existingBody === "string" && existingBody.trim()) {
       body = existingBody;

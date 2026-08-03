@@ -11,10 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowRight, MoreVertical, Upload, Clock, RefreshCw, Plus } from "lucide-react";
-import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
-import { PdfImportModal } from "@/components/PdfImportModal";
+import { importDocumentFile, importPdfAsViewer, importPptxAsViewer } from "@/lib/importDocument";
+import { FileImportModal, type ImportFileKind } from "@/components/FileImportModal";
 import { spacePath } from "@/lib/spacePath";
 import { useToast } from "@/components/ui/ToastProvider";
+
+function importKindForFile(file: File): ImportFileKind | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "pdf";
+  if (name.endsWith(".pptx") || name.endsWith(".ppt")) return "pptx";
+  return null;
+}
 
 export function SpacesList() {
   const router = useRouter();
@@ -63,7 +70,8 @@ export function SpacesList() {
   }
 
   async function handleFileUpload(spaceId: string, file: File) {
-    if (file.name.toLowerCase().endsWith(".pdf")) {
+    const kind = importKindForFile(file);
+    if (kind) {
       setPdfModalSpaceId(spaceId);
       setPdfModalFile(file);
       setMenuOpen(null);
@@ -89,7 +97,8 @@ export function SpacesList() {
     setPdfModalFile(null);
     try {
       const doc = await importDocumentFile(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const slug = slugById[spaceId] ?? spaceId;
+      router.push(`/spaces/${slug}/docs/${doc.slug}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -99,10 +108,15 @@ export function SpacesList() {
     if (!pdfModalFile) return;
     const spaceId = pdfModalSpaceId;
     const file = pdfModalFile;
+    const kind = importKindForFile(file);
     setPdfModalFile(null);
     try {
-      const doc = await importPdfAsViewer(spaceId, file);
-      router.push(`/spaces/${spaceId}/docs/${doc.id}`);
+      const doc =
+        kind === "pptx"
+          ? await importPptxAsViewer(spaceId, file)
+          : await importPdfAsViewer(spaceId, file);
+      const slug = slugById[spaceId] ?? spaceId;
+      router.push(`/spaces/${slug}/docs/${doc.slug}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -179,7 +193,7 @@ export function SpacesList() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.doc,.docx,.txt,.md"
+        accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
         className="hidden"
         onChange={handleFileChange}
       />
@@ -315,7 +329,8 @@ export function SpacesList() {
       </div>
 
       {pdfModalFile && typeof window !== "undefined" && (
-        <PdfImportModal
+        <FileImportModal
+          kind={importKindForFile(pdfModalFile) ?? "pdf"}
           fileName={pdfModalFile.name}
           onConvert={() => { void handlePdfConvert(); }}
           onAttach={() => { void handlePdfAttach(); }}

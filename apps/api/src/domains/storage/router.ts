@@ -113,7 +113,7 @@ export function createStorageRouter(
           QueueUrl: opts.pdfQueueUrl,
           MessageBody: JSON.stringify(msg),
         }),
-      ).catch(() => null);
+      );
 
       await recordAudit(db, {
         orgId,
@@ -194,7 +194,7 @@ export function createStorageRouter(
       };
       await sqs.send(
         new SendMessageCommand({ QueueUrl: opts.pdfQueueUrl, MessageBody: JSON.stringify(msg) }),
-      ).catch(() => null);
+      );
 
       res.status(202).json({ data: { attachmentId, status: "pending" } });
     },

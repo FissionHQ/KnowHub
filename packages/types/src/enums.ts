@@ -4,7 +4,7 @@ export type UserStatus = "active" | "invited" | "deactivated";
 
 export type AccessLevel = "view" | "edit";
 
-export type DocumentType = "page" | "pdf";
+export type DocumentType = "page" | "pdf" | "pptx";
 
 export type DocumentStatus = "draft" | "published" | "trashed";
 

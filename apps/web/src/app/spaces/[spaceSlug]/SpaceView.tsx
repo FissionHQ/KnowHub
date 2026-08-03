@@ -13,10 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FileText, Plus, File, ChevronRight } from "lucide-react";
 import clsx from "clsx";
-import { importDocumentFile, importPdfAsViewer } from "@/lib/importDocument";
+import { importDocumentFile, importPdfAsViewer, importPptxAsViewer } from "@/lib/importDocument";
 import { spaceDocPath, spacePath } from "@/lib/spacePath";
 import { SearchPanel } from "@/components/search/SearchPanel";
-import { PdfImportModal } from "@/components/PdfImportModal";
+import { FileImportModal, type ImportFileKind } from "@/components/FileImportModal";
 import { Pagination } from "@/components/ui/Pagination";
 import { SpaceGroupAccessPanel } from "@/components/SpaceGroupAccessPanel";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +25,13 @@ import { useToast } from "@/components/ui/ToastProvider";
 const PAGE_SIZE = 10;
 
 interface Props { spaceSlug: string }
+
+function importKindForFile(file: File): ImportFileKind | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "pdf";
+  if (name.endsWith(".pptx") || name.endsWith(".ppt")) return "pptx";
+  return null;
+}
 
 function formatDateTime(date: Date) {
   const d = new Date(date);
@@ -45,7 +52,7 @@ export function SpaceView({ spaceSlug }: Props) {
   const [, setImporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pdfModalFile, setPdfModalFile] = useState<File | null>(null);
+  const [importModalFile, setImportModalFile] = useState<File | null>(null);
 
   const { data: space, isLoading: spaceLoading } = useSWR<Space>(
     `space:${spaceSlug}`,
@@ -58,8 +65,9 @@ export function SpaceView({ spaceSlug }: Props) {
   );
 
   async function handleImport(file: File) {
-    if (file.name.toLowerCase().endsWith(".pdf")) {
-      setPdfModalFile(file);
+    const kind = importKindForFile(file);
+    if (kind) {
+      setImportModalFile(file);
       return;
     }
     if (!space) return;
@@ -74,25 +82,29 @@ export function SpaceView({ spaceSlug }: Props) {
     }
   }
 
-  async function handlePdfConvert() {
-    if (!pdfModalFile) return;
-    const file = pdfModalFile;
-    setPdfModalFile(null);
+  async function handleImportConvert() {
+    if (!importModalFile || !space) return;
+    const file = importModalFile;
+    setImportModalFile(null);
     try {
-      const doc = await importDocumentFile(space!.id, file);
-      router.push(spaceDocPath(space!, doc.slug));
+      const doc = await importDocumentFile(space.id, file);
+      router.push(spaceDocPath(space, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
   }
 
-  async function handlePdfAttach() {
-    if (!pdfModalFile) return;
-    const file = pdfModalFile;
-    setPdfModalFile(null);
+  async function handleImportAttach() {
+    if (!importModalFile || !space) return;
+    const file = importModalFile;
+    const kind = importKindForFile(file);
+    setImportModalFile(null);
     try {
-      const doc = await importPdfAsViewer(space!.id, file);
-      router.push(spaceDocPath(space!, doc.slug));
+      const doc =
+        kind === "pptx"
+          ? await importPptxAsViewer(space.id, file)
+          : await importPdfAsViewer(space.id, file);
+      router.push(spaceDocPath(space, doc.slug));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to import file");
     }
@@ -167,12 +179,16 @@ export function SpaceView({ spaceSlug }: Props) {
               </button>
               <div
                 className={
-                  doc.type === "pdf"
+                  doc.type === "pdf" || doc.type === "pptx"
                     ? "p-1 rounded-md bg-red-50 dark:bg-red-950/40 text-red-500 shrink-0"
                     : "p-1 rounded-md bg-orange-50 dark:bg-orange-950/40 text-primary shrink-0"
                 }
               >
-                {doc.type === "pdf" ? <File size={14} color="var(--primary)" /> : <FileText size={14} color="var(--primary)" />}
+                {doc.type === "pdf" || doc.type === "pptx" ? (
+                  <File size={14} color="var(--primary)" />
+                ) : (
+                  <FileText size={14} color="var(--primary)" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-foreground text-sm truncate group-hover:text-primary transition-colors">
@@ -245,7 +261,7 @@ export function SpaceView({ spaceSlug }: Props) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.txt,.md"
+              accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -345,12 +361,13 @@ export function SpaceView({ spaceSlug }: Props) {
         </>
       )}
 
-      {pdfModalFile && typeof window !== "undefined" && (
-        <PdfImportModal
-          fileName={pdfModalFile.name}
-          onConvert={() => { void handlePdfConvert(); }}
-          onAttach={() => { void handlePdfAttach(); }}
-          onCancel={() => setPdfModalFile(null)}
+      {importModalFile && typeof window !== "undefined" && (
+        <FileImportModal
+          kind={importKindForFile(importModalFile) ?? "pdf"}
+          fileName={importModalFile.name}
+          onConvert={() => { void handleImportConvert(); }}
+          onAttach={() => { void handleImportAttach(); }}
+          onCancel={() => setImportModalFile(null)}
         />
       )}
     </div>
