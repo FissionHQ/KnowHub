@@ -44,11 +44,9 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        # NEXT_PUBLIC_API_URL: http://api:3001
+        NEXT_PUBLIC_API_URL: http://api:3001
         # Browser-facing URL — must match the host you open in the browser (not localhost on remote deploy).
         NEXT_PUBLIC_COLLAB_WS_URL: ${NEXT_PUBLIC_COLLAB_WS_URL:-ws://localhost:3003}
-        NEXT_PUBLIC_API_URL: http://localhost:3001
-        # NEXT_PUBLIC_COLLAB_WS_URL: ws://localhost:3003
         NEXT_PUBLIC_A2UI_ENDPOINT: ${NEXT_PUBLIC_A2UI_ENDPOINT:-}
     environment:
       NEXT_PUBLIC_API_URL: http://api:3001

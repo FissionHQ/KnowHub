@@ -16,12 +16,6 @@ export function A2uiChat() {
   const show = !!URL_BASE && !loading && !!user && !PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
   const ref = useRef<HTMLElement & { getToken?: () => Promise<string | undefined> }>(null);
 
-//   <script type="module" src="http://localhost:4902/chat.js"></script>
-// <a2ui-chat app="know-hub" endpoint="http://localhost:4902"></a2ui-chat>
-// <script>
-//   // However your app keeps the signed-in user's token:
-//   document.querySelector('a2ui-chat').getToken = () => yourApp.currentUserToken();
-// </script>
   useEffect(() => {
     if (!URL_BASE || document.querySelector("script[data-a2ui]")) return;
     const s = document.createElement("script");
