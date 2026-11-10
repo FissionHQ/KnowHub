@@ -1,0 +1,1736 @@
+openapi: 3.0.3
+info:
+  title: KnowHub API
+  version: 1.0.0
+  description: 'KnowHub''s signed-in API. Responses are wrapped as {data: ...}; results only include what
+    the user may see. Login/logout/accept-invite are left out (they use cookies).'
+servers:
+- url: http://host.docker.internal:3001/api
+security:
+- bearer: []
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        role: &id003
+          type: string
+          description: 'What the person may do: admin (manages everything), member (reads and edits) or
+            viewer (read only).'
+          nullable: true
+        status:
+          type: string
+          description: e.g. active or invited
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    Group:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    Space:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        iconEmoji:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        accessLevel:
+          type: string
+          description: The signed-in user's access to this space
+          nullable: true
+      description: A top-level collection of documents.
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: true
+        spaceId:
+          type: string
+          format: uuid
+          nullable: true
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        ownerId:
+          type: string
+          nullable: true
+        ownerName:
+          type: string
+          nullable: true
+        status:
+          type: string
+          description: e.g. draft, published or trashed
+          nullable: true
+        version: &id001
+          type: integer
+          description: Days audit entries are kept, 30 to 3650.
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+        restrictDownload: &id002
+          type: boolean
+          description: true marks the comment thread as resolved.
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      description: A page or PDF stored in a space.
+    SearchHit:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+          nullable: true
+        spaceId:
+          type: string
+          format: uuid
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        preview:
+          type: string
+          description: Short matching excerpt
+          nullable: true
+        score:
+          type: number
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    SearchResult:
+      type: object
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+          nullable: true
+        total: *id001
+        page: *id001
+        size: *id001
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        documentId:
+          type: string
+          nullable: true
+        parentId:
+          type: string
+          nullable: true
+        authorName:
+          type: string
+          nullable: true
+        body:
+          type: string
+          nullable: true
+        resolved: *id002
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+    Permission:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        groupId:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          nullable: true
+        accessLevel: &id005
+          type: string
+          description: view lets the group or person read; edit lets them read and change.
+          nullable: true
+    Version:
+      type: object
+      properties:
+        versionNumber: *id001
+        title:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        authorName:
+          type: string
+          nullable: true
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        documentId:
+          type: string
+          nullable: true
+        fileName:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        sizeBytes: *id001
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        action:
+          type: string
+          nullable: true
+        actorId:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          nullable: true
+        target:
+          type: object
+          nullable: true
+    Org:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        branding:
+          type: object
+          nullable: true
+        maxFileSizeBytes: *id001
+        trashRetentionDays: *id001
+        auditRetentionDays: *id001
+    Invite:
+      type: object
+      properties:
+        userId:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        role: *id003
+        invitedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+paths:
+  /users/me:
+    get:
+      operationId: getMe
+      summary: The signed-in user
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+      description: The signed-in user. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+  /users:
+    get:
+      operationId: listUsers
+      summary: List people in the organisation
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+      description: List people in the organisation. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /users/invites:
+    get:
+      operationId: listInvites
+      summary: Pending invitations (admin only)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invite'
+      description: Pending invitations (admin only). Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /users/invite:
+    post:
+      operationId: inviteUser
+      summary: Invite a person (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: The person's email address, e.g. maya@company.com. Must be unique in the
+                    organisation.
+                name:
+                  type: string
+                  description: The display name, 1 to 200 characters (for a group, 1 to 100).
+                role: *id003
+                groupIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: The ids (UUIDs) of the groups the person joins on accepting; may be empty.
+              required:
+              - email
+              - name
+              - role
+              - groupIds
+      responses:
+        '201':
+          description: Created
+      description: Invite a person (admin only). Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /users/{userId}/resend-invite:
+    post:
+      operationId: resendInvite
+      summary: Resend an invitation (admin only)
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a person, as returned by listUsers.
+        description: The id (UUID) of a person, as returned by listUsers.
+      responses:
+        '200':
+          description: OK
+      description: Resend an invitation (admin only). Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /users/{userId}/role:
+    patch:
+      operationId: changeUserRole
+      summary: Change a user's role (admin only)
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a person, as returned by listUsers.
+        description: The id (UUID) of a person, as returned by listUsers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: *id003
+              required:
+              - role
+      responses:
+        '200':
+          description: OK
+      description: Change a user's role (admin only). Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /users/{userId}:
+    delete:
+      operationId: deleteUser
+      summary: Remove a user (admin only)
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a person, as returned by listUsers.
+        description: The id (UUID) of a person, as returned by listUsers.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deactivated: *id002
+      description: Remove a user (admin only). Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+  /groups:
+    get:
+      operationId: listGroups
+      summary: List groups
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Group'
+      description: Lists every group in the organisation. A group is a named set of people; spaces and
+        documents are shared with groups, so the list shows who access can be given to.
+    post:
+      operationId: createGroup
+      summary: Create a group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The display name, 1 to 200 characters (for a group, 1 to 100).
+                description:
+                  type: string
+                  description: Free text describing it, up to 500 characters (for a space, 1000).
+              required:
+              - name
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Group'
+      description: Create a group. Runs as the signed-in user, so it only works on what that person is
+        allowed to see or change.
+  /groups/memberships:
+    get:
+      operationId: listGroupMemberships
+      summary: Which users are in which groups
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+      description: Which users are in which groups. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /groups/{groupId}:
+    delete:
+      operationId: deleteGroup
+      summary: Delete a group
+      parameters:
+      - &id004
+        name: groupId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a group, as returned by listGroups.
+        description: The id (UUID) of a group, as returned by listGroups.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: *id002
+      description: Delete a group. Runs as the signed-in user, so it only works on what that person is
+        allowed to see or change.
+  /groups/{groupId}/members:
+    post:
+      operationId: addGroupMembers
+      summary: Add users to a group
+      parameters:
+      - *id004
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: The ids (UUIDs) of the people to add; at least one.
+              required:
+              - userIds
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      added: *id001
+      description: Add users to a group. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+  /groups/{groupId}/members/{userId}:
+    delete:
+      operationId: removeGroupMember
+      summary: Remove a user from a group
+      parameters:
+      - *id004
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a person, as returned by listUsers.
+        description: The id (UUID) of a person, as returned by listUsers.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      removed: *id002
+      description: Remove a user from a group. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+  /spaces:
+    get:
+      operationId: listSpaces
+      summary: List the spaces the user can open
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Space'
+      description: List the spaces the user can open. Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+    post:
+      operationId: createSpace
+      summary: Create a space
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The display name, 1 to 200 characters (for a group, 1 to 100).
+                description:
+                  type: string
+                  description: Free text describing it, up to 500 characters (for a space, 1000).
+                iconEmoji:
+                  type: string
+                  description: A single emoji shown beside the space, e.g. a book emoji.
+                groupPermissions: &id007
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      groupId:
+                        type: string
+                        format: uuid
+                        description: The id (UUID) of a group, as returned by listGroups.
+                      accessLevel: *id005
+                    required:
+                    - groupId
+                    - accessLevel
+                  description: 'Which groups can open the space and how: a list of {groupId, accessLevel},
+                    where accessLevel is view or edit. May be empty.'
+              required:
+              - name
+              - groupPermissions
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Space'
+      description: Create a space. Runs as the signed-in user, so it only works on what that person is
+        allowed to see or change.
+  /spaces/{spaceId}:
+    get:
+      operationId: getSpace
+      summary: Show one space
+      parameters:
+      - &id006
+        name: spaceId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a space, as returned by listSpaces.
+        description: The id (UUID) of a space, as returned by listSpaces.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Space'
+      description: Show one space. Runs as the signed-in user, so it only works on what that person is
+        allowed to see or change.
+    delete:
+      operationId: deleteSpace
+      summary: Delete a space
+      parameters:
+      - *id006
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: *id002
+      description: Delete a space. Runs as the signed-in user, so it only works on what that person is
+        allowed to see or change.
+  /spaces/{spaceId}/permissions:
+    get:
+      operationId: getSpacePermissions
+      summary: Which groups can open a space
+      parameters:
+      - *id006
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        groupId:
+                          type: string
+                          description: The id (UUID) of a group, as returned by listGroups.
+                        accessLevel: *id005
+      description: Which groups can open a space. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+    patch:
+      operationId: updateSpacePermissions
+      summary: Replace a space's group permissions
+      parameters:
+      - *id006
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                groupPermissions: *id007
+              required:
+              - groupPermissions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      spaceId:
+                        type: string
+                      groupPermissions:
+                        type: array
+                        items:
+                          type: object
+      description: Replace a space's group permissions. Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /spaces/{spaceId}/documents:
+    get:
+      operationId: listSpaceDocuments
+      summary: List the documents in a space
+      parameters:
+      - *id006
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+      description: List the documents in a space. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /documents:
+    post:
+      operationId: createDocument
+      summary: Create a document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                spaceId:
+                  type: string
+                  format: uuid
+                  description: The id (UUID) of a space, as returned by listSpaces.
+                parentId:
+                  type: string
+                  format: uuid
+                  description: The id (UUID) of the parent document or comment this sits under; leave
+                    out for top level.
+                type:
+                  type: string
+                  enum:
+                  - page
+                  - pdf
+                  description: page for a written page, pdf for an uploaded PDF. Default page.
+                title:
+                  type: string
+                  description: The document title, 1 to 500 characters.
+                content:
+                  type: string
+                  description: The page body as HTML. Default empty.
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Comma-separated tag names; documents carrying any of them are returned,
+                    e.g. onboarding,hr.
+              required:
+              - spaceId
+              - title
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Document'
+      description: Create a document. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+  /documents/{documentId}:
+    get:
+      operationId: getDocument
+      summary: Show one document
+      parameters:
+      - &id008
+        name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a document, as returned by listSpaceDocuments, searchDocuments
+            or getDocument.
+        description: The id (UUID) of a document, as returned by listSpaceDocuments, searchDocuments or
+          getDocument.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Document'
+      description: Show one document. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+    patch:
+      operationId: updateDocument
+      summary: Edit or publish a document
+      parameters:
+      - *id008
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: The document title, 1 to 500 characters.
+                content:
+                  type: string
+                  description: The page body as HTML. Default empty.
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Comma-separated tag names; documents carrying any of them are returned,
+                    e.g. onboarding,hr.
+                status:
+                  type: string
+                  enum:
+                  - draft
+                  - published
+                  description: draft (not visible to others yet) or published.
+                restrictDownload: *id002
+                visibility:
+                  type: string
+                  enum:
+                  - inherit
+                  - restricted
+                  description: inherit uses the space's permissions; restricted uses only the document's
+                    own permissions.
+                publish: *id002
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Document'
+      description: Edit or publish a document. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+    delete:
+      operationId: trashDocument
+      summary: Move a document to the trash
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      trashed: *id002
+      description: Move a document to the trash. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /documents/{documentId}/restore:
+    post:
+      operationId: restoreDocument
+      summary: Restore a document from the trash
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Document'
+      description: Restore a document from the trash. Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /documents/{documentId}/discard-draft:
+    post:
+      operationId: discardDraft
+      summary: Discard unpublished changes
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+      description: Discard unpublished changes. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+  /trash:
+    get:
+      operationId: listTrash
+      summary: List trashed documents (admin only)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+      description: List trashed documents (admin only). Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /documents/{documentId}/versions:
+    get:
+      operationId: listVersions
+      summary: Version history of a document
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Version'
+      description: Version history of a document. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /documents/{documentId}/versions/{versionNumber}/restore:
+    post:
+      operationId: restoreVersion
+      summary: Restore an older version
+      parameters:
+      - *id008
+      - name: versionNumber
+        in: path
+        required: true
+        schema: *id001
+        description: The version number of a document, starting at 1, as returned by listVersions.
+      responses:
+        '200':
+          description: OK
+      description: Restore an older version. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+  /documents/{documentId}/permissions:
+    get:
+      operationId: listDocumentPermissions
+      summary: Who has access to a document
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Permission'
+      description: Who has access to a document. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+    post:
+      operationId: addDocumentPermission
+      summary: Give a group or user access (exactly one of groupId, userId)
+      parameters:
+      - *id008
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                groupId:
+                  type: string
+                  format: uuid
+                  description: The id (UUID) of a group, as returned by listGroups.
+                userId:
+                  type: string
+                  format: uuid
+                  description: The id (UUID) of a person, as returned by listUsers.
+                accessLevel: *id005
+              required:
+              - accessLevel
+      responses:
+        '200':
+          description: OK
+      description: Give a group or user access (exactly one of groupId, userId). Runs as the signed-in
+        user, so it only works on what that person is allowed to see or change.
+  /documents/{documentId}/permissions/{permissionId}:
+    patch:
+      operationId: updateDocumentPermission
+      summary: Change an access level
+      parameters:
+      - *id008
+      - name: permissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id of a permission grant, as returned by listDocumentPermissions.
+        description: The id of a permission grant, as returned by listDocumentPermissions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accessLevel: *id005
+              required:
+              - accessLevel
+      responses:
+        '200':
+          description: OK
+      description: Change an access level. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+    delete:
+      operationId: removeDocumentPermission
+      summary: Remove an access grant
+      parameters:
+      - *id008
+      - name: permissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id of a permission grant, as returned by listDocumentPermissions.
+        description: The id of a permission grant, as returned by listDocumentPermissions.
+      responses:
+        '200':
+          description: OK
+      description: Remove an access grant. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+  /documents/{documentId}/comments:
+    get:
+      operationId: listDocumentComments
+      summary: Comments on a document
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+      description: Comments on a document. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+    post:
+      operationId: addComment
+      summary: Add a comment or reply
+      parameters:
+      - *id008
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                  description: The comment text, 1 to 10000 characters.
+                parentId:
+                  type: string
+                  format: uuid
+                  description: The id (UUID) of the parent document or comment this sits under; leave
+                    out for top level.
+              required:
+              - body
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+      description: Add a comment or reply. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+  /documents/{documentId}/comments/{commentId}:
+    patch:
+      operationId: updateComment
+      summary: Edit or resolve a comment
+      parameters:
+      - *id008
+      - &id009
+        name: commentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id of a comment, as returned by listDocumentComments.
+        description: The id of a comment, as returned by listDocumentComments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                  description: The comment text, 1 to 10000 characters.
+                resolved: *id002
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+      description: Edit or resolve a comment. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+    delete:
+      operationId: deleteComment
+      summary: Delete a comment
+      parameters:
+      - *id008
+      - *id009
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted: *id002
+      description: Delete a comment. Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
+  /search:
+    get:
+      operationId: searchDocuments
+      summary: Search documents by words, space, type, author, tag or date
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: The words to look for in titles and text. Required for suggestions; optional for
+          search when another filter is given.
+        schema:
+          type: string
+          description: The words to look for in titles and text. Required for suggestions; optional for
+            search when another filter is given.
+      - name: spaceId
+        in: query
+        required: false
+        description: The id (UUID) of a space, as returned by listSpaces.
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a space, as returned by listSpaces.
+      - name: type
+        in: query
+        required: false
+        description: page for a written page, pdf for an uploaded PDF. Default page.
+        schema:
+          type: string
+          enum:
+          - page
+          - pdf
+          description: page for a written page, pdf for an uploaded PDF. Default page.
+      - name: authorId
+        in: query
+        required: false
+        description: Only by this user
+        schema:
+          type: string
+          format: uuid
+      - name: tags
+        in: query
+        required: false
+        description: Comma-separated tag names; documents carrying any of them are returned, e.g. onboarding,hr.
+        schema:
+          type: string
+          description: Comma-separated tag names; documents carrying any of them are returned, e.g. onboarding,hr.
+      - name: from
+        in: query
+        required: false
+        description: Only items on or after this date and time (ISO 8601, e.g. 2026-01-31).
+        schema:
+          type: string
+          description: Only items on or after this date and time (ISO 8601, e.g. 2026-01-31).
+      - name: to
+        in: query
+        required: false
+        description: Only items on or before this date and time (ISO 8601, e.g. 2026-01-31).
+        schema:
+          type: string
+          description: Only items on or before this date and time (ISO 8601, e.g. 2026-01-31).
+      - name: page
+        in: query
+        required: false
+        schema: *id001
+        description: Page number of the results, starting at 1. Default 1.
+      - name: size
+        in: query
+        required: false
+        description: How many results per page, from 1 to 100. Default 20.
+        schema: *id001
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SearchResult'
+      description: Search documents by words, space, type, author, tag or date. Runs as the signed-in
+        user, so it only works on what that person is allowed to see or change.
+  /search/suggest:
+    get:
+      operationId: suggestTitles
+      summary: Title suggestions while typing
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          description: The words to look for in titles and text. Required for suggestions; optional for
+            search when another filter is given.
+        description: The words to look for in titles and text. Required for suggestions; optional for
+          search when another filter is given.
+      - name: spaceId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+          description: The id (UUID) of a space, as returned by listSpaces.
+        description: The id (UUID) of a space, as returned by listSpaces.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+      description: Title suggestions while typing. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /documents/{documentId}/view:
+    post:
+      operationId: recordView
+      summary: Mark a document as recently viewed
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      recorded: *id002
+      description: Mark a document as recently viewed. Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /documents/{documentId}/favorite:
+    get:
+      operationId: isFavorite
+      summary: Is this document a favourite?
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      favorited: *id002
+      description: Is this document a favourite?. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+    post:
+      operationId: toggleFavorite
+      summary: Add or remove a favourite
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      favorited: *id002
+      description: Add or remove a favourite. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+  /users/me/recent:
+    get:
+      operationId: listRecentlyViewed
+      summary: Documents the user opened recently
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+      description: Documents the user opened recently. Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /users/me/recently-updated:
+    get:
+      operationId: listRecentlyEdited
+      summary: Documents the user edited recently
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+      description: Documents the user edited recently. Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+  /users/me/favorites:
+    get:
+      operationId: listFavorites
+      summary: The user's favourite documents
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+      description: The user's favourite documents. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /documents/{documentId}/attachments:
+    get:
+      operationId: listAttachments
+      summary: Attachments of a document
+      parameters:
+      - *id008
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
+      description: Attachments of a document. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+    post:
+      operationId: uploadAttachment
+      summary: Upload a file to a document
+      parameters:
+      - *id008
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      attachmentId:
+                        type: string
+                      status:
+                        type: string
+      description: Upload a file to a document. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+  /documents/{documentId}/attachments/replace:
+    post:
+      operationId: replaceAttachment
+      summary: Replace a document's file
+      parameters:
+      - *id008
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      attachmentId:
+                        type: string
+                      status:
+                        type: string
+      description: Replace a document's file. Runs as the signed-in user, so it only works on what that
+        person is allowed to see or change.
+  /attachments/{attachmentId}/status:
+    get:
+      operationId: getAttachmentStatus
+      summary: Virus-scan and processing status
+      parameters:
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id of an attachment, as returned by listAttachments.
+        description: The id of an attachment, as returned by listAttachments.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        description: draft (not visible to others yet) or published.
+      description: Virus-scan and processing status. Runs as the signed-in user, so it only works on what
+        that person is allowed to see or change.
+  /attachments/{attachmentId}/view:
+    get:
+      operationId: viewAttachment
+      summary: Open an attachment
+      parameters:
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          description: The id of an attachment, as returned by listAttachments.
+        description: The id of an attachment, as returned by listAttachments.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        description: Temporary address of the file
+                      expiresIn: *id001
+      description: Returns a temporary address (url) the file can be opened from, and how many seconds
+        it stays valid.
+  /admin/settings:
+    get:
+      operationId: getOrgSettings
+      summary: Organisation settings (admin only)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Org'
+      description: Organisation settings (admin only). Runs as the signed-in user, so it only works on
+        what that person is allowed to see or change.
+    patch:
+      operationId: updateOrgSettings
+      summary: Change organisation settings (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: The display name, 1 to 200 characters (for a group, 1 to 100).
+                branding:
+                  type: object
+                  properties:
+                    logoUrl:
+                      type: string
+                      format: uri
+                    primaryColor:
+                      type: string
+                      description: '#RRGGBB'
+                  description: 'Look of the organisation: logoUrl (an https address) and primaryColor
+                    (hex, e.g. #1a73e8).'
+                maxFileSizeBytes: *id001
+                trashRetentionDays: *id001
+                auditRetentionDays: *id001
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Org'
+      description: Change organisation settings (admin only). Runs as the signed-in user, so it only works
+        on what that person is allowed to see or change.
+  /admin/audit-log:
+    get:
+      operationId: listAuditLog
+      summary: Audit log (admin only)
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: How many entries to return, from 1 to 200. Default 50.
+        schema: *id001
+      - name: offset
+        in: query
+        required: false
+        schema: *id001
+        description: How many entries to skip, for paging. Default 0.
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Only entries of this kind of action, as written in the log, e.g. document.created.
+        description: Only entries of this kind of action, as written in the log, e.g. document.created.
+      - name: actorId
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Only entries caused by this person (a user id, UUID).
+        description: Only entries caused by this person (a user id, UUID).
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Only items on or after this date and time (ISO 8601, e.g. 2026-01-31).
+        description: Only items on or after this date and time (ISO 8601, e.g. 2026-01-31).
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Only items on or before this date and time (ISO 8601, e.g. 2026-01-31).
+        description: Only items on or before this date and time (ISO 8601, e.g. 2026-01-31).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEntry'
+      description: Audit log (admin only). Runs as the signed-in user, so it only works on what that person
+        is allowed to see or change.
